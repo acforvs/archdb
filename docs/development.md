@@ -16,7 +16,9 @@ store persists across deploys; identical views reuse a link. Share first checks 
 the full configuration hash. Successful lookups use Netlify's durable CDN cache, shared by visitors;
 missing lookups are not cached. Only configurations not found in storage need a creation request.
 Each browser tab also remembers up to 200 results. Cache misses, including after invalidation or
-expiry, still invoke a function. Creation is limited to 30 requests per minute per IP.
+expiry, still invoke a function. Creation is limited to 30 requests per minute per IP;
+lookups and short-link redirects each allow 120. These limits reduce abuse from one IP
+but do not cap total usage across visitors.
 Existing links and static hosting work without this service; the share dialog can
 also copy a full URL. To test short links locally, run `netlify dev --dir site` after building.
 

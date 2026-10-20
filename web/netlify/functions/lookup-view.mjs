@@ -3,4 +3,7 @@ import { lookupView } from "../lib/shared-views.mjs";
 
 export default (request) => lookupView(request, getStore({ name: "shared-views-v1", consistency: "strong" }));
 
-export const config = { path: "/api/views/:digest" };
+export const config = {
+  path: "/api/views/:digest",
+  rateLimit: { windowLimit: 120, windowSize: 60, aggregateBy: ["ip", "domain"] },
+};

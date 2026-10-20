@@ -20,6 +20,7 @@ FORBIDDEN = {
 PATTERNS = {
     "private key": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"),
     "GitHub token": re.compile(rb"\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})\b"),
+    "Netlify token": re.compile(rb"\bnfp_[A-Za-z0-9_-]{20,}\b"),
     "Hugging Face token": re.compile(rb"\bhf_[A-Za-z0-9]{30,}\b"),
     "OpenAI token": re.compile(rb"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{40,}\b"),
     "AWS key": re.compile(rb"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
@@ -28,6 +29,10 @@ PATTERNS = {
     "credential assignment": re.compile(
         rb"""(?m)^\s*(?:export\s+)?[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY)[A-Z0-9_]*\s*=\s*["']?[A-Za-z0-9_./+-]{16,}"""
     ),
+    "JSON credential": re.compile(
+        rb"""(?i)["'](?:auth_token|access_token|api_key|client_secret|password|netlify_auth_token|github_token|refresh_token)["']\s*:\s*["'][^"'\s]{16,}["']"""
+    ),
+    "JWT": re.compile(rb"\beyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\b"),
 }
 
 
