@@ -245,12 +245,14 @@ test("the explorer, directory and model pages share the saved theme", async () =
     await toggle.click();
     assert.equal(await page.evaluate(() => localStorage.getItem("theme")), "light");
     await page.getByRole("link", { name: "All models", exact: true }).click();
+    await page.waitForURL(new URL("/models/", baseURL).href);
     assert.equal(await page.locator(".masthead").innerText(), header);
     assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily), font);
     assert.equal(await page.getByRole("link", { name: "All models", exact: true }).getAttribute("aria-current"), "page");
     assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
     assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(247, 247, 245)");
     await page.getByRole("link", { name: "DeepSeek-V3-Base", exact: true }).click();
+    await page.waitForURL(new URL("/models/deepseek-v3/", baseURL).href);
     assert.equal(await page.locator(".masthead").innerText(), header);
     assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
     await toggle.click();
