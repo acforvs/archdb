@@ -1,0 +1,797 @@
+# Field registry. Every fact in data/models/*.yaml must use a key defined here.
+#
+# type: int | float | str | bool | list | date
+# unit: params | tokens | layers | elements | count | ratio | lr | bytes (omitted for text/bool)
+# required: <condition> means the record must state the field or list it under not_disclosed;
+#   conditions are defined in archdb/data.py (always, moe, swa, mla, mtp, ...).
+# derived: true means the value is computed by archdb/derive.py and must not be authored.
+
+groups:
+  meta: Release
+  params: Parameters
+  shape: Shape
+  attn: Attention
+  ffn: Feed-forward
+  moe: Mixture of experts
+  mtp: Multi-token prediction
+  norm: Normalization and stability
+  ctx: Context length
+  train: Pretraining recipe
+  scaling: Scaling & HP transfer
+  kv: KV cache
+  eval: Evaluations
+
+fields:
+  # --- meta ------------------------------------------------------------------
+  meta.released:
+    type: date
+    required: always
+    label: Released
+    definition: Date the weights (or, if earlier, the technical report) were first made public, YYYY-MM-DD, as dated by the publisher. A Hugging Face repository creation date is used only when no dated publisher page exists, with a note.
+
+  meta.license:
+    type: str
+    required: open_weights
+    label: License
+    definition: License of the released weights as declared by the publisher (model card metadata or license file), e.g. apache-2.0, mit, or the name of a custom license.
+
+  # --- params ----------------------------------------------------------------
+  params.total:
+    type: float
+    required: always
+    unit: params
+    label: Reported total params
+    definition: Total parameter count as reported by the publisher. See params.note for whether embeddings, MTP heads or vision towers are included.
+  params.active:
+    type: float
+    required: always
+    unit: params
+    label: Reported active params
+    definition: Parameters used per token in the forward pass, as reported by the publisher.
+  params.active_prefill:
+    type: float
+    unit: params
+    label: Active params (prefill)
+    aliases: [YOCO, prefill]
+    definition: Parameters used per prompt token during prefill when the publisher states it differs from decode (e.g. YOCO-style designs that skip the upper half of the stack).
+  params.active_non_embedding:
+    type: float
+    unit: params
+    required: always
+    label: Active non-embedding (stated)
+    aliases: [non-embedding, Kaplan N]
+    definition: Active parameters excluding the input embedding and the output head (unembedding). Stated by the publisher, or computed from params.active by subtracting vocab × d_model for each of the embedding and output head that params.active is stated to include (basis inferred, note with the arithmetic). Not disclosed when the scope of params.active is not stated.
+  params.counted_total:
+    type: float
+    unit: params
+    label: Counted total params
+    aliases: [checkpoint, safetensors]
+    derived: true
+    definition: Parameters of the text backbone counted from the released checkpoint's safetensors headers (embedding, output head, all experts and other weights; excluding MTP modules, vision/audio towers and n-gram lookup tables). Shown only when the counts reproduce the publisher's stated total and active parameters within 5% under some scope.
+  params.counted_embedding:
+    type: float
+    unit: params
+    label: Counted embedding + head
+    derived: true
+    definition: Input embedding plus output head (once if tied), counted from the checkpoint.
+  params.counted_lookup:
+    type: float
+    unit: params
+    label: Counted lookup tables
+    aliases: [ngram, engram, n-gram, per-layer embedding]
+    derived: true
+    definition: Parameters in n-gram / Engram / per-layer embedding tables counted from the checkpoint. Like the token embedding, they are lookups and are excluded from params.counted_total and params.counted_active_non_embedding.
+  params.counted_active_non_embedding:
+    type: float
+    unit: params
+    label: Counted active params (non-embedding)
+    aliases: [non-embedding, Kaplan N, checkpoint]
+    derived: true
+    definition: Active parameters per token excluding the input embedding and output head, counted from the checkpoint as all non-expert weights plus routed-expert weights × top_k / experts. Same validation as params.counted_total.
+  params.note:
+    type: str
+    label: Counting scope
+    definition: What the publisher's counts include or exclude (MTP modules, embeddings, vision encoder, n-gram tables).
+  params.embedding:
+    type: float
+    unit: params
+    label: Embedding params
+    definition: Parameters in input embedding and output head, as reported.
+  params.non_embedding:
+    type: float
+    unit: params
+    label: Non-embedding params
+    definition: Parameters excluding embedding and output head, as reported.
+
+  # --- shape -----------------------------------------------------------------
+  shape.layers:
+    type: int
+    required: always
+    unit: layers
+    label: Layers
+    definition: Number of transformer blocks in the main backbone (attention or token mixer plus FFN), excluding MTP modules.
+  shape.d_model:
+    type: int
+    required: always
+    unit: elements
+    label: d_model
+    definition: Residual stream width.
+  shape.vocab:
+    type: int
+    required: always
+    unit: count
+    label: Vocab
+    definition: Embedding table rows (vocab_size in config, may include padding).
+  shape.tied_embeddings:
+    type: bool
+    required: always
+    label: Tied embeddings
+    definition: Input embedding and output head share weights.
+  shape.memory:
+    type: str
+    label: Lookup memory
+    definition: Hashed n-gram or conditional-memory tables outside the dense backbone (Engram, n-gram embeddings), with size and placement.
+  shape.tokenizer:
+    type: str
+    label: Tokenizer
+    definition: Tokenizer type and lineage as described by the publisher (e.g. byte-level BPE shared with an earlier model).
+  shape.aspect:
+    type: float
+    unit: ratio
+    label: d_model / layers
+    aliases: [aspect ratio, width depth]
+    derived: true
+    definition: Width-to-depth ratio, d_model divided by the number of blocks.
+
+  # --- attention -------------------------------------------------------------
+  attn.kind:
+    type: str
+    required: always
+    label: Token mixers
+    definition: "Token-mixing layer types in the backbone, e.g. GQA, MLA, SWA, Gated DeltaNet, Mamba-2, DSA (DeepSeek sparse attention)."
+  attn.layout:
+    type: str
+    required: hybrid
+    label: Layer layout
+    definition: "Interleaving of mixer types, written as a repeating unit, e.g. '3 GDN : 1 GQA' or '5 SWA : 1 global'."
+  attn.global_layers:
+    type: int
+    required: always
+    unit: layers
+    label: Global-attention layers
+    definition: Layers whose KV cache grows with full context (dense or sparse global attention, MLA). Excludes sliding-window and linear/recurrent layers.
+  attn.swa_ratio:
+    type: float
+    unit: ratio
+    label: "SWA : global"
+    aliases: [interleave, pattern, local global ratio]
+    derived: true
+    definition: "attn.local_layers divided by attn.global_layers, the sliding-window to global interleave ratio (5 for '5 SWA : 1 global')."
+  attn.linear_ratio:
+    type: float
+    unit: ratio
+    label: "Linear : global"
+    aliases: [hybrid ratio, interleave, pattern]
+    derived: true
+    definition: "attn.linear_layers divided by attn.global_layers (3 for '3 Gated DeltaNet : 1 GQA')."
+  attn.local_layers:
+    type: int
+    required: swa_kind
+    unit: layers
+    label: Sliding-window layers
+    definition: Layers with a fixed attention window.
+  attn.linear_layers:
+    type: int
+    required: linear_kind
+    unit: layers
+    label: Linear / SSM layers
+    definition: Layers with a fixed-size recurrent state (linear attention, DeltaNet variants, Mamba).
+  attn.heads:
+    type: int
+    required: always
+    unit: count
+    label: Query heads
+    definition: Query heads in the global-attention layers.
+  attn.kv_heads:
+    type: int
+    required: gqa
+    unit: count
+    label: KV heads
+    definition: Key/value heads in the global-attention layers. Not applicable to MLA, whose cache is a shared latent.
+  attn.qk_width:
+    type: int
+    unit: elements
+    label: Heads × head dim
+    derived: true
+    definition: attn.heads × attn.head_dim, the query projection width of global layers.
+  attn.group_size:
+    type: float
+    unit: ratio
+    label: Q heads / KV head
+    aliases: [GQA ratio, grouping]
+    derived: true
+    definition: attn.heads divided by attn.kv_heads in global layers.
+  attn.head_dim:
+    type: int
+    required: always
+    unit: elements
+    label: QK head dim
+    definition: Query/key dimension per head in global-attention layers (for MLA, nope + rope dims).
+  attn.v_head_dim:
+    type: int
+    required: mla
+    unit: elements
+    label: V head dim
+    definition: Value dimension per head in global layers (MLA v_head_dim; stated for MLA even when equal to the QK head dim).
+  attn.window:
+    type: int
+    required: swa
+    unit: tokens
+    label: Window
+    definition: Sliding-window size of the local layers.
+  attn.long_window_layers:
+    type: int
+    unit: layers
+    label: Long-window SWA layers
+    definition: Sliding-window layers (counted in attn.local_layers) that use attn.long_window instead of attn.window.
+  attn.long_window:
+    type: int
+    unit: tokens
+    label: Long window
+    definition: Window of the attn.long_window_layers.
+  attn.local_kv_heads:
+    type: int
+    required: swa
+    unit: count
+    label: SWA KV heads
+    definition: KV heads in sliding-window layers (stated even when equal to attn.kv_heads).
+  attn.local_heads:
+    type: int
+    required: swa
+    unit: count
+    label: SWA query heads
+    definition: Query heads in sliding-window layers (stated even when equal to attn.heads).
+  attn.local_head_dim:
+    type: int
+    required: swa
+    unit: elements
+    label: SWA head dim
+    definition: Head dimension (K and V) in sliding-window layers (stated even when equal to attn.head_dim).
+  attn.kv_lora_rank:
+    type: int
+    required: mla
+    unit: elements
+    label: MLA KV latent
+    definition: Width of the compressed KV latent that MLA caches per token per layer.
+  attn.q_lora_rank:
+    type: int
+    required: mla
+    unit: elements
+    label: MLA Q latent
+    definition: Width of the low-rank query projection in MLA; 0 when queries use a full-rank projection.
+  attn.rope_dim:
+    type: int
+    required: mla
+    unit: elements
+    label: Decoupled RoPE dim
+    definition: Width of the shared positional key that MLA caches next to the latent.
+  attn.position:
+    type: str
+    required: always
+    label: Positional encoding
+    definition: "Positional scheme in global layers: RoPE, partial RoPE, NoPE, or mixed per layer type."
+  attn.rope_theta:
+    type: float
+    required: rope
+    label: RoPE base
+    definition: RoPE base frequency of the global layers at release.
+  attn.local_rope_theta:
+    type: float
+    required: swa_rope
+    label: SWA RoPE base
+    definition: RoPE base frequency of the sliding-window layers (stated even when equal to attn.rope_theta).
+  attn.rope_fraction:
+    type: float
+    unit: ratio
+    label: Rotary fraction
+    definition: Fraction of each head's QK dimensions that are rotated.
+  attn.qk_norm:
+    type: bool
+    required: always
+    label: QK norm
+    definition: Queries and keys are normalized per head before the dot product.
+  attn.gate:
+    type: str
+    label: Output gate
+    definition: Gate applied to the attention output before the output projection, with its placement.
+  attn.softcap:
+    type: float
+    label: Attention logit softcap
+    definition: tanh soft-capping value applied to attention logits.
+  attn.sparse:
+    type: str
+    label: Sparse attention
+    definition: Token-selection mechanism inside global layers, e.g. DSA lightning indexer with top-k.
+  attn.scale:
+    type: str
+    label: Attention scaling
+    definition: Query-key scaling when it is not 1/sqrt(head_dim), e.g. query_pre_attn_scalar, length-dependent (SSMax-style) scaling, or value scaling.
+  attn.sinks:
+    type: str
+    label: Attention sinks
+    definition: Learned sink logits or sink bias in the softmax, with the layer types that use them.
+  attn.bias:
+    type: bool
+    required: always
+    label: QKV bias
+    definition: Query/key/value projections have bias terms.
+  attn.linear_kind:
+    type: str
+    required: linear
+    label: Linear-mixer details
+    definition: Configuration of the linear / SSM layers (e.g. Gated DeltaNet heads and dims, Mamba-2 state size), as one string.
+  attn.linear_heads:
+    type: int
+    required: linear
+    unit: count
+    label: Linear-mixer heads
+    definition: Value heads (or SSM heads) in the linear / SSM layers.
+  attn.linear_head_dim:
+    type: int
+    required: linear
+    unit: elements
+    label: Linear-mixer head dim
+    definition: Head dimension of the linear / SSM layers (value head dim for DeltaNet variants, head_dim for Mamba-2).
+  attn.indexer_dim:
+    type: int
+    required: dsa
+    unit: elements
+    label: Indexer key dim
+    definition: Width of the sparse-attention indexer key cached per token in each global layer (DSA lightning indexer), counted in the KV cache.
+  attn.kv_sharing:
+    type: str
+    label: Cross-layer KV sharing
+    definition: Layers that reuse another layer's KV cache instead of computing their own (YOCO-style, cross-layer attention), and which layers own caches.
+  attn.kv_groups:
+    type: list
+    items: [name, layers, elements, tokens_per_entry, window, note, quote]
+    label: KV cache groups
+    definition: "Explicit KV cache description for designs the standard formula cannot express (compressed or shared caches). Each item: name, layers (layers owning this cache), elements (scalars per cache entry, K and V together), tokens_per_entry (compression ratio, 1 if none), window (entries kept, for sliding windows), quote. When present, KV fields are computed from it."
+  attn.conv:
+    type: int
+    unit: elements
+    label: Short conv kernel
+    definition: Kernel size of the causal short convolution in linear / SSM layers or attention projections.
+
+  # --- ffn -------------------------------------------------------------------
+  ffn.activation:
+    type: str
+    required: always
+    label: Activation
+    aliases: [SwiGLU, GeLU, nonlinearity]
+    definition: FFN activation (SwiGLU, GeGLU, ...).
+  ffn.dim:
+    type: int
+    required: dense_ffn
+    unit: elements
+    label: Dense FFN dim
+    definition: Intermediate width of the dense FFN layers that are actually executed.
+  ffn.clamp:
+    type: str
+    label: Activation clamp
+    definition: Clamping of GLU gate / up activations (e.g. SwiGLU limit 7), with the layers it applies to.
+  ffn.bias:
+    type: bool
+    label: FFN bias
+    definition: FFN projections have bias terms.
+  ffn.mult:
+    type: float
+    unit: ratio
+    label: Dense FFN / d_model
+    derived: true
+    definition: ffn.dim divided by shape.d_model.
+
+  # --- moe -------------------------------------------------------------------
+  moe.experts:
+    type: int
+    required: moe
+    unit: count
+    label: Routed experts
+    definition: Routed experts per MoE layer.
+  moe.top_k:
+    type: int
+    required: moe
+    unit: count
+    label: Experts per token
+    definition: Routed experts selected per token.
+  moe.shared:
+    type: int
+    required: moe
+    unit: count
+    label: Shared experts
+    definition: Always-on experts per MoE layer.
+  moe.expert_dim:
+    type: int
+    required: moe
+    unit: elements
+    label: Expert dim
+    definition: Intermediate width of one routed expert.
+  moe.shared_dim:
+    type: int
+    required: shared_experts
+    unit: elements
+    label: Shared expert dim
+    definition: Total intermediate width of the shared expert(s).
+  moe.dense_layers:
+    type: int
+    required: moe
+    unit: layers
+    label: Leading dense layers
+    definition: Number of initial blocks that use a dense FFN instead of MoE.
+  moe.router:
+    type: str
+    required: moe
+    label: Router score
+    definition: Gating function over expert logits (softmax, sigmoid).
+  moe.balancing:
+    type: str
+    required: moe
+    label: Load balancing
+    definition: Load-balancing method, with coefficients where disclosed.
+  moe.routed_scale:
+    type: float
+    label: Routed scaling factor
+    definition: Multiplier applied to the combined routed-expert output (routed_scaling_factor).
+  moe.norm_topk:
+    type: bool
+    required: moe
+    label: Renormalize top-k
+    definition: Selected expert weights are renormalized to sum to 1.
+  moe.groups:
+    type: str
+    label: Group-limited routing
+    definition: Expert groups and groups selected per token, or node-limited routing, when used.
+  moe.latent_dim:
+    type: int
+    unit: elements
+    label: Expert latent dim
+    definition: Width of the projected space routed experts operate in (LatentMoE), when smaller than d_model.
+  moe.latent_ratio:
+    type: float
+    unit: ratio
+    label: Latent compression α (d_model / latent)
+    aliases: [alpha, α, LatentMoE]
+    derived: true
+    definition: shape.d_model divided by moe.latent_dim, how much LatentMoE compresses the hidden state before routed experts.
+  moe.granularity:
+    type: float
+    unit: ratio
+    label: Expert dim / d_model
+    derived: true
+    definition: moe.expert_dim divided by shape.d_model.
+  moe.sparsity:
+    type: float
+    unit: ratio
+    label: Sparsity (experts / top-k)
+    aliases: [sparsity, expert ratio]
+    derived: true
+    definition: Routed experts divided by experts selected per token.
+  moe.active_fraction:
+    type: float
+    unit: ratio
+    label: Active / total
+    derived: true
+    definition: params.active divided by params.total.
+
+  # --- mtp -------------------------------------------------------------------
+  mtp.depth:
+    type: int
+    required: always
+    unit: count
+    label: MTP depth
+    aliases: [multi-token prediction, nextn]
+    definition: Additional future tokens predicted during pretraining (0 when the model was trained without MTP).
+  mtp.modules:
+    type: int
+    required: mtp
+    unit: count
+    label: MTP modules
+    definition: MTP modules with distinct weights. 1 with mtp.depth > 1 means one module is applied recursively.
+  mtp.block:
+    type: str
+    label: MTP module
+    definition: Contents of one MTP module (mixer and FFN type, norms, how the previous hidden state and next-token embedding are combined).
+  mtp.ffn:
+    type: str
+    required: mtp
+    label: MTP FFN
+    definition: "FFN in the MTP module: 'dense' or 'MoE', with its width when it differs from the backbone."
+  mtp.shares_embedding:
+    type: bool
+    required: mtp
+    label: MTP shares embedding/head
+    definition: MTP modules use the main model's input embedding and output head.
+  mtp.params:
+    type: float
+    unit: params
+    label: MTP params
+    definition: Parameters of all MTP modules as reported by the publisher.
+  mtp.loss_weight:
+    type: str
+    required: mtp
+    label: MTP loss weight
+    definition: Weight of the MTP loss, including its schedule.
+  mtp.released:
+    type: bool
+    required: mtp
+    label: MTP weights released
+    definition: The released checkpoint contains the MTP module weights.
+
+  # --- norm ------------------------------------------------------------------
+  norm.type:
+    type: str
+    required: always
+    label: Norm
+    definition: Normalization layer type in the blocks.
+  norm.placement:
+    type: str
+    required: always
+    label: Norm placement
+    aliases: [pre-norm, post-norm, sandwich]
+    definition: Pre-norm, post-norm, or sandwich (pre and post).
+  norm.logit_softcap:
+    type: float
+    label: Final logit softcap
+    definition: tanh soft-capping value on output logits.
+  norm.eps:
+    type: float
+    required: always
+    label: Norm epsilon
+    definition: Epsilon of the block normalization layers.
+  norm.residual:
+    type: str
+    label: Residual stream
+    definition: Residual design when it is not a plain sum, e.g. hyper-connections with n streams, gated residuals, depth-scaled residuals, FP32 residual accumulation.
+  norm.embedding:
+    type: str
+    label: Embedding scaling
+    definition: Scaling or normalization applied to input embeddings (e.g. × sqrt(d_model), RMSNorm after embedding).
+  norm.output_scale:
+    type: str
+    label: Output logit scaling
+    definition: Scaling applied to output logits other than a softcap (e.g. muP-style width multiplier).
+
+  # --- ctx -------------------------------------------------------------------
+  ctx.pretrain:
+    type: int
+    required: always
+    unit: tokens
+    label: Pretraining context
+    definition: Sequence length of the main pretraining stage.
+  ctx.final:
+    type: int
+    required: always
+    unit: tokens
+    label: Trained context
+    definition: Longest sequence length trained on after context extension.
+  ctx.max:
+    type: int
+    required: always
+    unit: tokens
+    label: Advertised context
+    definition: Longest context the publisher says the model supports, possibly beyond trained length via RoPE scaling.
+  ctx.extension:
+    type: str
+    label: Extension method
+    definition: How context was extended (stages, RoPE base change, YaRN factor).
+
+  # --- train -----------------------------------------------------------------
+  train.tokens:
+    type: float
+    required: always
+    unit: tokens
+    label: Pretraining tokens
+    definition: Tokens seen in pretraining including annealing and context extension, as reported.
+  train.optimizer:
+    type: str
+    required: always
+    label: Optimizer
+    definition: Optimizer used for the bulk of parameters.
+  train.lr_peak:
+    type: float
+    required: always
+    unit: lr
+    label: Peak LR
+    aliases: [learning rate]
+    definition: Peak learning rate of the main pretraining stage.
+  train.lr_min:
+    type: float
+    required: always
+    unit: lr
+    label: Final LR
+    aliases: [learning rate]
+    definition: Learning rate at the end of the decay.
+  train.schedule:
+    type: str
+    required: always
+    label: LR schedule
+    definition: Learning-rate schedule shape with phase boundaries.
+  train.warmup:
+    type: str
+    required: always
+    label: Warmup
+    definition: Warmup length in steps or tokens.
+  train.batch:
+    type: str
+    required: always
+    label: Batch size
+    definition: "Global batch size, including any batch-size ramp: sequences × sequence length (token total), or the token total alone when only that is stated."
+  train.batch_tokens:
+    type: float
+    unit: tokens
+    label: Batch (tokens)
+    aliases: [batch size, global batch]
+    definition: Global batch size in tokens during the main pretraining stage, after any ramp (sequences × sequence length when stated in sequences, marked inferred).
+  train.weight_decay:
+    type: float
+    required: always
+    label: Weight decay
+    definition: Decoupled weight decay coefficient.
+  train.betas:
+    type: str
+    required: always
+    label: Adam betas
+    definition: (beta1, beta2) of the Adam-family optimizer or its AdamW fallback.
+  train.grad_clip:
+    type: float
+    required: always
+    label: Grad clip
+    definition: Global gradient-norm clipping threshold.
+  train.dropout:
+    type: float
+    label: Dropout
+    definition: Dropout rate applied during pretraining, with placement in the note. Recorded only when the publisher states it.
+  train.precision:
+    type: str
+    required: always
+    label: Training precision
+    definition: Matmul precision of pretraining (BF16, FP8 recipe, NVFP4 recipe) with the scaling granularity where disclosed. Never inferred from the released checkpoint dtype.
+  train.init:
+    type: str
+    label: Initialization
+    definition: Weight initialization (std or scheme) as stated by the publisher; config initializer_range alone is not evidence.
+  train.stability:
+    type: str
+    label: Stability measures
+    definition: Interventions used during pretraining to keep it stable (QK-clip, z-loss, logit caps, spike handling), with coefficients.
+  train.masking:
+    type: str
+    label: Document masking
+    definition: Whether attention crosses document boundaries within a packed sequence.
+  train.objective:
+    type: str
+    label: Extra objectives
+    definition: Objectives beyond next-token prediction and MTP (fill-in-the-middle rate, distillation, multimodal tokens from the start).
+  train.data:
+    type: str
+    label: Data mix
+    definition: Pretraining data composition as disclosed (domain shares, synthetic fraction, repetition).
+  train.cutoff:
+    type: str
+    label: Data cutoff
+    definition: Pretraining data cutoff date.
+  train.hardware:
+    type: str
+    label: Hardware
+    definition: Accelerators used for pretraining, count and duration where stated.
+  train.compute:
+    type: str
+    label: Compute
+    definition: Pretraining compute as stated (GPU-hours or FLOPs).
+  train.averaging:
+    type: str
+    label: Checkpoint averaging
+    definition: EMA or checkpoint merging applied to produce the released base weights.
+  train.stages:
+    type: list
+    items: [name, tokens, seq_len, lr, batch_tokens, batch_sequences, steps, note, quote, source]
+    label: Stages
+    definition: "Ordered pretraining stages. Each item: name, tokens, seq_len, lr, batch_tokens, batch_sequences, steps, note, quote, and source when it differs from the fact's source."
+
+  # --- scaling ---------------------------------------------------------------
+  scaling.parametrization:
+    type: str
+    label: Parametrization
+    aliases: [muP, μP, CompleteP, maximal update, standard parametrization]
+    definition: "Width/depth parametrization used to transfer hyperparameters: SP (standard), μP, CompleteP, u-μP, depth-μP, with the multipliers that differ from SP. Only when stated."
+  scaling.hp_rule:
+    type: str
+    label: HP selection rule
+    aliases: [scaling law, hyperparameter transfer, optimal learning rate, optimal batch]
+    definition: How peak LR, batch size or other hyperparameters were chosen for the released run (fitted scaling law with its formula, μP transfer from a proxy width, sweep), as stated.
+  scaling.ladder:
+    type: str
+    label: Scaling ladder
+    aliases: [proxy models, ablation ladder]
+    definition: Smaller models trained to choose the architecture or recipe (sizes, token budgets), as disclosed.
+  scaling.tpp:
+    type: float
+    unit: ratio
+    label: Tokens / param
+    aliases: [TPP, chinchilla, overtraining]
+    derived: true
+    definition: train.tokens divided by params.total.
+  scaling.tpp_active:
+    type: float
+    unit: ratio
+    label: Tokens / active param (non-embedding)
+    aliases: [TPP, chinchilla, overtraining]
+    derived: true
+    definition: train.tokens divided by params.counted_active_non_embedding, or by the stated params.active_non_embedding when there is no validated checkpoint count.
+  scaling.batch_ratio:
+    type: float
+    unit: ratio
+    label: Batch / critical-batch scaling (B / D^0.47)
+    aliases: [power lines, critical batch, batch scaling]
+    derived: true
+    definition: "train.batch_tokens divided by train.tokens^0.47, proportional to B / Bcrit(D). Critical batch size grows about as D^0.47 (Zhang et al. 2024; Power Lines fits D^0.462), so equal values mean the same batch relative to the critical batch for the training horizon; larger means a larger batch than that scaling suggests."
+  scaling.adamw_tau:
+    type: float
+    unit: ratio
+    label: AdamW timescale τ
+    aliases: [power lines, EMA timescale, weight decay]
+    derived: true
+    definition: "B / (η λ D) with B = train.batch_tokens, η = train.lr_peak, λ = train.weight_decay and D = train.tokens: the AdamW EMA timescale as a fraction of training (Bergsma et al. 2025, Power Lines, arXiv 2505.13738). Computed only when the optimizer is AdamW; uses the peak LR."
+
+  # --- kv (all derived) ------------------------------------------------------
+  kv.bytes_per_token:
+    type: float
+    unit: bytes
+    label: KV bytes / token
+    aliases: [kv cache, memory]
+    derived: true
+    definition: BF16 KV cache per token of a sequence at the selected context, kv.bytes_at_context divided by the context (131,072 tokens in exports). Includes sliding-window caches, so for SWA models it falls as context grows. Applies to prefill and decode alike.
+  kv.growth_per_token:
+    type: float
+    unit: bytes
+    label: KV growth / token
+    aliases: [kv cache, marginal, asymptotic]
+    derived: true
+    definition: BF16 KV-cache bytes added per additional token once sliding windows are full, i.e. global layers and sparse-attention indexer keys only. The limit of kv.bytes_per_token at long context.
+  kv.bytes_per_token_per_active:
+    type: float
+    unit: bytes
+    label: KV bytes / token / B active
+    aliases: [kv cache, efficiency]
+    derived: true
+    definition: kv.bytes_per_token divided by active parameters in billions (131,072 tokens in exports).
+  kv.bytes_at_context_per_active:
+    type: float
+    unit: bytes
+    label: KV at context / B active
+    aliases: [kv cache, efficiency, memory per parameter]
+    derived: true
+    definition: kv.bytes_at_context divided by active parameters in billions (131,072 tokens in exports).
+  kv.bytes_at_context:
+    type: float
+    unit: bytes
+    label: KV at context
+    aliases: [kv cache, memory]
+    derived: true
+    definition: BF16 KV cache for one sequence at the selected context (131,072 tokens in exports), including sliding-window layers capped at their window and indexer keys. Excludes recurrent state, MTP or draft layers and compressor tail state.
+
+  # --- eval ------------------------------------------------------------------
+  # Scores of the released post-trained model from independent evaluators, not publisher-reported.
+  # Records of base checkpoints use their post-trained sibling; the note names the checkpoint and setting.
+  eval.aa_index:
+    type: float
+    unit: score
+    label: AA Intelligence Index
+    aliases: [artificial analysis, benchmark]
+    definition: Artificial Analysis Intelligence Index v4.3.2 of the post-trained model, from a dated Wayback snapshot of its Artificial Analysis page. The note names the variant (reasoning setting).
+  eval.deepswe:
+    type: float
+    unit: score
+    label: DeepSWE pass@1
+    aliases: [swe, coding, agentic, benchmark]
+    definition: DeepSWE v1.1 pass@1 (Datacurve; 113 tasks, same mini-swe-agent scaffold for every model), as a fraction.

@@ -1,0 +1,201 @@
+name: Laguna-S-2.1
+org: Poolside
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  blog: {url: https://web.archive.org/web/20261009070156/https://poolside.ai/blog/introducing-laguna-s-2-1, kind: blog}
+  card: {url: https://huggingface.co/poolside/Laguna-S-2.1/resolve/0f573140834b11cfac0c2af97a101a7a69a13e22/README.md, kind: model-card}
+  config: {url: https://huggingface.co/poolside/Laguna-S-2.1/resolve/0f573140834b11cfac0c2af97a101a7a69a13e22/config.json, kind: config}
+  configuration_laguna: {url: https://huggingface.co/poolside/Laguna-S-2.1/resolve/0f573140834b11cfac0c2af97a101a7a69a13e22/configuration_laguna.py, kind: code}
+  modeling_laguna: {url: https://huggingface.co/poolside/Laguna-S-2.1/resolve/0f573140834b11cfac0c2af97a101a7a69a13e22/modeling_laguna.py, kind: code}
+
+not_disclosed: [params.active_non_embedding, moe.balancing, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  gating_types: "not read by modeling_laguna.py; gating is set by /gating"
+  mlp_layer_types: "not read by modeling_laguna.py; MoE placement comes from mlp_only_layers and decoder_sparse_step"
+
+facts:
+  meta.released:
+    value: "2026-07-21"
+    source: blog
+    at: "Introducing Laguna S 2.1; post date"
+    quote: 'category:"announcements",date:"2026-07-21"'
+  meta.license:
+    value: openmdw-1.1
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: openmdw-1.1"
+
+  params.active:
+    value: 8_000_000_000
+    source: blog
+    at: "Introducing Laguna S 2.1; intro"
+    quote: "Laguna S 2.1 is a 118B total parameter Mixture-of-Experts (MoE) model with 8B activated parameters per token"
+    note: "The card says \"~8B activated\"."
+  params.total:
+    value: 118_000_000_000
+    source: card
+    at: "README.md; Model overview"
+    quote: "Number of parameters: 118B total, ~8B activated per token"
+
+  shape.d_model: {value: 3072, source: config, at: "/hidden_size"}
+  shape.layers: {value: 48, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 100_352, source: config, at: "/vocab_size"}
+  shape.tokenizer:
+    value: "Laguna family tokenizer"
+    source: card
+    at: "README.md; Model overview"
+    quote: "Vocabulary: 100,352 tokens (Laguna family tokenizer)"
+
+  attn.gate:
+    value: "softplus, per head, on attention output before o_proj"
+    source: card
+    at: "README.md; Model overview"
+    quote: "Attention: grouped-query, 8 KV heads, head dim 128; per-head softplus output gating"
+  attn.global_layers: {value: 12, source: config, at: "/layer_types | count full_attention"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads:
+    value: 48
+    source: config
+    at: "/num_attention_heads"
+    note: "Global layers; SWA layers use 72 (attn.local_heads)."
+  attn.local_heads:
+    value: 72
+    source: config
+    at: "/num_attention_heads_per_layer/1"
+    note: "Layer 1 is sliding_attention; every sliding_attention entry is 72, every full_attention entry 48. modeling_laguna.py LagunaDecoderLayer.__init__ passes the per-layer count to LagunaAttention."
+  attn.kind:
+    value: "GQA, SWA"
+    source: card
+    at: "README.md; intro"
+    quote: "grouped-query attention, and interleaved full/sliding-window attention"
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "3 SWA : 1 global"
+    source: card
+    at: "README.md; Highlights"
+    quote: "48 layers in a 1:3 global-to-SWA ratio (12 global attention layers, 36 sliding-window layers, window 512)"
+    note: "Config /layer_types starts each group of four with the global layer."
+  attn.local_kv_heads:
+    value: 8
+    source: config
+    at: "/num_key_value_heads"
+    note: "LagunaAttention builds k_proj/v_proj from config.num_key_value_heads and config.head_dim for both layer types."
+  attn.local_head_dim:
+    value: 128
+    source: config
+    at: "/head_dim"
+    note: "LagunaAttention uses config.head_dim for both layer types."
+  attn.local_rope_theta:
+    value: 10000
+    source: config
+    at: "/rope_parameters/sliding_attention/rope_theta"
+    note: "configuration_laguna.py derives swa_rope_parameters from rope_parameters[\"sliding_attention\"]; LagunaModel builds swa_rotary_emb from it."
+  attn.local_layers: {value: 36, source: config, at: "/layer_types | count sliding_attention"}
+  attn.position:
+    value: "partial RoPE (global, 50%), RoPE (SWA)"
+    source: config
+    at: "config.json; rope_parameters.full_attention"
+    quote: "\"partial_rotary_factor\": 0.5"
+    note: "rope_parameters.sliding_attention has partial_rotary_factor 1.0."
+  attn.qk_norm:
+    value: true
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaAttention.__init__"
+    quote: "self.q_norm = LagunaRMSNorm(config.head_dim, eps=config.rms_norm_eps)"
+  attn.rope_fraction:
+    value: 0.5
+    source: config
+    at: "/rope_parameters/full_attention/partial_rotary_factor"
+    note: "Global layers; SWA layers rotate all dims (/rope_parameters/sliding_attention/partial_rotary_factor = 1.0)."
+  attn.rope_theta:
+    value: 500_000
+    source: config
+    at: "/rope_parameters/full_attention/rope_theta"
+    note: "Global layers; SWA layers use 10,000."
+  attn.v_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.bias:
+    value: false
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaAttention.__init__"
+    quote: "self.q_proj = nn.Linear(config.hidden_size, self.num_heads * config.head_dim, bias=False)"
+  attn.window: {value: 512, source: config, at: "/sliding_window"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: configuration_laguna
+    at: "configuration_laguna.py; LagunaConfig.__init__"
+    quote: "hidden_act: str = \"silu\""
+    note: "config.json sets no hidden_act; LagunaMLP computes down_proj(act_fn(gate_proj(x)) * up_proj(x))."
+  ffn.bias:
+    value: false
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 12288, source: config, at: "/intermediate_size"}
+
+  moe.dense_layers:
+    value: 1
+    source: config
+    at: "/mlp_only_layers | len"
+    note: "Layer 0; decoder_sparse_step 1 makes every other layer MoE (LagunaDecoderLayer.__init__)."
+
+  moe.expert_dim: {value: 1024, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/num_experts"}
+  moe.router:
+    value: sigmoid
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaTopKRouter"
+    quote: "Laguna MoE router using sigmoid scoring (not softmax)."
+    note: "The card's \"router with softplus gating\" conflicts with the code."
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/moe_routed_scaling_factor"}
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model overview"
+    quote: "Experts: 256 routed (top-10) plus 1 shared expert"
+  moe.shared_dim: {value: 1024, source: config, at: "/shared_expert_intermediate_size"}
+  moe.top_k: {value: 10, source: config, at: "/num_experts_per_tok"}
+
+  norm.placement:
+    value: pre
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaDecoderLayer.forward"
+    quote: "residual = hidden_states hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaDecoderLayer.__init__"
+    quote: "self.input_layernorm = LagunaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.extension:
+    value: "YaRN factor 128 over original 8,192 on global layers (release config)"
+    source: config
+    at: "config.json; rope_parameters.full_attention"
+    quote: "\"rope_type\": \"yarn\", \"factor\": 128.0, \"original_max_position_embeddings\": 8192,"
+    note: "Training-time extension stages are not disclosed. Same dict: beta_fast 32, beta_slow 1, attention_factor 1.485; max_position_embeddings 1,048,576."
+  ctx.max:
+    value: 1_048_576
+    source: card
+    at: "README.md; Model overview"
+    quote: "Context window: 1,048,576 tokens"
+  train.hardware:
+    value: "4,096 H200; pretraining began 2026-05-22"
+    source: blog
+    at: "Introducing Laguna S 2.1; The bets we're making"
+    quote: "Laguna S 2.1 began pre-training on 4,096 NVIDIA H200 GPUs on May 22, 2026, 60 days ago."
+  train.data:
+    value: "same pretraining data as XS 2.1"
+    source: blog
+    at: "Introducing Laguna S 2.1; A strong base, then new post-training"
+    quote: "Laguna S 2.1 is a scale-up of the Laguna XS family, trained on exactly the same pre-training data as XS 2.1"
+  train.cutoff:
+    value: "November 2025"
+    source: blog
+    at: "Introducing Laguna S 2.1; Case study 3"
+    quote: "the model has a knowledge cutoff date in November 2025"

@@ -1,0 +1,217 @@
+name: Granite-4.1-30B-Base
+org: IBM
+kind: base
+
+sources:
+  blog: {url: https://web.archive.org/web/20260430151008/https://huggingface.co/blog/ibm-granite/granite-4-1, kind: blog}
+  disclosure: {url: https://raw.githubusercontent.com/ibm-granite/granite-4.1-language-models/1f82511b399b633ee9368b4d637401e5f53f43d0/disclosures/granite_4.1_30b_base_disclosure.json, kind: model-card}
+  card: {url: https://huggingface.co/ibm-granite/granite-4.1-30b-base/resolve/9bb22a92d17f4a51788c4750d32764ed068d94f2/README.md, kind: model-card}
+  config: {url: https://huggingface.co/ibm-granite/granite-4.1-30b-base/resolve/9bb22a92d17f4a51788c4750d32764ed068d94f2/config.json, kind: config}
+  modeling_granite: {url: https://raw.githubusercontent.com/huggingface/transformers/e0eb2810ac1b2caf6d082f247d8d37162ecf67a0/src/transformers/models/granite/modeling_granite.py, kind: code}
+
+not_disclosed: [params.active_non_embedding, mtp.depth, train.optimizer, train.lr_peak, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+facts:
+  meta.released:
+    value: "2026-04-29"
+    source: card
+    at: "README.md; Model Summary"
+    quote: "Release Date: April 29th, 2026"
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; front matter"
+    quote: "license: apache-2.0"
+
+  params.total:
+    value: 28_865_728_512
+    source: disclosure
+    at: "granite_4.1_30b_base_disclosure.json; model.parameter_count"
+    quote: '"parameter_count": 28865728512,'
+    note: "Card rounds to 30B; tied embedding counted once."
+  params.active:
+    value: 28_865_728_512
+    source: disclosure
+    at: "granite_4.1_30b_base_disclosure.json; model.parameter_count"
+    quote: '"parameter_count": 28865728512,'
+    basis: inferred
+    note: "Dense model; active equals the stated total."
+
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.layers: {value: 64, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings:
+    value: true
+    source: config
+    at: "/tie_word_embeddings"
+  shape.vocab: {value: 100_352, source: config, at: "/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.global_layers:
+    value: 64
+    source: card
+    at: "README.md; Model Architecture table"
+    quote: "Number of layers 40 40 64"
+    note: "Dense transformer; every layer is full GQA."
+  attn.head_dim:
+    value: 128
+    source: card
+    at: "README.md; Model Architecture table"
+    quote: "Attention head size 64 128 128"
+  attn.heads: {value: 32, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: GQA
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Core components of this architecture are: GQA, RoPE, MLP with SwiGLU, RMSNorm, and shared input/output embeddings."
+    note: "Dense attention-only model, not the Mamba-2 hybrid used in Granite 4.0."
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "64 GQA"
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Granite-4.1-30B-Base is based on a decoder-only dense transformer architecture."
+  attn.position:
+    value: RoPE
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Core components of this architecture are: GQA, RoPE, MLP with SwiGLU, RMSNorm, and shared input/output embeddings."
+  attn.qk_norm:
+    value: false
+    source: modeling_granite
+    at: "modeling_granite.py; GraniteAttention.forward"
+    quote: "query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2) key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)"
+  attn.rope_theta:
+    value: 50_000_000
+    source: config
+    at: "/rope_theta"
+    note: "This card does not state θ. The card of Granite-4.2-30B (post-trained from this base) says θ = 10,000,000, but its config.json, like this one, sets 50,000,000, which modeling_granite.py uses."
+  attn.scale:
+    value: "0.0078125 (1/head_dim) instead of 1/sqrt(head_dim)"
+    source: config
+    at: "config.json; attention_multiplier"
+    quote: '"attention_multiplier": 0.0078125,'
+    note: "modeling_granite.py sets self.scaling = config.attention_multiplier."
+
+  ffn.activation:
+    value: SwiGLU
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Core components of this architecture are: GQA, RoPE, MLP with SwiGLU, RMSNorm, and shared input/output embeddings."
+    note: "Config hidden_act silu; GraniteMLP computes down_proj(act_fn(gate_proj(x)) * up_proj(x))."
+  ffn.bias: {value: false, source: config, at: "/mlp_bias"}
+  ffn.dim: {value: 32768, source: config, at: "/intermediate_size"}
+
+  norm.embedding:
+    value: "× 12 (embedding_multiplier)"
+    source: config
+    at: "config.json; embedding_multiplier"
+    quote: '"embedding_multiplier": 12.0,'
+    note: "modeling_granite.py: inputs_embeds = inputs_embeds * self.embedding_multiplier."
+  norm.eps: {value: 1.0e-5, source: config, at: "/rms_norm_eps"}
+  norm.output_scale:
+    value: "logits ÷ 16 (logits_scaling)"
+    source: config
+    at: "config.json; logits_scaling"
+    quote: '"logits_scaling": 16.0,'
+    note: "modeling_granite.py: logits = logits / self.config.logits_scaling."
+  norm.placement:
+    value: pre
+    source: modeling_granite
+    at: "modeling_granite.py; GraniteDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.residual:
+    value: "branch outputs × 0.175 before the residual add (residual_multiplier)"
+    source: config
+    at: "config.json; residual_multiplier"
+    quote: '"residual_multiplier": 0.175,'
+    note: "modeling_granite.py: hidden_states = residual + hidden_states * self.residual_multiplier, after attention and after the MLP."
+  norm.type:
+    value: RMSNorm
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Core components of this architecture are: GQA, RoPE, MLP with SwiGLU, RMSNorm, and shared input/output embeddings."
+
+  ctx.extension:
+    value: "Staged 4K → 32K → 128K → 512K (phase 5, 396B tokens); exponential LR decay from 1e-4 to 0; model merge after each stage"
+    source: blog
+    at: "Pre-Training; Phase 5: Long Context Training (LCE)"
+    quote: "The LCE phase uses an exponential learning rate schedule starting at 1e-4 and decaying to 0"
+    note: "32K and 128K stages reuse the phase-4 mix; the 512K stage uses 80% books + 20% code repositories (8B and 30B only)."
+  ctx.final:
+    value: 524_288
+    source: card
+    at: "README.md; Model Summary"
+    quote: "long‑context extension is applied to expand the model’s context window to 512K tokens."
+  ctx.max:
+    value: 524_288
+    source: card
+    at: "README.md; Model Summary"
+    quote: "long‑context extension is applied to expand the model’s context window to 512K tokens."
+    note: "Released config sets max_position_embeddings 131072 and no rope_scaling."
+  ctx.pretrain:
+    value: 4096
+    source: blog
+    at: "Pre-Training; Phase 5: Long Context Training (LCE)"
+    quote: "extends the context window from 4K to 512K"
+
+  train.averaging:
+    value: "model merge after each long-context stage"
+    source: blog
+    at: "Pre-Training; Phase 5: Long Context Training (LCE)"
+    quote: "we do a model merge after each LCE stage"
+  train.data:
+    value: "Phase 1: CommonCrawl ~59%, code ~20%, technical ~10.5%, math ~7%, multilingual ~2%, domain-specific ~1.5%. Later phases raise math/code and add synthetic, long-CoT and instruction data."
+    source: blog
+    at: "Pre-Training; Phase 1: General Pre-Training (10T tokens)"
+    quote: "CommonCrawl ~59% — general web data"
+  train.hardware:
+    value: "NVIDIA GB200 NVL72 cluster (CoreWeave)"
+    source: card
+    at: "README.md; Infrastructure"
+    quote: "We trained the Granite 4.1 Language Models utilizing an NVIDIA GB200 NVL72 cluster hosted in CoreWeave."
+  train.objective:
+    value: "FIM with prefix and suffix tokens"
+    source: card
+    at: "README.md; Model Summary"
+    quote: "code completion through specialized prefix and suffix tokens"
+  train.lr_min:
+    value: 0
+    source: blog
+    at: "Pre-Training; Phase 5: Long Context Training (LCE)"
+    quote: "The LCE phase uses an exponential learning rate schedule starting at 1e-4 and decaying to 0"
+    note: "Phase 4 also decays linearly to zero before LCE."
+  train.schedule:
+    value: "Warmup + power schedule (phases 1-2), exponential decay (phase 3), linear decay to zero (phase 4), exponential decay from 1e-4 to 0 (phase 5, long context)"
+    source: card
+    at: "README.md; Training Data table"
+    quote: "General mixture of training data, warmup, and power scheduler for learning rate."
+  train.stages:
+    value:
+      - name: phase-1
+        tokens: 10_000_000_000_000
+        note: "General mixture; warmup and power LR schedule."
+        quote: "10 trillion tokens in phase one"
+      - name: phase-2
+        tokens: 2_000_000_000_000
+        note: "Higher code and math share; power LR schedule."
+        quote: "2 trillion tokens each in phases two and three"
+      - name: phase-3
+        tokens: 2_000_000_000_000
+        note: "High-quality data; exponential LR decay."
+        quote: "High quality training data, exponential decay of learning rate."
+      - name: phase-4
+        tokens: 500_000_000_000
+        note: "High-quality data; linear LR decay to zero."
+        quote: "0.5 trillion tokens in phase four"
+      - name: phase-5-long-context
+        tokens: 396_000_000_000
+        note: "Sub-stages at 32K, 128K and 512K; exponential LR decay from 1e-4 to 0. Tokens from the card's Training Data table (396B)."
+        quote: "Long Context Extension with exponential learning rate schedule."
+    source: card
+    at: "README.md; Model Summary and Training Data table"
+  train.tokens:
+    value: 15_000_000_000_000
+    source: card
+    at: "README.md; Model Summary"
+    quote: "The model is trained from scratch on approximately 15 trillion tokens using a five‑phase training strategy"
+    note: "Approximate; phases sum to 14.896T (10T + 2T + 2T + 0.5T + 396B)."

@@ -1,0 +1,337 @@
+name: Nemotron-3-Ultra-550B-A55B-Base
+org: NVIDIA
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16/resolve/9f5b80e4845884eb8da03353b0b176503631e034/README.md, kind: model-card}
+  config: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16/resolve/9f5b80e4845884eb8da03353b0b176503631e034/config.json, kind: config}
+  index: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16/resolve/9f5b80e4845884eb8da03353b0b176503631e034/model.safetensors.index.json, kind: config}
+  modeling_nemotron_h: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/nemotron_h/modeling_nemotron_h.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2606.15007v1, kind: paper}
+
+not_disclosed: [train.grad_clip, params.active_non_embedding]
+
+config_unused:
+  chunk_size: "Mamba-2 SSD scan chunk length, kernel tiling only"
+  expand: "not read by modeling_nemotron_h.py; Mamba inner width is mamba_num_heads × mamba_head_dim"
+  intermediate_size: "dense MLP width; layers_block_type has no dense (mlp) blocks"
+  norm_eps: "not read by modeling_nemotron_h.py; layer_norm_epsilon is used"
+  partial_rotary_factor: "no rotary embedding (NoPE)"
+  rescale_prenorm_residual: "initialization flag in _init_weights, not evidence of training init"
+  time_step_floor: "dt bias initialization range in _init_weights"
+  time_step_max: "dt bias initialization range in _init_weights"
+
+facts:
+  meta.released:
+    value: "2026-06-04"
+    source: card
+    at: "README.md; Release Date"
+    quote: "Hugging Face - 06/04/2026"
+    note: "Report on arXiv 2026-06-12; Hugging Face repository created 2026-06-03."
+  meta.license:
+    value: "other (openmdw-1.1)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: openmdw-1.1"
+
+  params.active:
+    value: 55_000_000_000
+    source: report
+    at: "PDF page 1; Abstract"
+    quote: "a 550 billion total and 55 billion active parameter Mixture-of-Experts"
+  params.note:
+    value: "Rounded publisher figures; MTP inclusion not stated. The checkpoint index lists 560.5B parameters including the MTP block."
+    source: index
+    at: "model.safetensors.index.json; metadata"
+    quote: '"total_parameters": 560524578816'
+  params.total:
+    value: 550_000_000_000
+    source: report
+    at: "PDF page 1; Abstract"
+    quote: "a 550 billion total and 55 billion active parameter Mixture-of-Experts"
+
+  shape.d_model: {value: 8192, source: config, at: "/hidden_size"}
+  shape.layers:
+    value: 60
+    source: report
+    at: "PDF page 4; Table 1"
+    quote: "Total Layers 108"
+    basis: inferred
+    note: "One block per token mixer: 48 Mamba-2 + 12 attention (config layers_block_type). 48 blocks are followed by a MoE FFN; the 12 Mamba-2 layers right before each attention layer have none. The publisher's 108 layers (Table 1) count mixer and MoE sublayers separately."
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 131_072, source: config, at: "/vocab_size"}
+
+  attn.global_layers: {value: 12, source: config, at: "/layers_block_type | count attention"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "GQA, Mamba-2"
+    source: report
+    at: "PDF page 3; §2.1"
+    quote: "Nemotron 3 Ultra uses the same hybrid Mamba-Attention Mixture-of-Experts (MoE) architecture as Nemotron 3 Super"
+    note: "Attention is GQA with 64 query and 2 KV heads (Table 1)."
+  attn.kv_heads: {value: 2, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "48 Mamba-2 + 12 GQA"
+    source: report
+    at: "PDF page 3; §2.1, Figure 2"
+    quote: "The layer pattern and configuration for Nemotron 3 Ultra are shown in Figure 2 and Table 1"
+    basis: inferred
+    note: "From config layers_block_type. Irregular: Mamba-2 runs before, between and after the 12 attention layers are 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4."
+  attn.linear_layers: {value: 48, source: config, at: "/layers_block_type | count mamba"}
+  attn.linear_kind:
+    value: "Mamba-2: 256 heads × head dim 64, state 128, 8 groups, conv kernel 4"
+    source: report
+    at: "PDF page 4; Table 1"
+    quote: "Mamba State Dimension 128 Mamba Groups 8 Mamba Heads 256 Mamba Head Dimension 64"
+    note: "Conv kernel from config /conv_kernel (use_conv_bias true); groups = n_groups, state = ssm_state_size; mamba_hidden_act silu; dt clamped below at time_step_min 0.001 (NemotronHMamba2Mixer time_step_limit)."
+  attn.linear_heads: {value: 256, source: config, at: "/mamba_num_heads"}
+  attn.linear_head_dim: {value: 64, source: config, at: "/mamba_head_dim"}
+  attn.conv: {value: 4, source: config, at: "/conv_kernel"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.position:
+    value: NoPE
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHAttention.forward"
+    quote: "key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)"
+    note: "No rotary embedding is applied to q or k; config rope_theta is unused."
+  attn.qk_norm:
+    value: false
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHAttention.forward"
+    quote: "query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2)"
+
+  ffn.activation:
+    value: "ReLU²"
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHExperts.forward"
+    quote: "# Expert computation: down_proj(act_fn(up_proj(x)))"
+    note: "Not gated; act_fn = ACT2FN[mlp_hidden_act] with config mlp_hidden_act relu2, for routed and shared experts."
+  ffn.bias: {value: false, source: config, at: "/mlp_bias"}
+
+  moe.balancing:
+    value: "aux-loss-free bias (update rate 1e-3) + load-balancing loss 1e-4"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "All other hyperparameters remain the same as for Nemotron 3 Super."
+    basis: inferred
+    note: "Ultra §2.4 does not override it; Super report p.14 §2.4: 'auxiliary-loss-free load balancing strategy ... with an update rate of 10−3, paired with a standard load balancing loss with coefficient of 10−4'."
+  moe.expert_dim:
+    value: 5120
+    source: config
+    at: "/moe_intermediate_size"
+    note: "Routed experts map the 2048-wide latent to 5120 and back (LatentMoE)."
+  moe.experts: {value: 512, source: config, at: "/n_routed_experts"}
+  moe.latent_dim:
+    value: 2048
+    source: config
+    at: "/moe_latent_size"
+    note: "fc1_latent_proj (8192→2048) and fc2_latent_proj (2048→8192) wrap the routed experts; router and shared expert act on the 8192-wide hidden state (NemotronHMoE.forward)."
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 5.0, source: config, at: "/routed_scaling_factor"}
+  moe.router:
+    value: sigmoid
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHTopkRouter.forward"
+    quote: "scores = router_logits.sigmoid()"
+    note: "Expert-selection bias e_score_correction_bias is added for top-k choice only; n_group = topk_group = 1 (no group-limited routing)."
+  moe.dense_layers: {value: 0, source: config, at: "/layers_block_type | count mlp"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim: {value: 10240, source: config, at: "/moe_shared_expert_intermediate_size"}
+  moe.top_k: {value: 22, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 2
+    source: report
+    at: "PDF page 3; §2.1"
+    quote: "native Multi-Token Prediction for inference acceleration with two heads during pre-training"
+    note: "Both heads share one attention+MoE block; the checkpoint stores one block (num_nextn_predict_layers 1)."
+  mtp.modules:
+    value: 1
+    source: report
+    at: "PDF page 3; §2.1"
+    quote: "Both MTP heads share the same parameters to enable robust autoregressive drafting"
+  mtp.block:
+    value: "next-token embedding and hidden state each normed (enorm, hnorm), concatenated and projected 2×8192→8192 (eh_proj); then one GQA attention layer and one LatentMoE layer; final norm"
+    source: report
+    at: "PDF page 3; §2.1"
+    quote: "consist of a single attention layer followed by a single MoE layer"
+    note: "Config mtp_layers_block_type [attention, moe]; projection and norms from mtp.layers.0.{enorm,hnorm,eh_proj} in the index, eh_proj shape [8192, 16384] in the safetensors header."
+  mtp.ffn:
+    value: "MoE"
+    source: report
+    at: "PDF page 3; §2.1"
+    quote: "consist of a single attention layer followed by a single MoE layer"
+    note: "LatentMoE with the backbone's widths: expert up_proj [5120, 2048], latent proj [2048, 8192], shared expert [10240, 8192] (safetensors header)."
+  mtp.shares_embedding:
+    value: true
+    source: report
+    at: "PDF page 12; §2.7"
+    quote: "the MTP blocks’ wgrad contribution to the shared output layer"
+    note: "Output head stated shared; the MTP tensors (mtp.*) in the index also contain no embedding table."
+  mtp.loss_weight:
+    value: "0.1 (0.05 per MTP head)"
+    source: report
+    at: "PDF page 12; §2.7"
+    quote: "Nemotron 3 Ultra uses 2 MTP blocks with a MTP loss scaling factor of 0.1 (0.05 for each MTP block)"
+  mtp.released: {value: true, source: index, at: "/weight_map | has mtp.layers.0.eh_proj"}
+
+  norm.eps: {value: 1.0e-5, source: config, at: "/layer_norm_epsilon"}
+  norm.placement:
+    value: pre
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHBlock docstring"
+    quote: "Each block applies pre-normalization followed by the mixer, then adds a residual connection."
+  norm.type:
+    value: RMSNorm
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHBlock.__init__"
+    quote: "self.norm = NemotronHRMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)"
+
+  ctx.extension:
+    value: "Long-context CPT at constant LR 2.5e-6 for 33B tokens: 92% of iterations at 1M, 8% at 4K; blend 46% long-context (document QA + SFT-style), 54% phase-2 data"
+    source: report
+    at: "PDF page 9; §2.5"
+    quote: "We performed CPT on 1,048,576 (1M) context length for 92% of the iterations, while we trained on 4,096 (4K) for the remaining 8% of the time"
+  ctx.final:
+    value: 1_048_576
+    source: report
+    at: "PDF page 9; §2.5"
+    quote: "We performed CPT on 1,048,576 (1M) context length for 92% of the iterations"
+  ctx.max:
+    value: 1_048_576
+    source: card
+    at: "README.md; Input"
+    quote: "Maximum context length up to 1M tokens."
+    note: "Config max_position_embeddings is 262144; NoPE layers do not read it."
+  ctx.pretrain:
+    value: 8192
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "All other hyperparameters remain the same as for Nemotron 3 Super."
+    basis: inferred
+    note: "Ultra §2.4 does not override it; Super report p.14 §2.4: 'The model was trained with a sequence length of 8,192'."
+
+  train.averaging:
+    value: "Checkpoint merge with a 500B-token window, selected from merges over 125B-1T windows and several orderings, used as the start of the long-context phase"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "A 500B token merge window checkpoint that exhibited a balanced trade-off between knowledge, math, and code was selected for the long-context phase."
+  train.batch:
+    value: "3,072 × 8,192 (25.17M tokens)"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "All other hyperparameters remain the same as for Nemotron 3 Super."
+    basis: inferred
+    note: "Ultra §2.4 does not override it; Super report p.14 §2.4: 'batch size of 3,072 sequences, resulting in approximately 25.17 million tokens per batch'. The Ultra long-context phase states 25,165,824 tokens per iteration (§2.5)."
+  train.batch_tokens:
+    value: 25_165_824
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "All other hyperparameters remain the same as for Nemotron 3 Super."
+    basis: inferred
+    note: "Super recipe 3,072 × 8,192 = 25,165,824 (Super report §2.4), kept by Ultra §2.4; the Ultra long-context phase also states 25,165,824 tokens per iteration (§2.5)."
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "All other hyperparameters remain the same as for Nemotron 3 Super."
+    basis: inferred
+    note: "Ultra §2.4 does not override it; Super report p.14 §2.4: 'momentum coefficients β1 = 0.9 and β2 = 0.95'."
+  train.cutoff:
+    value: "September 2025"
+    source: card
+    at: "README.md; Model Overview, Data Freshness"
+    quote: "The pre-training data has a cutoff date of September 2025."
+  train.data:
+    value: "Two-phase curriculum over 19 categories, switching from diversity- to quality-biased mix after ~15T tokens (~75%); quality-filtered + synthetic web crawl ~49% of phase 1 and ~38% of phase 2; also finepdfs, math, code (refreshed to Sep 2025), Nemotron-CC-Code, Wikipedia, academic, legal, multilingual (11 languages), Crawl++, SFT-style data"
+    source: report
+    at: "PDF page 8; §2.3.6"
+    quote: "The pretraining corpus spans 19 high level categories across both data mixtures."
+  train.hardware:
+    value: "GB200"
+    source: report
+    at: "PDF page 9; §2.5"
+    quote: "128-way expert parallelism, and 2-way pipeline parallelism to train on GB200 GPUs."
+    note: "Stated only for the long-context phase."
+  train.lr_min:
+    value: 2.5e-6
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "minus-sqrt decay schedule to a minimum of 2.5 × 10−6"
+  train.lr_peak:
+    value: 2.5e-4
+    source: report
+    at: "PDF page 8; §2.4"
+    quote: "We warmup the learning rate for 200 billion tokens to a peak value of 2.5 × 10−4"
+  train.optimizer:
+    value: AdamW
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "All other hyperparameters remain the same as for Nemotron 3 Super."
+    basis: inferred
+    note: "Ultra §2.4 does not override it; Super report p.14 §2.4: 'We used AdamW (Loshchilov & Hutter, 2017) optimizer'."
+  train.precision:
+    value: "NVFP4 (E2M1; 2D block quantization on weights; RHT on wgrad inputs; stochastic rounding on gradients). Higher precision for the final 15% of the network (16 layers), Mamba output projections, latent projections, QKV/attention projections, MTP layers and embeddings; FP32 gradient reduction."
+    source: report
+    at: "PDF pages 3-4; §2.2"
+    quote: "NVFP4 layers use the E2M1 datatype with two-dimensional block quantization on weights, Random Hadamard Transforms on inputs to wgrad, and stochastic rounding on gradients"
+    note: "The 16 layers count Mamba, attention and MoE sublayers separately (108 total)."
+  train.schedule:
+    value: "WSD: 200B-token warmup, stable to 15T, minus-sqrt decay over the final 5T tokens"
+    source: report
+    at: "PDF pages 8-9, 12; §2.4, §2.7"
+    quote: "For the final 5 trillion tokens we then decay the learning rate"
+    note: "After a divergence near 16T the run was rolled back to the 15T checkpoint and decay started there, cutting the horizon to 20T (§2.7)."
+  train.stability:
+    value: "Divergence at ~8T attributed to lowering local gradient accumulation for the output layer from FP32 to BF16 (MTP wgrad contribution lost): rollback + FP32 gradient reduction. Divergence at ~16T (cause undetermined): rollback to the 15T checkpoint + immediate LR decay."
+    source: report
+    at: "PDF page 12; §2.7"
+    quote: "Rolling back to an earlier checkpoint and moving back to the full FP32 gradient reduction recipe re-stabilized training"
+  train.stages:
+    value:
+      - name: phase-1
+        tokens: 15_000_000_000_000
+        seq_len: 8192
+        batch_sequences: 3072
+        note: "Diversity-biased mix; warmup and stable LR. seq_len and batch from the Super recipe, which Ultra §2.4 keeps."
+        quote: "with 15 trillion tokens of data in the first phase focusing on diversity and broad domain coverage"
+      - name: phase-2
+        tokens: 5_000_000_000_000
+        seq_len: 8192
+        batch_sequences: 3072
+        note: "Quality-biased mix; spans the minus-sqrt LR decay."
+        quote: "followed by 5 trillion tokens of data in the second phase focusing on high quality data"
+      - name: long-context
+        tokens: 33_000_000_000
+        seq_len: 1_048_576
+        lr: 2.5e-6
+        batch_tokens: 25_165_824
+        note: "92% of iterations at 1M, 8% at 4K (math and code SFT-style data only); starts from a 500B-token checkpoint merge."
+        quote: "Eventually, the LC-Phase was trained for 33B tokens."
+    source: report
+    at: "PDF pages 1, 9; §1, §2.5"
+  train.tokens:
+    value: 20_000_000_000_000
+    source: report
+    at: "PDF page 1; Abstract"
+    quote: "We pre-trained Nemotron 3 Ultra on 20 trillion text tokens"
+    note: "Excludes the 33B-token long-context phase."
+  train.warmup:
+    value: "200B tokens"
+    source: report
+    at: "PDF page 8; §2.4"
+    quote: "We warmup the learning rate for 200 billion tokens"
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "All other hyperparameters remain the same as for Nemotron 3 Super."
+    basis: inferred
+    note: "Ultra §2.4 does not override it; Super report p.14 §2.4: 'optimizer with a weight decay of 0.1'."
+
+  scaling.hp_rule:
+    value: "Nemotron 3 Super recipe and hyperparameters, adjusted to a 20T WSD horizon and 2.5e-4 peak LR"
+    source: report
+    at: "PDF page 8; §2.4"
+    quote: "We follow the same training recipe and hyperparameters as Nemotron 3 Super (NVIDIA, 2026), with a few adjustments"

@@ -1,0 +1,338 @@
+name: Ling-2.6-1T-base
+org: inclusionAI
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/inclusionAI/Ling-2.6-1T-base/resolve/64beeb8a048920769d206e52ae303a81779296ec/README.md, kind: model-card}
+  config: {url: https://huggingface.co/inclusionAI/Ling-2.6-1T-base/resolve/64beeb8a048920769d206e52ae303a81779296ec/config.json, kind: config}
+  hf-index: {url: https://huggingface.co/inclusionAI/Ling-2.6-1T-base/resolve/64beeb8a048920769d206e52ae303a81779296ec/model.safetensors.index.json, kind: config}
+  modeling_bailing_moe_v2_5: {url: https://huggingface.co/inclusionAI/Ling-2.6-1T-base/resolve/64beeb8a048920769d206e52ae303a81779296ec/modeling_bailing_moe_v2_5.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2606.15079v1, kind: paper}
+  hf-api: {url: https://huggingface.co/api/models/inclusionAI/Ling-2.6-1T-base, kind: api}
+
+not_disclosed: [params.active_non_embedding, train.optimizer, train.lr_peak, train.lr_min, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip]
+
+config_unused:
+  max_window_layers: not read by modeling_bailing_moe_v2_5.py
+  moe_layer_freq: not read by modeling_bailing_moe_v2_5.py
+  num_key_value_heads: "64 = num_attention_heads: MLA num_key_value_groups is 1 (repeat_kv2 no-op); Lightning sets KV heads to num_attention_heads"
+  num_kv_heads_for_linear_attn: not read; Lightning sets KV heads to num_attention_heads
+  rotary_dim: not read; Lightning rotary width comes from partial_rotary_factor
+
+facts:
+  meta.released:
+    value: "2026-06-02"
+    source: hf-api
+    at: "/createdAt"
+    quote: "2026-06-02T"
+    note: "Hugging Face repository creation date; no dated publisher page for the base weights (report: arXiv 13 Jun 2026)."
+
+  meta.license: {value: mit, source: card, at: "README.md; YAML front matter", quote: "license: mit"}
+
+  params.active:
+    value: 63_000_000_000
+    source: card
+    at: "README.md; 3. Model Summary"
+    quote: "Totoal ~1T, Activated ~63B"
+  params.note:
+    value: "Approximate (~) card figures; whether the MTP layer is counted is not stated."
+    source: card
+    at: "README.md; 3. Model Summary"
+    quote: "Totoal ~1T, Activated ~63B"
+  params.total:
+    value: 1_000_000_000_000
+    source: card
+    at: "README.md; 3. Model Summary"
+    quote: "Totoal ~1T, Activated ~63B"
+
+  shape.d_model:
+    value: 8192
+    source: report
+    at: "p.5 §2.1.1; config /hidden_size"
+    quote: "We set the number of Transformer layers to 80 and the hidden dimension d to 8,192."
+  shape.layers:
+    value: 80
+    source: report
+    at: "p.5 §2.1.1; config /num_hidden_layers"
+    quote: "We set the number of Transformer layers to 80 and the hidden dimension d to 8,192."
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab:
+    value: 157_184
+    source: report
+    at: "p.5 §2.1.1; config /vocab_size"
+    quote: "The model uses a vocabulary size of 157,184"
+
+  attn.bias:
+    value: false
+    source: config
+    at: "/use_qkv_bias"
+    note: "Read for MLA q_a/kv_a and Lightning QKV projections; output projections use /use_bias (false)."
+  attn.gate:
+    value: "sigmoid gate after group RMSNorm, before the output projection, on Lightning layers; none on MLA layers"
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5LinearAttention.forward"
+    quote: "o = o * torch.sigmoid_(g_proj)"
+    note: "Group RMSNorm over 8 groups (/group_norm_size). MLA layers project straight to the output (no g_proj in BailingMoeV2_5MultiLatentAttention)."
+  attn.global_layers:
+    value: 10
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5DecoderLayer.__init__"
+    quote: "if (layer_idx + 1) % config.layer_group_size == 0"
+    basis: inferred
+    note: "MLA at layers 7, 15, …, 79: 80 / /layer_group_size 8."
+  attn.head_dim:
+    value: 192
+    source: config
+    at: "/qk_nope_head_dim + /qk_rope_head_dim"
+    note: "MLA layers. /head_dim=128 is the Lightning Attention head size."
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "Lightning, MLA"
+    source: report
+    at: "p.5 §2.1"
+    quote: "design a hybrid attention architecture combining Lightning Attention with MLA in a 7:1 ratio"
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.layout:
+    value: "7 Lightning : 1 MLA"
+    source: report
+    at: "p.5 §2.1"
+    quote: "design a hybrid attention architecture combining Lightning Attention with MLA in a 7:1 ratio"
+  attn.linear_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.linear_heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.linear_kind:
+    value: "Lightning Attention: 64 heads × 128, fixed per-head ALiBi-style decay slopes scaled down with depth, per-head QK RMSNorm, partial RoPE (64 of 128 dims), group-RMSNorm + sigmoid output gate"
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5LinearAttention.build_slope_tensor"
+    quote: "Build a tensor of slopes for Lightning Attention-2"
+  attn.linear_layers:
+    value: 70
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5DecoderLayer.__init__"
+    quote: "if (layer_idx + 1) % config.layer_group_size == 0"
+    basis: inferred
+    note: "80 layers minus 10 MLA layers (every 8th)."
+  attn.position:
+    value: "partial RoPE (MLA, decoupled 64 of 192 QK dims, interleaved), partial RoPE (Lightning, 64 of 128 dims)"
+    source: report
+    at: "p.5 §2.1.1"
+    note: "Lightning rotary width = head_dim 128 × partial_rotary_factor 0.5."
+    quote: "The rotary dimension is set to 64, i.e., Partial RoPE is applied to a subset of head dimensions."
+  attn.q_lora_rank: {value: 1536, source: config, at: "/q_lora_rank"}
+  attn.qk_norm:
+    value: false
+    source: report
+    at: "p.7 §2.1.3"
+    quote: "We resolve this by removing QK Norm prior to the MLA conversion."
+    note: "MLA layers: Ling-2.0 QK Norm was fused into the projections before conversion. Lightning layers keep per-head QK RMSNorm (use_qk_norm, read only by BailingMoeV2_5LinearAttention)."
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta:
+    value: 6_000_000
+    source: report
+    at: "p.5 §2.1.1; config /rope_theta"
+    quote: "via RoPE (Su et al., 2024) positional encoding with θ = 6,000,000."
+  attn.v_head_dim: {value: 128, source: config, at: "/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5MLP.forward"
+    quote: "return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn = ACT2FN[/hidden_act] = silu; report: \"We employ SiLU as the activation function\"."
+  ffn.dim:
+    value: 18432
+    source: report
+    at: "p.5 §2.1.1; config /intermediate_size"
+    quote: "For the first 4 Transformer blocks, we use dense FFN layers with an intermediate size of 18,432 rather than MoE layers."
+
+  moe.balancing:
+    value: "aux-loss-free expert bias, update rate γ=0.001 in continued pretraining, 0.0001 in mid-training"
+    source: report
+    at: "p.9 §2.3.1; config /moe_router_enable_expert_bias, /topk_method noaux_tc"
+    quote: "γ=0.001 during continue pre-training, which is then reduced to 0.0001 for mid-training."
+  moe.dense_layers:
+    value: 4
+    source: report
+    at: "p.5 §2.1.1; config /first_k_dense_replace"
+    quote: "For the first 4 Transformer blocks, we use dense FFN layers with an intermediate size of 18,432 rather than MoE layers."
+  moe.expert_dim:
+    value: 2048
+    source: report
+    at: "p.5 §2.1.1; config /moe_intermediate_size"
+    quote: "the intermediate hidden dimension of each routed expert is 2,048."
+  moe.experts:
+    value: 256
+    source: report
+    at: "p.5 §2.1.1; config /num_experts, /n_routed_experts"
+    quote: "Each MoE layer consists of 1 shared expert and 256 routed experts"
+  moe.groups:
+    value: "8 groups, top-4 groups per token"
+    source: report
+    at: "p.5 §2.1.1; config /n_group, /topk_group"
+    quote: "We adopt a grouped routing strategy with ngroup = 8 groups and top-4 group selection"
+  moe.norm_topk:
+    value: true
+    source: report
+    at: "p.5 §2.1.1; config /norm_topk_prob"
+    quote: "the routed output is scaled by a factor of 2.5 with normalized top-k probabilities."
+  moe.routed_scale:
+    value: 2.5
+    source: report
+    at: "p.5 §2.1.1; config /routed_scaling_factor"
+    quote: "the routed output is scaled by a factor of 2.5 with normalized top-k probabilities."
+  moe.router:
+    value: sigmoid
+    source: report
+    at: "p.5 §2.1.1; config /score_function, /scoring_func, /router_dtype fp32"
+    quote: "where the router operates in FP32 precision with sigmoid scoring."
+  moe.shared:
+    value: 1
+    source: report
+    at: "p.5 §2.1.1; config /num_shared_experts"
+    quote: "Each MoE layer consists of 1 shared expert and 256 routed experts"
+  moe.shared_dim: {value: 2048, source: config, at: "/moe_shared_expert_intermediate_size"}
+  moe.top_k:
+    value: 8
+    source: report
+    at: "p.5 §2.1.1; config /num_experts_per_tok"
+    quote: "Among the routed experts, 8 experts are activated for each token."
+
+  mtp.depth:
+    value: 1
+    source: report
+    at: "p.42 App. B"
+    quote: "We therefore incorporate two additional MTP layers during the post-training stage"
+    basis: inferred
+    note: "App. B contrasts the standard single MTP layer (MTP-1) used before post-training with the two layers added after it; pretraining used MTP loss weight 0.1 (§2.3.1). Base config /num_nextn_predict_layers is 1."
+  mtp.modules: {value: 1, source: config, at: "/num_nextn_predict_layers"}
+  mtp.block:
+    value: "RMSNorm(embedding of token t+1) and RMSNorm(hidden) concatenated, eh_proj 2d→d, then one MLA + MoE block with final RMSNorm"
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5MTPLayer"
+    quote: "hidden_states = self.eh_proj(torch.cat([input_embeds, hidden_states], dim=-1))"
+  mtp.ffn:
+    value: MoE
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5MTPLayer.__init__"
+    quote: "self.mlp = BailingMoeV2_5SparseMoeBlock(config)"
+  mtp.shares_embedding:
+    value: true
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5ForCausalLM.forward"
+    quote: "mtp_logits = self.lm_head(mtp_hidden_states).float()"
+    note: "Input embedding is also the shared word_embeddings (BailingMoeV2_5Model.forward)."
+  mtp.loss_weight:
+    value: "0.1"
+    source: report
+    at: "p.9 §2.3.1"
+    quote: "The MTP loss weight is set to 0.1."
+  mtp.released:
+    value: true
+    source: hf-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: "\"model.layers.80.eh_proj.weight\""
+
+  norm.eps:
+    value: 1.0e-6
+    source: config
+    at: "/rms_norm_eps"
+  norm.placement:
+    value: pre
+    source: modeling_bailing_moe_v2_5
+    at: "modeling_bailing_moe_v2_5.py; BailingMoeV2_5DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "p.5 §2.1.1"
+    quote: "We employ SiLU as the activation function and RMSNorm"
+
+  ctx.extension:
+    value: "Mid-training: 4K → 32K (250B, 20% of sequences at 32K) → 32K (425B) → 256K (525B)"
+    source: report
+    at: "p.10 §2.3.2"
+    quote: "The third phase covers 525B tokens and extends the context window to 256K"
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.10 §2.3.2"
+    quote: "The third phase covers 525B tokens and extends the context window to 256K"
+  ctx.max:
+    value: 262_144
+    source: report
+    at: "p.5 §2.1.1; config /max_position_embeddings"
+    quote: "supports a maximum context length of 262,144 tokens"
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.10 §2.3.2"
+    quote: "all parameters are unfrozen for full continued training on 8T tokens with a 4K context window."
+
+  train.averaging:
+    value: "checkpoint merging in place of LR decay (WSM)"
+    source: report
+    at: "p.9 §2.3.1"
+    quote: "the final annealing effect is achieved through checkpoint merging."
+  train.data:
+    value: "Continued pretraining: ~46% reasoning (math, code), 50% general, 4% multilingual; multilingual web data dropped in mid-training. Adds 1.1T Fineweb2/Fineweb2-hq and ~70B synthetic web-code tokens; agentic trajectory corpus"
+    source: report
+    at: "p.10 §2.3.2"
+    quote: "The data mixture allocates approximately 46% to reasoning-intensive domains (e.g., mathematics and code), 50% to general corpora (e.g., web text), and 4% to multilingual data."
+    note: "Fineweb2 and synthetic web-code figures: p.8 §2.2.2; multilingual mid-training mix: p.9."
+  train.init:
+    value: "Continued from Ling-2.0-1T-base (20T tokens); GQA converted to Lightning Attention (new params random) and to MLA via TransMLA after fusing QK Norm into the projections"
+    source: report
+    at: "p.9 §2.3.2"
+    quote: "Starting from the Ling-2.0 base checkpoint, this stage smoothly transitions the architecture from GQA-based Softmax Attention to the hybrid linear attention with MLA"
+  train.precision:
+    value: "FP8, with FP32 optimizer master weights"
+    source: report
+    at: "p.29 §4.2"
+    quote: "Since Ling-2.6 uses FP8 training from pretraining through supervised fine-tuning, FP32 optimizer master weights retain higher-precision information"
+  train.schedule:
+    value: "WSM: linear warmup, then constant LR to the end; no decay phase"
+    source: report
+    at: "p.9 §2.3.1"
+    quote: "We continue to use the WSM scheduler from Ling-2.0: a linear warmup to a peak learning rate, followed by a constant phase until training concludes"
+    note: "Mid-training phase 1 explicitly keeps the peak LR; other hyper-parameters are inherited from Ling-2.0 and not restated."
+  train.stages:
+    value:
+      - name: migration
+        tokens: 400_000_000_000
+        seq_len: 4096
+        note: "Four steps: Lightning conversion, linear warmup (partial unfreeze), MLA conversion, MLA warmup; all at 4K (Figure 4)."
+        quote: "It proceeds in four steps over approximately 400B tokens."
+      - name: continued
+        tokens: 8_000_000_000_000
+        seq_len: 4096
+        quote: "all parameters are unfrozen for full continued training on 8T tokens with a 4K context window."
+      - name: mid-1
+        tokens: 250_000_000_000
+        seq_len: 32768
+        note: "20% of sequences at 32K; LR stays at the pretraining peak."
+        quote: "The first phase trains on 250B tokens, sampling 20% of sequences at 32K length"
+      - name: mid-2
+        tokens: 425_000_000_000
+        seq_len: 32768
+        quote: "The second phase spans 425B tokens at 32K context length"
+      - name: mid-3
+        tokens: 525_000_000_000
+        seq_len: 262_144
+        quote: "The third phase covers 525B tokens and extends the context window to 256K"
+    source: report
+    at: "p.9–10 §2.3.2"
+  train.tokens:
+    value: 9_600_000_000_000
+    source: report
+    at: "p.9 §2.3"
+    quote: "processes approximately 9.6T tokens across three stages."
+    note: "Continued-pretraining tokens on top of Ling-2.0-1T-base's 20T; approximate."
+  scaling.hp_rule:
+    value: "LR and batch size from Ling scaling laws re-fit on the hybrid linear-attention architecture for the total training budget; other HPs from Ling-2.0"
+    source: report
+    at: "p.9 §2.3.1"
+    quote: "we first re-establish the Ling scaling laws on the hybrid linear attention architecture to determine the appropriate learning rate and batch size given the total training budget"
+  scaling.ladder:
+    value: "equal-FLOPs scaling-law runs over hybrid group size M ∈ {2, 4, 8, 16} (1 MLA + M−1 Lightning per group); model sizes not given"
+    source: report
+    at: "p.5 §2.1.2, Figure 3, Table 2"
+    quote: "We define the layer group size M such that each group contains 1 Full Attention (MLA) layer and M − 1 Linear Attention layers, and compare configurations with M ∈ {2, 4, 8, 16}"

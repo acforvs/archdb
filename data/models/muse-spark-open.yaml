@@ -1,0 +1,299 @@
+name: Muse-Spark-Open-816B-A42B
+org: Meta
+kind: reasoning
+note: "Only the post-trained multimodal checkpoint is public. Its config.json is gated, so values noted as MuseSparkTextConfig defaults come from the transformers config class declared for this checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/meta-models/Muse-Spark-Open-816B-A42B/resolve/0fb02478b02565b2ce7fc57e6051c91172774ac9/README.md, kind: model-card}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/muse_spark/modeling_muse_spark.py, kind: code}
+  configuration_muse_spark: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/muse_spark/configuration_muse_spark.py, kind: code}
+  torchtitan_flavors: {url: https://raw.githubusercontent.com/pytorch/torchtitan/48bbce4434dfac2c38fedc9c7ef9c1998b04cf50/torchtitan/models/muse_spark/flavors.py, kind: code}
+
+not_disclosed: [moe.balancing, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision, params.active_non_embedding]
+
+facts:
+  meta.released:
+    value: "2026-10-15"
+    source: card
+    at: "README.md; Muse Spark Open Model Overview; Date of Release"
+    quote: "Date of Release | October 15th, 2026"
+  meta.license:
+    value: "other (Muse Model License)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: muse-model-license"
+  params.total:
+    value: 816_000_000_000
+    source: card
+    at: "README.md; Muse Spark Open Model Card"
+    quote: "Muse Spark Open is an 816B total/42B active parameter open weights model with a context window of 1M tokens."
+  params.active:
+    value: 42_000_000_000
+    source: card
+    at: "README.md; Muse Spark Open Model Card"
+    quote: "Muse Spark Open is an 816B total/42B active parameter open weights model with a context window of 1M tokens."
+  params.note:
+    value: "Whether 816B includes the 1.8B-param Perception Encoder is not stated."
+    source: card
+    at: "README.md; Muse Spark Open Model Overview; Type"
+    quote: "Mixture-of-Experts Transformer, with Perception Encoder"
+  params.embedding:
+    value: 3_310_354_432
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: 'untied input/output embeddings, vocab × dim \= 202,048 × 8192 ≈ \~1.66B'
+    basis: inferred
+    note: "2 × 202,048 × 8192 for the untied input embedding and output layer."
+
+  shape.d_model:
+    value: 8192
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Hidden Dimension: 8192"
+  shape.layers:
+    value: 62
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Number of Layers: 62"
+  shape.vocab:
+    value: 202_048
+    source: card
+    at: "README.md; Model Overview; Vocabulary Size"
+    quote: "Vocabulary Size | 202,048"
+  shape.tied_embeddings:
+    value: false
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "untied input/output embeddings"
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig.__post_init__"
+    quote: "Full attention on NoPE layers (every 4th, counted backward from the last), sliding otherwise — the reference config's sliding_window_pattern [w, w, w, 0]."
+    note: "Card: grouped-query attention."
+  attn.layout:
+    value: "3 SWA : 1 global"
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig.__post_init__"
+    quote: "Full attention on NoPE layers (every 4th, counted backward from the last), sliding otherwise — the reference config's sliding_window_pattern [w, w, w, 0]."
+    basis: inferred
+    note: "With 62 layers (card), global layers are 1, 5, ..., 61."
+  attn.global_layers:
+    value: 16
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig.__post_init__"
+    quote: "Full attention on NoPE layers (every 4th, counted backward from the last), sliding otherwise — the reference config's sliding_window_pattern [w, w, w, 0]."
+    basis: inferred
+    note: "Layers i in 0..61 (62 layers, card) with (61 - i) % 4 == 0."
+  attn.local_layers:
+    value: 46
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig.__post_init__"
+    quote: "Full attention on NoPE layers (every 4th, counted backward from the last), sliding otherwise — the reference config's sliding_window_pattern [w, w, w, 0]."
+    basis: inferred
+    note: "62 layers (card) minus 16 global layers."
+  attn.heads:
+    value: 128
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Number of Attention Heads: 128 for Q and 16 for KV (grouped-query attention)"
+  attn.kv_heads:
+    value: 16
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Number of Attention Heads: 128 for Q and 16 for KV (grouped-query attention)"
+    note: "MuseSparkTextAttention uses the same KV head count on SWA and global layers."
+  attn.local_heads:
+    value: 128
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Number of Attention Heads: 128 for Q and 16 for KV (grouped-query attention)"
+    note: "One attention class for both layer types; only the window and RoPE differ (MuseSparkTextAttention, torchtitan _muse_spark_config)."
+  attn.local_kv_heads:
+    value: 16
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Number of Attention Heads: 128 for Q and 16 for KV (grouped-query attention)"
+    note: "Same attention class on SWA and global layers."
+  attn.local_head_dim:
+    value: 64
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Head Dimension: 64"
+    note: "Same attention class on SWA and global layers."
+  attn.local_rope_theta:
+    value: 500000
+    source: torchtitan_flavors
+    at: "torchtitan/models/muse_spark/flavors.py; module constants"
+    quote: "_ROPE_THETA = 500_000.0"
+    note: "Also the rope_parameters default of MuseSparkTextConfig; global layers are NoPE."
+  attn.head_dim:
+    value: 64
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Head Dimension: 64"
+  attn.window:
+    value: 2048
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "sliding_window: int | None = 2048"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B)."
+  attn.position:
+    value: "RoPE (SWA, θ 500000), NoPE (global)"
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig docstring, layer_rope_theta"
+    quote: "Defaults to the global theta everywhere except every 4th layer counted backward from the last, which is NoPE."
+    note: "θ 500000 is the default rope_parameters in MuseSparkTextConfig.__post_init__, a class declared for this checkpoint."
+  attn.qk_norm:
+    value: true
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "QK-norm enabled"
+    note: "Weightless RMSNorm on Q and K (MuseSparkTextAttention); see attn.scale."
+  attn.scale:
+    value: "1/sqrt(head_dim) × 5.4730064863875 (Q multiplied by qk_scale_factor after QK-norm)"
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "qk_scale_factor: float = 5.4730064863875"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B). Applied in MuseSparkTextAttention.forward."
+  attn.bias:
+    value: false
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "attention_bias: bool = False"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B)."
+  attn.gate:
+    value: "elementwise sigmoid gate computed from the block input, applied after a weightless per-head output RMSNorm, before o_proj"
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkTextAttention.forward"
+    quote: "attn_output = attn_output * torch.sigmoid(self.gate_proj(hidden_states))"
+    note: "Card: output gate and output norm on the attention block."
+
+  ffn.activation:
+    value: SwiGLU
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkExperts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn is hidden_act, silu by MuseSparkTextConfig default (class declared for this checkpoint)."
+  ffn.clamp:
+    value: "none"
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkExperts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "The torchtitan 816B-A42B flavor also uses plain SwiGLU; only torchtitan's Dist-MoE throughput recipes for continued training from the released checkpoint swap in ClampedSwiGLU (limit 7, α 1.702, up + 1), a different function, so it does not describe pretraining."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkExperts.__init__"
+    quote: "self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts, 2 * self.intermediate_dim, self.hidden_dim))"
+    basis: inferred
+    note: "Experts hold only gate_up_proj and down_proj weights; no bias parameters."
+
+  moe.experts:
+    value: 256
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Number of Experts: 256"
+  moe.top_k:
+    value: 8
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "Experts Activated per Token: 8 (top-k routing)"
+  moe.expert_dim:
+    value: 4096
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "moe_intermediate_size: int = 4096"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B). Experts run at moe_hidden_size 4096 (see moe.latent_dim)."
+  moe.shared:
+    value: 0
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkMoE.__init__"
+    quote: "self.experts = MuseSparkExperts(config) self.post_expert_proj = nn.Linear(config.moe_hidden_size, config.hidden_size, bias=False)"
+    basis: inferred
+    note: "MuseSparkMoE has a router, pre/post projections and routed experts only; no shared-expert branch."
+  moe.dense_layers:
+    value: 0
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig.__post_init__"
+    quote: 'self.mlp_layer_types = ["sparse"] * self.num_hidden_layers'
+    note: "MuseSparkTextConfig default; the torchtitan 816B-A42B flavor also builds a MoE FFN in all 62 layers."
+  moe.router:
+    value: sigmoid
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkTopkRouter.__init__"
+    quote: 'self.scoring_function = ACT2FN["sigmoid"]'
+    note: "Logits computed in FP32 and scaled by output_multiplier; an e_score_correction_bias buffer is added for top-k selection only."
+  moe.norm_topk:
+    value: true
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkTopkRouter.forward"
+    quote: "top_k_weights = top_k_weights / (top_k_weights.sum(dim=-1, keepdim=True) + self.norm_topk_prob_eps)"
+  moe.routed_scale:
+    value: 1.0
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "routed_scaling_factor: float = 1.0"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B)."
+  moe.latent_dim:
+    value: 4096
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "moe_hidden_size: int = 4096"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B). pre_expert_proj 8192 → 4096 (then RMSNorm) before the experts, post_expert_proj back to 8192."
+
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkTextDecoderLayer.__init__"
+    quote: "self.input_layernorm = MuseSparkTextCenteredRMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+    note: "Pre-attention and pre-FFN norms; post-attention norm is weightless, post-FFN norm scales the input by (1+w) before normalizing, final norm is a plain RMSNorm."
+  norm.placement:
+    value: sandwich
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkTextDecoderLayer.forward"
+    quote: "hidden_states = self.post_attention_layernorm(hidden_states) hidden_states = self.post_attention_residual_gate(residual, hidden_states)"
+    note: "The post-norm output joins the residual through a learned gate (see norm.residual)."
+  norm.eps:
+    value: 1.0e-5
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "rms_norm_eps: float = 1e-5"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B). Post-attention, post-FFN and post-expert norms use post_norm_eps 1e-8."
+  norm.residual:
+    value: "learned per-channel residual gate: alpha·residual + beta·h, beta = sigmoid(g/0.3), alpha = sqrt(sigmoid(-g/0.3)·(1+beta))"
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkResidualGate.forward"
+    quote: "alpha = torch.sqrt(torch.clamp(torch.sigmoid(-w) * (1.0 + beta), min=self.eps))"
+    note: "Temperature 0.3 is the residual_gate_temperature default of MuseSparkTextConfig (class declared for this checkpoint)."
+  norm.embedding:
+    value: "weightless RMSNorm after embedding lookup"
+    source: hf-transformers
+    at: "modeling_muse_spark.py; MuseSparkTextNormedEmbedding.forward"
+    quote: "return self.embed_norm(super().forward(input_ids))"
+  norm.output_scale:
+    value: "logits × 1/sqrt(d_model/256) = 0.1767766952966369, before the softcap"
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig docstring, output_multiplier"
+    quote: "Equal to `1/sqrt(hidden_size / 256)` for the released checkpoint."
+    note: "Router logits are scaled by the same output_multiplier."
+  norm.logit_softcap:
+    value: 20
+    source: configuration_muse_spark
+    at: "configuration_muse_spark.py; MuseSparkTextConfig"
+    quote: "final_logit_softcapping: float = 20.0"
+    note: "MuseSparkTextConfig default; the class is declared for this checkpoint (auto_docstring checkpoint=meta-models/Muse-Spark-Open-816B-A42B). Logits are first multiplied by output_multiplier (see norm.output_scale)."
+
+  ctx.max:
+    value: 1_000_000
+    source: card
+    at: "README.md; Muse Spark Open Model Card"
+    quote: "with a context window of 1M tokens"
+
+  train.data:
+    value: "text, images, audio and video; more than 100 languages"
+    source: card
+    at: "README.md; Training data"
+    quote: "Training data includes text, images, audio, and video."
+    note: "Card Languages row: trained on data from more than 100 languages."

@@ -1,0 +1,211 @@
+name: Step-3
+org: StepFun
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint (stepfun-ai/step3, a VLM); architecture facts are for the language model."
+
+sources:
+  card: {url: https://huggingface.co/stepfun-ai/step3/resolve/e2d67fc936dc60f8f606f2429728f1dea503e10d/README.md, kind: model-card}
+  config: {url: https://huggingface.co/stepfun-ai/step3/resolve/e2d67fc936dc60f8f606f2429728f1dea503e10d/config.json, kind: config}
+  index: {url: https://huggingface.co/stepfun-ai/step3/resolve/e2d67fc936dc60f8f606f2429728f1dea503e10d/model.safetensors.index.json, kind: config}
+  configuration_step3: {url: https://huggingface.co/stepfun-ai/step3/resolve/e2d67fc936dc60f8f606f2429728f1dea503e10d/configuration_step3.py, kind: code}
+  modeling_step3: {url: https://huggingface.co/stepfun-ai/step3/resolve/e2d67fc936dc60f8f606f2429728f1dea503e10d/modeling_step3.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2507.19427v1, kind: paper}
+  blog: {url: "https://web.archive.org/web/20250812171427/https://stepfun.ai/research/en/step3", kind: blog}
+
+not_disclosed:
+  - params.active_non_embedding
+  - moe.balancing
+  - mtp.depth
+  - ctx.pretrain
+  - ctx.final
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+facts:
+  meta.released:
+    value: "2025-07-25"
+    source: report
+    at: "p.1 arXiv stamp"
+    quote: "arXiv:2507.19427v1 [cs.LG] 25 Jul 2025"
+    note: "Report predates the weights (release blog dated July 31, 2025)."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; front matter"
+    quote: "license: apache-2.0"
+
+  params.total:
+    value: 321_000_000_000
+    source: card
+    at: "README.md; Introduction"
+    quote: "with 321B total parameters and 38B active"
+  params.active:
+    value: 38_000_000_000
+    source: card
+    at: "README.md; Introduction"
+    quote: "with 321B total parameters and 38B active"
+  params.note:
+    value: "321B includes the 5B vision encoder; the LLM alone is 316B. 38B active per text token."
+    source: card
+    at: "README.md; Step3 model card table"
+    quote: "Total Parameters (LLM) | 316B"
+
+  shape.layers: {value: 61, source: config, at: "/text_config/num_hidden_layers"}
+  shape.d_model: {value: 7168, source: config, at: "/text_config/hidden_size"}
+  shape.vocab: {value: 128_815, source: config, at: "/text_config/vocab_size"}
+  shape.tied_embeddings:
+    value: false
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: "\"lm_head.weight\": \"model-00005.safetensors\""
+    basis: inferred
+    note: "Inferred from the checkpoint: lm_head.weight (shard 5) and model.embed_tokens.weight (shard 1) are separate [128815, 7168] tensors with different bytes; no config key or code states tying (config.json has no tie_word_embeddings)."
+  shape.tokenizer:
+    value: "DeepSeek-V3 tokenizer"
+    source: card
+    at: "README.md; Step3 model card table"
+    quote: "Tokenizer | Deepseek V3"
+
+  attn.kind:
+    value: MFA
+    source: card
+    at: "README.md; Step3 model card table"
+    quote: "Attention Mechanism | MFA"
+    note: "Multi-matrix Factorization Attention: query down-projected 7168 → 2048 (/text_config/share_q_dim), RMSNorm, up-projected to 64×256; one K and one V head shared by all query heads."
+  attn.global_layers:
+    value: 61
+    source: card
+    at: "README.md; Step3 model card table"
+    quote: "Number of Layers (Dense layer included)|61"
+    note: "Every layer uses full MFA attention (Step3vDecoderLayer)."
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}
+  attn.kv_heads:
+    value: 1
+    source: report
+    at: "p.2 §2"
+    quote: "Key and a Value head, all with a dimension of 256."
+    note: "Step3vAttention hardcodes num_key_value_heads = 1 (/text_config/num_attention_groups 1 is not read). The cache is 512 elements per token per layer, matching report Table 3 (1.02e9 bytes at 32K in FP8 = 32,768 × 61 × 512)."
+  attn.head_dim: {value: 256, source: config, at: "/text_config/head_dim"}
+  attn.position:
+    value: RoPE
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vAttention.forward"
+    quote: "query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)"
+    note: "All 256 dims rotated; no rope_scaling in config.json."
+  attn.rope_theta: {value: 500_000, source: config, at: "/text_config/rope_theta"}
+  attn.qk_norm:
+    value: false
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vAttention.forward"
+    quote: "query_states = self.inter_norm(query_states)"
+    note: "The only attention norm is RMSNorm on the 2048-dim query latent before up-projection; per-head Q and K are not normalized."
+  attn.bias:
+    value: false
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vAttention.__init__"
+    quote: "self.k_proj = nn.Linear(config.hidden_size, self.head_dim, bias=False)"
+    note: "q_proj, wq, v_proj and o_proj are also bias-free."
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vMLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU; routed experts use the same form (Step3vMoEMLP.get_expert_output)."
+  ffn.dim:
+    value: 18432
+    source: config
+    at: "/text_config/intermediate_size"
+    note: "Dense FFN of layers 0–3 and 60."
+  ffn.bias:
+    value: false
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.experts: {value: 48, source: config, at: "/text_config/moe_num_experts"}
+  moe.top_k: {value: 3, source: config, at: "/text_config/moe_top_k"}
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Step3 model card table"
+    quote: "Number of Shared Experts| 1"
+  moe.expert_dim: {value: 5120, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.shared_dim: {value: 5120, source: config, at: "/text_config/share_expert_dim"}
+  moe.dense_layers:
+    value: 4
+    source: config
+    at: "config.json text_config.moe_layers_enum"
+    quote: "\"moe_layers_enum\": \"4,5,6,7,"
+    note: "moe_layers_enum lists layers 4–59, so the last layer (60) is dense too: 5 dense layers in total (card)."
+  moe.router:
+    value: softmax
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vMoEMLP.forward"
+    quote: "routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)"
+  moe.norm_topk:
+    value: false
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vMoEMLP.forward"
+    quote: "routing_weights, selected_experts = torch.topk(routing_weights, self.top_k, dim=-1) # we cast back to the input dtype"
+    note: "Top-k softmax weights are used without renormalization, consistent with /text_config/norm_expert_weight false (which the code does not read)."
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vDecoderLayer.__init__"
+    quote: "self.input_layernorm = Step3vRMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.placement:
+    value: pre
+    source: modeling_step3
+    at: "modeling_step3.py; Step3vDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.eps:
+    value: 1e-5
+    source: configuration_step3
+    at: "configuration_step3.py; Step3TextConfig.__init__"
+    quote: "rms_norm_eps: float = 1e-5,"
+    note: "config.json sets no rms_norm_eps, so the Step3TextConfig default applies."
+
+  ctx.max:
+    value: 65536
+    source: card
+    at: "README.md; Step3 model card table"
+    quote: "Max Context Length | 65536"
+    note: "/text_config/max_seq_len and /text_config/max_position_embedding (RoPE cache length) are also 65536."
+
+  train.tokens:
+    value: ">20T"
+    source: blog
+    at: "Pretrain Data"
+    quote: "During pretraining, Step3 processes over 20T text tokens across more than ten languages"
+    note: "Text tokens; 4T image-text mixed tokens are counted separately."
+  train.data:
+    value: ">20T text tokens in >10 languages, 3.7T high-quality tokens reserved for annealing; web and licensed publisher data, MinHash-deduplicated; 4T image-text mixed tokens"
+    source: blog
+    at: "Pretrain Data"
+    quote: "of which 3.7T high-quality tokens are reserved for the annealing phases, while incorporating 4T image-text mixed tokens"
+  train.objective:
+    value: "multimodal: 4T image-text mixed tokens in pretraining; connector and LLM trained on 1.4T multimodal tokens with the 5B vision encoder frozen"
+    source: blog
+    at: "Multimodal"
+    quote: "In the second stage, the vision encoder is frozen, and the Connector and the LLM are trained on the full dataset, totaling 1.4T tokens."
+  train.stages:
+    value:
+      - name: pretraining
+        note: ">20T text tokens in total, including annealing."
+        quote: "During pretraining, Step3 processes over 20T text tokens"
+      - name: annealing
+        tokens: 3_700_000_000_000
+        note: "Several annealing phases on high-quality data."
+        quote: "of which 3.7T high-quality tokens are reserved for the annealing phases"
+    source: blog
+    at: "Pretrain Data"

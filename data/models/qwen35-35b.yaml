@@ -1,0 +1,197 @@
+name: Qwen3.5-35B-A3B
+org: Qwen
+kind: reasoning
+note: "Describes the post-trained checkpoint; the base weights are public separately as Qwen3.5-35B-A3B-Base."
+
+sources:
+  card: {url: https://huggingface.co/Qwen/Qwen3.5-35B-A3B/resolve/59d61f3ce65a6d9863b86d2e96597125219dc754/README.md, kind: model-card}
+  config: {url: https://huggingface.co/Qwen/Qwen3.5-35B-A3B/resolve/59d61f3ce65a6d9863b86d2e96597125219dc754/config.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/qwen3_5_moe/modeling_qwen3_5_moe.py, kind: code}
+  weights-index: {url: https://huggingface.co/Qwen/Qwen3.5-35B-A3B/resolve/59d61f3ce65a6d9863b86d2e96597125219dc754/model.safetensors.index.json, kind: config}
+  github: {url: https://raw.githubusercontent.com/QwenLM/Qwen3.8/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md, kind: model-card}
+  flash_next_report: {url: https://raw.githubusercontent.com/QwenLM/Qwen3.8-Flash-Next/69885871a64393807d988b27b1b5e380e8f28526/tech_report.pdf, kind: paper}
+
+not_disclosed: [mtp.depth, mtp.loss_weight, moe.balancing, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision, params.active_non_embedding]
+
+config_unused:
+  mamba_ssm_dtype: GDN recurrent-state dtype for serving; not read by the modeling code
+  mrope_interleaved: not read; the modeling code always interleaves the T/H/W sections
+
+facts:
+  meta.released:
+    value: "2026-02-24"
+    source: github
+    at: "QwenLM GitHub README; News"
+    quote: "2026-02-24: Qwen3.5-122B-A10B, Qwen3.5-35B-A3B, and Qwen3.5-27B are released"
+  meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+
+  params.active:
+    value: 3_000_000_000
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "35B in total and 3B activated"
+  params.note:
+    value: "Rounded card figure, listed under the Language Model block; the vision encoder is separate. Whether the MTP module is counted is not stated."
+    source: card
+    at: "README.md; Model Overview"
+    quote: "Type: Causal Language Model with Vision Encoder"
+  params.total:
+    value: 35_000_000_000
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "35B in total and 3B activated"
+
+  shape.d_model: {value: 2048, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 40, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 248_320, source: config, at: "/text_config/vocab_size"}
+
+  attn.gate:
+    value: "sigmoid, elementwise on the attention output before o_proj; gate projected jointly with Q"
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeAttention.forward"
+    quote: "attn_output = attn_output * torch.sigmoid(gate)"
+    note: "Config attn_output_gate true; the code applies the gate unconditionally."
+  attn.global_layers: {value: 10, source: config, at: "/text_config/layer_types | count full_attention"}
+  attn.head_dim: {value: 256, source: config, at: "/text_config/head_dim"}
+  attn.heads: {value: 16, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: "Gated DeltaNet, GQA"
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "10 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))"
+    note: "Gated Attention is GQA with 16 Q / 2 KV heads."
+  attn.kv_heads: {value: 2, source: config, at: "/text_config/num_key_value_heads"}
+  attn.layout:
+    value: "3 Gated DeltaNet : 1 GQA"
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "10 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))"
+    note: "Config full_attention_interval 4; layer_types lists the same pattern."
+  attn.linear_layers: {value: 30, source: config, at: "/text_config/layer_types | count linear_attention"}
+  attn.position:
+    value: "partial RoPE"
+    source: card
+    at: "README.md; Model Overview; Gated Attention"
+    quote: "Rotary Position Embedding Dimension: 64"
+    note: "64 of 256 head dims rotated; config rope_parameters mrope_section [11, 11, 10], interleaved in code."
+  attn.qk_norm:
+    value: true
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeAttention.__init__"
+    quote: "self.q_norm = Qwen3_5MoeRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+    note: "Per-head RMSNorm on Q and K in the full-attention layers."
+  attn.rope_fraction: {value: 0.25, source: config, at: "/text_config/rope_parameters/partial_rotary_factor"}
+  attn.rope_theta: {value: 10_000_000, source: config, at: "/text_config/rope_parameters/rope_theta"}
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+  attn.conv: {value: 4, source: config, at: "/text_config/linear_conv_kernel_dim"}
+  attn.linear_head_dim: {value: 128, source: config, at: "/text_config/linear_value_head_dim"}
+  attn.linear_heads: {value: 32, source: config, at: "/text_config/linear_num_value_heads"}
+  attn.linear_kind:
+    value: "Gated DeltaNet: 16 QK heads, 32 V heads, head dim 128, short conv 4, SiLU-gated RMSNorm on output"
+    source: card
+    at: "README.md; Model Overview; Gated DeltaNet"
+    quote: "Number of Linear Attention Heads: 32 for V and 16 for QK"
+    note: "QK heads/dim from config linear_num_key_heads and linear_key_head_dim; conv kernel from config linear_conv_kernel_dim; SiLU output gate from Qwen3_5MoeRMSNormGated in modeling_qwen3_5_moe.py."
+
+  ffn.activation:
+    value: "SwiGLU"
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeExperts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn is SiLU (config hidden_act silu)."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Shared-expert MLP; routed experts are bias-free weight tensors."
+
+  moe.expert_dim: {value: 512, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/text_config/num_experts"}
+  moe.router:
+    value: softmax
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeTopKRouter.forward"
+    quote: "router_probs = torch.nn.functional.softmax(router_logits, dtype=torch.float, dim=-1)"
+    note: "Top-k taken after softmax; shared expert has its own sigmoid gate."
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model Overview; Mixture of Experts"
+    quote: "8 Routed + 1 Shared"
+  moe.shared_dim: {value: 512, source: config, at: "/text_config/shared_expert_intermediate_size"}
+  moe.top_k: {value: 8, source: config, at: "/text_config/num_experts_per_tok"}
+  moe.dense_layers:
+    value: 0
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "10 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))"
+    note: "Every layer is MoE; Qwen3_5Moe code has no dense-layer option."
+  moe.norm_topk:
+    value: true
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeTopKRouter.forward"
+    quote: "router_top_value /= router_top_value.sum(dim=-1, keepdim=True)"
+    note: "Unconditional in this code path."
+
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/text_config/mtp_num_hidden_layers"
+    note: "One MTP decoder layer (mtp.layers.0 only in the weight index); card: MTP trained with multi-steps."
+  mtp.block:
+    value: "one decoder layer (gated attention + MoE); RMSNormed hidden state and RMSNormed next-token embedding fused by linear fc; final RMSNorm"
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.* entries"
+    quote: "mtp.pre_fc_norm_embedding.weight"
+    note: "From weight names: pre_fc_norm_hidden, pre_fc_norm_embedding, fc, layers.0 (self_attn with q_norm/k_norm, mlp), norm."
+  mtp.ffn:
+    value: "MoE"
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.layers.0.mlp"
+    quote: "mtp.layers.0.mlp.shared_expert_gate.weight"
+  mtp.shares_embedding:
+    value: true
+    source: config
+    at: "config.json; mtp_use_dedicated_embeddings"
+    quote: '"mtp_use_dedicated_embeddings": false'
+    note: "The weight index has no MTP embedding or output head."
+  mtp.released:
+    value: true
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.* entries"
+    quote: "mtp.fc.weight"
+
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeRMSNorm.forward"
+    quote: "output = output * (1.0 + self.weight.float())"
+    note: "Gain initialized at 0 and applied as 1 + weight."
+  norm.eps: {value: 1.0e-6, source: config, at: "/text_config/rms_norm_eps"}
+
+  ctx.max:
+    value: 1_010_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "262,144 natively and extensible up to 1,010,000 tokens"
+    note: "262,144 native (config max_position_embeddings); beyond that via inference-time YaRN."
+
+  train.objective:
+    value: "early-fusion training on vision-language tokens"
+    source: card
+    at: "README.md; Qwen3.5 Highlights"
+    quote: "Early fusion training on multimodal tokens"
+
+  scaling.hp_rule:
+    value: "LR and batch from a fitted hyperparameter scaling law (coefficients not published)"
+    source: flash_next_report
+    at: "Qwen3.8-Flash-Next report p.3 §1; p.16 §3.2"
+    quote: "so we refit the scaling law (Kaplan et al., 2020) used for the Qwen3.5 series"
+    note: "§3.2 of the same report: the Qwen scaling laws cover learning rate and batch size."

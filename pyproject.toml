@@ -1,0 +1,24 @@
+[project]
+name = "archdb"
+version = "0.1.0"
+description = "Sourced database of LLM architectures and pretraining recipes"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "pillow>=11,<13",
+    "pyyaml>=6",
+]
+
+[project.scripts]
+archdb = "archdb.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 110

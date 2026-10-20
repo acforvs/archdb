@@ -1,0 +1,219 @@
+name: gpt-oss-120b
+org: OpenAI
+kind: reasoning
+note: "Only the post-trained reasoning checkpoint is public; MoE weights were quantized to MXFP4 during post-training."
+
+sources:
+  config: {url: https://huggingface.co/openai/gpt-oss-120b/resolve/b5c939de8f754692c1647ca79fbf85e8c1e70f8a/config.json, kind: config}
+  card: {url: https://arxiv.org/pdf/2508.10925v1, kind: paper}
+  hf_card: {url: https://huggingface.co/openai/gpt-oss-120b/resolve/b5c939de8f754692c1647ca79fbf85e8c1e70f8a/README.md, kind: model-card}
+  modeling_gpt_oss: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/gpt_oss/modeling_gpt_oss.py, kind: code}
+
+not_disclosed:
+  - moe.balancing
+  - mtp.depth
+  - ctx.pretrain
+  - ctx.final
+  - train.tokens
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+config_unused:
+  hidden_act: "not read by modeling_gpt_oss.py; experts compute gate · σ(1.702 · gate) directly"
+
+facts:
+  meta.released:
+    value: "2025-08-05"
+    source: card
+    at: "PDF p.1 title block"
+    quote: "August 5, 2025"
+    note: "Weights published on Hugging Face the same day."
+
+  meta.license:
+    value: apache-2.0
+    source: hf_card
+    at: "README.md YAML front matter"
+    quote: "license: apache-2.0"
+
+  params.active:
+    value: 5_130_000_000
+    source: card
+    at: "PDF p.4 §2, Table 1"
+    quote: "Active Parameters 5.13B 3.61B"
+  params.active_non_embedding:
+    value: 4_550_000_000
+    source: card
+    at: "PDF p.4 §2, Table 1 caption"
+    quote: "Unembedding parameters are counted towards active, but not embeddings."
+    basis: inferred
+    note: "5.13B − 201,088 × 2,880 (unembedding, counted as active; input embedding not counted) = ~4.55B."
+  params.note:
+    value: "Unembedding counted as active, input embedding not; 1.16B embed + unembed."
+    source: card
+    at: "PDF p.4 §2, Table 1 caption"
+    quote: "Unembedding parameters are counted towards active, but not embeddings."
+  params.total:
+    value: 116_830_000_000
+    source: card
+    at: "PDF p.4 §2, Table 1"
+    quote: "Total Parameters 116.83B 20.91B"
+  params.embedding:
+    value: 1_160_000_000
+    source: card
+    at: "PDF p.4 §2, Table 1"
+    quote: "Embed + Unembed 1.16B 1.16B"
+
+  shape.d_model: {value: 2880, source: config, at: "/hidden_size"}
+  shape.layers: {value: 36, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 201_088, source: config, at: "/vocab_size"}
+  shape.tokenizer:
+    value: "o200k_harmony: BPE extending o200k (GPT-4o, o4-mini) with harmony chat-format tokens"
+    source: card
+    at: "PDF p.5 §2.3 Tokenizer"
+    quote: "This is a Byte Pair Encoding (BPE) which extends the o200k tokenizer used for other OpenAI models such as GPT-4o and OpenAI o4-mini"
+
+  attn.global_layers: {value: 18, source: config, at: "/layer_types | count full_attention"}
+  attn.head_dim: {value: 64, source: config, at: "/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "GQA, SWA"
+    source: card
+    at: "PDF p.4 §2.2 Attention"
+    quote: "Following GPT-3, attention blocks alternate between banded window and fully dense patterns [10][11], where the bandwidth is 128 tokens."
+  attn.sinks:
+    value: "learned per-head sink logit in the softmax denominator, all layers"
+    source: card
+    at: "PDF p.4 §2.2 Attention"
+    quote: "Each attention head has a learned bias in the denominator of the softmax, similar to off-by-one attention and attention sinks"
+  attn.bias: {value: true, source: config, at: "/attention_bias"}
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "1 SWA : 1 global"
+    source: card
+    at: "PDF p.4 §2.2 Attention"
+    quote: "attention blocks alternate between banded window and fully dense patterns"
+    note: "Config /layer_types alternates strictly, starting with a sliding-window layer."
+  attn.local_layers: {value: 18, source: config, at: "/layer_types | count sliding_attention"}
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/num_attention_heads"
+    note: "GptOssAttention reads the same head counts, head_dim and rotary embedding for both layer types; only sliding_window differs."
+  attn.local_kv_heads: {value: 8, source: config, at: "/num_key_value_heads", note: "Same attribute as the full-attention layers (GptOssAttention.__init__)."}
+  attn.local_head_dim: {value: 64, source: config, at: "/head_dim", note: "Same attribute as the full-attention layers (GptOssAttention.__init__)."}
+  attn.local_rope_theta: {value: 150_000, source: config, at: "/rope_theta", note: "GptOssModel builds one rotary embedding shared by both layer types."}
+  attn.qk_norm:
+    value: false
+    source: modeling_gpt_oss
+    at: "modeling_gpt_oss.py; GptOssAttention.forward"
+    quote: "query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2)"
+    note: "Queries and keys go from projection straight to RoPE; no norm module."
+  attn.position:
+    value: RoPE
+    source: card
+    at: "PDF p.4 §2.2 Attention"
+    quote: "We apply rotary position embeddings [14] and extend the context length of dense layers to 131,072 tokens using YaRN [15]."
+  attn.rope_theta: {value: 150_000, source: config, at: "/rope_theta"}
+  attn.window: {value: 128, source: config, at: "/sliding_window"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: card
+    at: "PDF p.4 §2.2 Mixture-of-Experts"
+    quote: "The MoE blocks use the gated SwiGLU [9] activation function"
+  ffn.clamp:
+    value: "gate clamped to ≤7, up clamped to [-7, 7]; output (up + 1) · gate · σ(1.702 · gate); all MoE layers"
+    source: modeling_gpt_oss
+    at: "modeling_gpt_oss.py; GptOssExperts._apply_gate"
+    quote: "up = up.clamp(min=-self.limit, max=self.limit)"
+    note: "Limit 7.0 from config /swiglu_limit, α 1.702 from GptOssConfig default; the card calls this clamping plus a residual connection (footnote 1)."
+  ffn.bias:
+    value: true
+    source: modeling_gpt_oss
+    at: "modeling_gpt_oss.py; GptOssExperts.__init__"
+    quote: "self.gate_up_proj_bias = nn.Parameter(torch.empty(self.num_experts, 2 * self.intermediate_size))"
+
+  moe.expert_dim: {value: 2880, source: config, at: "/intermediate_size"}
+  moe.experts: {value: 128, source: config, at: "/num_local_experts"}
+  moe.router:
+    value: "softmax (over the top-k selected logits)"
+    source: card
+    at: "PDF p.4 §2.2 Mixture-of-Experts"
+    quote: "weight the output of each expert by the softmax of the router projection over only the selected experts."
+    note: "Router is a linear layer with bias (GptOssTopKRouter)."
+  moe.norm_topk:
+    value: true
+    source: card
+    at: "PDF p.4 §2.2 Mixture-of-Experts"
+    quote: "weight the output of each expert by the softmax of the router projection over only the selected experts."
+    note: "Softmax after top-k, so selected weights sum to 1."
+  moe.shared:
+    value: 0
+    source: modeling_gpt_oss
+    at: "modeling_gpt_oss.py; GptOssMLP.__init__"
+    quote: "self.router = GptOssTopKRouter(config) self.experts = GptOssExperts(config)"
+    note: "The MoE block has only a router and routed experts."
+  moe.dense_layers:
+    value: 0
+    source: modeling_gpt_oss
+    at: "modeling_gpt_oss.py; GptOssDecoderLayer.__init__"
+    quote: "self.mlp = GptOssMLP(config)"
+    note: "Every decoder layer uses the MoE block."
+  moe.top_k: {value: 4, source: config, at: "/num_experts_per_tok"}
+
+  norm.placement:
+    value: pre
+    source: card
+    at: "PDF p.4 §2.2"
+    quote: "Similar to GPT-2 we use Pre-LN placement"
+  norm.eps: {value: 1e-5, source: config, at: "/rms_norm_eps"}
+  norm.type:
+    value: RMSNorm
+    source: card
+    at: "PDF p.4 §2.2"
+    quote: "applying root mean square normalization [6] on the activations before each attention and MoE block."
+
+  ctx.extension:
+    value: "YaRN on the dense layers to 131,072"
+    source: card
+    at: "PDF p.4 §2.2 Attention"
+    quote: "extend the context length of dense layers to 131,072 tokens using YaRN [15]."
+    note: "Config rope_scaling: rope_type yarn, factor 32, original_max_position_embeddings 4096, beta_fast 32, beta_slow 1; HF code applies it to both layer types."
+  ctx.max:
+    value: 131_072
+    source: card
+    at: "PDF p.4 §2.2 Attention"
+    quote: "extend the context length of dense layers to 131,072 tokens using YaRN [15]."
+    note: "Equals config max_position_embeddings."
+
+  train.data:
+    value: "text-only, trillions of tokens; STEM, coding, general knowledge; CBRN-filtered with GPT-4o pretraining filters"
+    source: card
+    at: "PDF p.5 §2.4 Pretraining"
+    quote: "We train the models on a text-only dataset with trillions of tokens, with a focus on STEM, coding, and general knowledge."
+    note: "Next sentence: harmful content filtered by reusing the CBRN pre-training filters from GPT-4o."
+  train.cutoff:
+    value: "June 2024"
+    source: card
+    at: "PDF p.5 §2.4 Pretraining"
+    quote: "Our model has a knowledge cutoff of June 2024."
+  train.hardware:
+    value: "NVIDIA H100"
+    source: card
+    at: "PDF p.5 §2.4 Pretraining"
+    quote: "The gpt-oss models trained on NVIDIA H100 GPUs using the PyTorch framework"
+  train.compute:
+    value: "2.1M H100-hours"
+    source: card
+    at: "PDF p.5 §2.4 Pretraining"
+    quote: "The training run for gpt-oss-120b required 2.1 million H100-hours to complete"
+    note: "Stated under §2.4 Pretraining as \"the training run\"; whether post-training is included is not stated."

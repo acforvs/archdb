@@ -1,0 +1,32 @@
+# Country of each organization: where it, or the company it belongs to, is headquartered.
+# Labs inside a larger company take the parent's country (Qwen: Alibaba, Google DeepMind: Alphabet).
+
+Ai2: {country: United States, url: "https://web.archive.org/web/20261002212725/https://allenai.org/about", quote: "we are a seattle based non-profit ai research institute"}
+Arcee AI: {country: United States, url: "https://web.archive.org/web/20261010083502/https://www.arcee.ai/", quote: "arcee is an open intelligence lab based in the u.s."}
+Cohere: {country: Canada, url: "https://en.wikipedia.org/w/index.php?title=Cohere&oldid=1375422810", quote: "is headquartered in toronto"}
+DeepSeek: {country: China, url: "https://en.wikipedia.org/w/index.php?title=DeepSeek&oldid=1380939138", quote: "based in hangzhou , zhejiang"}
+Google DeepMind: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=Google_DeepMind&oldid=1380412362", quote: "is a british-american artificial intelligence (ai) research laboratory which is a subsidiary of alphabet inc."}
+IBM: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=IBM&oldid=1379231841", quote: "is an american multinational technology company headquartered in armonk, new york"}
+inclusionAI: {country: China, url: "https://en.wikipedia.org/w/index.php?title=Ant_Group&oldid=1380505693", quote: "headquarters xihu district , hangzhou , china"}
+LG AI Research: {country: South Korea, url: "https://en.wikipedia.org/w/index.php?title=LG&oldid=1376104107", quote: "is a south korean multinational conglomerate"}
+MBZUAI IFM: {country: United Arab Emirates, url: "https://en.wikipedia.org/w/index.php?title=Mohamed_bin_Zayed_University_of_Artificial_Intelligence&oldid=1374891836", quote: "public university in abu dhabi, uae"}
+Meituan: {country: China, url: "https://en.wikipedia.org/w/index.php?title=Meituan&oldid=1379460130", quote: "is a chinese technology company"}
+Meta: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=Meta_Platforms&oldid=1380291192", quote: "headquartered in menlo park, california , is an american multinational technology company"}
+Microsoft AI: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=Microsoft_AI&oldid=1380003212", quote: "headquarters in redmond, washington"}
+MiniMax: {country: China, url: "https://en.wikipedia.org/w/index.php?title=MiniMax_Group&oldid=1377609224", quote: "is an artificial intelligence (ai) company based in shanghai , china"}
+Mistral AI: {country: France, url: "https://en.wikipedia.org/w/index.php?title=Mistral_AI&oldid=1379950095", quote: "is a french artificial intelligence (ai) company headquartered in paris"}
+Moonshot AI: {country: China, url: "https://en.wikipedia.org/w/index.php?title=Moonshot_AI&oldid=1380036373", quote: "is an artificial intelligence (ai) company based in beijing , china"}
+Motif Technologies: {country: South Korea, url: "https://web.archive.org/web/20260611074323/https://en.wowtale.net/2026/05/28/234131/", quote: "a south korean ai company building large-scale foundation models from the ground up"}
+NVIDIA: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=Nvidia&oldid=1380904349", quote: "is an american multinational technology company headquartered in santa clara, california"}
+OpenAI: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=OpenAI&oldid=1380903030", quote: "headquartered in san francisco , california, led by ceo sam altman"}
+Poolside: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=Poolside_AI&oldid=1375163829", quote: "it is headquartered in san francisco"}
+Qwen: {country: China, url: "https://en.wikipedia.org/w/index.php?title=Alibaba_Cloud&oldid=1376856898", quote: "alibaba cloud also develops the qwen series of open weights large language models . it is the largest cloud computing company in china"}
+Reflection AI: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=Reflection_AI&oldid=1379939634", quote: "reflection is headquartered in new york city"}
+SK Telecom: {country: South Korea, url: "https://en.wikipedia.org/w/index.php?title=SK_Telecom&oldid=1378301817", quote: "is a south korean wireless telecommunications operator"}
+StepFun: {country: China, url: "https://en.wikipedia.org/w/index.php?title=StepFun&oldid=1380325424", quote: "is an artificial intelligence (ai) company based in shanghai , china"}
+Swiss AI: {country: Switzerland, url: "https://web.archive.org/web/20260924045626/https://www.swiss-ai.org/", quote: "over 10 academic institutions across switzerland"}
+Tencent: {country: China, url: "https://en.wikipedia.org/w/index.php?title=Tencent&oldid=1380562568", quote: "is a chinese multinational technology conglomerate and holding company headquartered in shenzhen"}
+Thinking Machines Lab: {country: United States, url: "https://en.wikipedia.org/w/index.php?title=Thinking_Machines_Lab&oldid=1380003250", quote: "the company is based in san francisco"}
+Upstage: {country: South Korea, url: "https://en.wikipedia.org/w/index.php?title=Upstage_%28company%29&oldid=1369298162", quote: "is a south korean artificial intelligence company founded in 2020"}
+Xiaomi: {country: China, url: "https://en.wikipedia.org/w/index.php?title=Xiaomi&oldid=1380612502", quote: "headquartered in beijing , china"}
+Z.ai: {country: China, url: "https://en.wikipedia.org/w/index.php?title=Z.ai&oldid=1376085152", quote: "is a chinese artificial intelligence company"}

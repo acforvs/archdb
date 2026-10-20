@@ -1,0 +1,274 @@
+name: Ling-3.0-flash-base
+org: inclusionAI
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/inclusionAI/Ling-3.0-flash-base/resolve/0a96b0a3c68f93e5565d6f2d56c98557bded74fb/README.md, kind: model-card}
+  config: {url: https://huggingface.co/inclusionAI/Ling-3.0-flash-base/resolve/0a96b0a3c68f93e5565d6f2d56c98557bded74fb/config.json, kind: config}
+  config-30t: {url: https://huggingface.co/inclusionAI/Ling-3.0-flash-base-30T/resolve/4c7a67683c9e7ea9fad199b58e7b54cd835b63c2/config.json, kind: config}
+  hf-index: {url: https://huggingface.co/inclusionAI/Ling-3.0-flash-base/resolve/0a96b0a3c68f93e5565d6f2d56c98557bded74fb/model.safetensors.index.json, kind: config}
+  modeling_bailing_moe_v3: {url: https://huggingface.co/inclusionAI/Ling-3.0-flash-base/resolve/0a96b0a3c68f93e5565d6f2d56c98557bded74fb/modeling_bailing_moe_v3.py, kind: code}
+  chat-card: {url: https://huggingface.co/inclusionAI/Ling-3.0-flash/resolve/fcc60a52b34c69c6271d0ac8a8cb0815020b6a43/README.md, kind: model-card}
+  tds: {url: https://huggingface.co/inclusionAI/AI-Transparency/resolve/b72c608a99347c0f4551161fd4c55ae11823460e/Ling-3.0-LLM_TDS-Summary.pdf, kind: paper}
+  hf-index-30t: {url: https://huggingface.co/inclusionAI/Ling-3.0-flash-base-30T/resolve/4c7a67683c9e7ea9fad199b58e7b54cd835b63c2/model.safetensors.index.json, kind: config}
+  hf-commits: {url: https://huggingface.co/api/models/inclusionAI/Ling-3.0-flash-base/commits/main, kind: api}
+
+not_disclosed: [moe.balancing, mtp.loss_weight, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  group_norm_size: not read by modeling_bailing_moe_v3.py
+  num_key_value_heads: "32 = num_attention_heads: MLA num_key_value_groups is 1 (no-op); KDA uses num_attention_heads"
+  rotary_dim: not read; MLA rotary width is qk_rope_head_dim
+
+facts:
+  meta.released:
+    value: "2026-08-12"
+    source: hf-commits
+    at: "Hugging Face commit history; 'Initial model release' 4489af0"
+    quote: "\"date\":\"2026-08-12T13:55:51.000Z\""
+    note: "Date of the first commit with weights; no dated publisher page exists for the base weights, and when the repository became public is not recorded."
+
+  meta.license: {value: mit, source: card, at: "README.md; YAML front matter", quote: "license: mit"}
+
+  params.active:
+    value: 5_100_000_000
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "Totoal 124B, Activated 5.1B (Non-emb)"
+  params.active_non_embedding:
+    value: 5_100_000_000
+    source: card
+    at: "README.md; Model Overview, Key features"
+    quote: "activating just 5.1B (Non-emb) parameters per token"
+  params.note:
+    value: "Rounded publisher figures; active count excludes embeddings. Whether the MTP layer is counted is not stated; the checkpoint index (254.97 GB in BF16, ≈127.5B parameters) includes it."
+    source: card
+    at: "README.md; Model Overview, Key features"
+    quote: "activating just 5.1B (Non-emb) parameters per token"
+  params.total:
+    value: 124_000_000_000
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "Totoal 124B, Activated 5.1B (Non-emb)"
+
+  shape.d_model: {value: 2560, source: config, at: "/hidden_size"}
+  shape.layers: {value: 42, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 157_184, source: config, at: "/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/use_qkv_bias"}
+  attn.conv: {value: 4, source: config, at: "/short_conv_kernel_size"}
+  attn.gate:
+    value: "head-wise sigmoid on the MLA output, before the output projection"
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MultiLatentAttention.forward"
+    quote: "gate = F.sigmoid(gate.float()).type_as(hidden_states)"
+    note: "/gated_attention_proj_granularity_type = head_wise. KDA layers have their own sigmoid-gated output norm."
+  attn.global_layers:
+    value: 7
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "35 KDA + 7 Gated MLA (5:1)"
+  attn.head_dim:
+    value: 192
+    source: config
+    at: "/qk_nope_head_dim + /qk_rope_head_dim"
+    note: "MLA layers (= /qk_head_dim). /head_dim=128 is the KDA head size."
+  attn.heads: {value: 32, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "KDA, MLA"
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "35 KDA + 7 Gated MLA (5:1)"
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.layout:
+    value: "5 KDA : 1 MLA"
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3DecoderLayer.__init__"
+    quote: "if (layer_idx + 1) % config.layer_group_size == 0"
+    note: "/layer_group_size = 6: MLA at layers 5, 11, …, 41."
+  attn.linear_head_dim:
+    value: 128
+    source: config
+    at: "/head_dim"
+    note: "BailingMoeV3KimiDeltaAttention uses /head_dim for both key and value heads."
+  attn.linear_heads:
+    value: 32
+    source: config
+    at: "/num_attention_heads"
+    note: "BailingMoeV3KimiDeltaAttention sets num_heads = num_attention_heads."
+  attn.linear_kind:
+    value: "KDA: 32 heads × 128, short conv 4 + SiLU on q/k/v, L2-normed q/k, full-rank decay and output-gate projections, safe gate with lower bound −5, sigmoid-gated RMSNorm on output"
+    source: config
+    at: "config.json kda_lower_bound, kda_safe_gate, no_kda_lora"
+    quote: "\"kda_lower_bound\": -5.0, \"kda_safe_gate\": true,"
+    note: "no_kda_lora = true selects full-rank f_proj/g_proj in BailingMoeV3KimiDeltaAttention."
+  attn.linear_layers:
+    value: 35
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "35 KDA + 7 Gated MLA (5:1)"
+  attn.position:
+    value: "partial RoPE (MLA, decoupled 64 of 192 QK dims, interleaved), NoPE (KDA)"
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MultiLatentAttention.forward"
+    quote: "q_rot, k_rot = apply_rotary_pos_emb_interleave(q_rot, k_rot, cos, sin)"
+    note: "The rotary embedding overrides /partial_rotary_factor=0.5 with 1.0 over the 64 qk_rope_head_dim dims; interleaved per /rope_interleave."
+  attn.q_lora_rank:
+    value: 0
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MultiLatentAttention.__init__"
+    quote: "self.q_proj = nn.Linear(config.hidden_size, self.num_heads * self.qk_head_dim, bias=False)"
+    note: "/q_lora_rank is null: full-rank query projection, no Q latent."
+  attn.qk_norm:
+    value: false
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MultiLatentAttention.forward"
+    quote: "key_states = torch.cat((k_pass, k_rot), dim=-1)"
+    note: "MLA layers: RMSNorm only on the KV latent (/q_lora_rank is null, so queries are a direct projection); no per-head Q/K norm, and /use_qk_norm is not read. KDA layers L2-normalize q and k."
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta:
+    value: 6_000_000
+    source: config
+    at: "/rope_theta"
+    note: "The pretrained-only 30T checkpoint config has rope_theta 10000 and max_position_embeddings 8192."
+  attn.v_head_dim: {value: 128, source: config, at: "/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MLP.forward"
+    quote: "return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn = ACT2FN[/hidden_act] = silu; used for dense, shared and routed FFNs. Config expert_swiglu_limit_list / share_expert_swiglu_limit_list are not read by the modeling code."
+  ffn.bias:
+    value: false
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 6144, source: config, at: "/intermediate_size"}
+
+  moe.dense_layers: {value: 2, source: config, at: "/first_k_dense_replace"}
+  moe.expert_dim: {value: 768, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 512, source: config, at: "/num_experts"}
+  moe.groups:
+    value: "8 groups, top-4 groups per token"
+    source: config
+    at: "config.json n_group, topk_group"
+    quote: "\"n_group\": 8,"
+    note: "/topk_group = 4; groups ranked by the sum of their top-2 biased scores (BailingMoeV3Gate.group_limited_topk)."
+  moe.norm_topk:
+    value: true
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3Gate.forward; config /norm_topk_prob"
+    quote: "topk_weight = scores / (scores.sum(dim=-1, keepdim=True) + 1e-20) if self.top_k > 1 else scores"
+  moe.routed_scale:
+    value: 2.5
+    source: config
+    at: "/routed_scaling_factor"
+    note: "Multiplied into the renormalized top-k weights in BailingMoeV3Gate.forward."
+  moe.router:
+    value: sigmoid
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3Gate.forward; config /score_function, /scoring_func"
+    quote: "scores = torch.sigmoid(logits.float()).type_as(logits)"
+    note: "Router logits computed in FP32 (/router_dtype fp32). BailingMoeV3Gate adds an expert_bias buffer (/moe_router_enable_expert_bias, /topk_method noaux_tc) to the scores for top-k selection only; how it was updated is not stated."
+  moe.shared: {value: 1, source: config, at: "/num_shared_experts"}
+  moe.shared_dim: {value: 768, source: config, at: "/moe_shared_expert_intermediate_size"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 1
+    source: hf-index-30t
+    at: "Ling-3.0-flash-base-30T model.safetensors.index.json; weight_map"
+    quote: "\"model.layers.42.eh_proj.weight\""
+    basis: inferred
+    note: "The pretrained-only checkpoint (before mid-training) already carries one MTP layer (/num_nextn_predict_layers = 1); the depth used in pretraining is not stated in text."
+  mtp.modules: {value: 1, source: config, at: "/num_nextn_predict_layers"}
+  mtp.block:
+    value: "RMSNorm(embedding of token t+1) and RMSNorm(hidden) concatenated, eh_proj 2d→d, then one gated MLA + MoE block with final RMSNorm"
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MTPLayer"
+    quote: "hidden_states = self.eh_proj(torch.cat([input_embeds, hidden_states], dim=-1))"
+  mtp.ffn:
+    value: MoE
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3MTPLayer.__init__"
+    quote: "self.mlp = BailingMoeV3SparseMoeBlock(config)"
+  mtp.shares_embedding:
+    value: true
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3ForCausalLM.forward"
+    quote: "mtp_logits = self.lm_head(mtp_hidden_states).float()"
+    note: "Input embedding is also the shared word_embeddings (BailingMoeV3Model.forward)."
+  mtp.released:
+    value: true
+    source: hf-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: "\"model.layers.42.eh_proj.weight\""
+
+  norm.eps: {value: 1.0e-6, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling_bailing_moe_v3
+    at: "modeling_bailing_moe_v3.py; BailingMoeV3DecoderLayer.__init__"
+    quote: "self.input_layernorm = BailingMoeV3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+
+  ctx.extension:
+    value: "8K → 32K → 256K; RoPE base 10,000 in the pretrained-only checkpoint, 6,000,000 after mid-training"
+    source: chat-card
+    at: "Ling-3.0-flash README.md; Model Overview table"
+    quote: "Context Training Schedule 8K -> 32K -> 256K"
+    note: "RoPE bases from the -base-30T and -base-midtrain/-base configs; the stage boundaries relative to mid-training are not stated."
+  ctx.final:
+    value: 262_144
+    source: chat-card
+    at: "Ling-3.0-flash README.md; Model Overview table"
+    quote: "Context Training Schedule 8K -> 32K -> 256K"
+  ctx.max: {value: 262_144, source: config, at: "/max_position_embeddings"}
+  ctx.pretrain:
+    value: 8192
+    source: config-30t
+    at: "/max_position_embeddings"
+    note: "Config of the pretrained-only checkpoint; the Ling-3.0-flash card gives the schedule as '8K -> 32K -> 256K'."
+
+  train.averaging:
+    value: "WSM: weighted checkpoint merging of mid-training checkpoints replaces LR decay"
+    source: card
+    at: "README.md; Model Overview, Key features"
+    quote: "We replace conventional learning-rate decay with weighted checkpoint merging."
+  train.data:
+    value: ">10T text tokens; mainly English and Chinese: Common Crawl, academic papers, developer Q&A and code, licensed text, own crawl (Ant Spider), synthetic data from Ling-2.6 models"
+    source: tds
+    at: "Ling-3.0 LLM TDS summary, §1.3 and §2"
+    quote: "More than 10 trillions tokens"
+    note: "Training-data size, not tokens seen; the EU AI Act summary covers all training (pre- and post-) of Ling-3.0-flash, -tiny and -flash-fin."
+  train.cutoff:
+    value: "~2025-10"
+    source: tds
+    at: "Ling-3.0 LLM TDS summary, §1.3; latest date of data acquisition"
+    quote: "Approximately October 2025."
+    note: "Covers all Ling-3.0 LLM training data, pre- and post-training."
+  train.schedule:
+    value: "Warmup-Stable and Merge (WSM): warmup, stable LR, no decay phase; checkpoint merging replaces decay"
+    source: card
+    at: "README.md; Model Overview, Key features"
+    quote: "By eliminating the decay phase, our Base Model is better suited for continual pretraining and dynamic data expansion"
+  train.stages:
+    value:
+      - name: pretraining
+        seq_len: 8192
+        note: "Released as Ling-3.0-flash-base-30T; seq_len from that checkpoint's config (max_position_embeddings 8192)."
+        quote: "Pretrained checkpoint have completed large-scale pretraining but have not undergone mid-training, WSM merging (or learning-rate decay), or post-training."
+      - name: mid-training
+        note: "Released as Ling-3.0-flash-base-midtrain; its config has max_position_embeddings 262144 and rope_theta 6,000,000."
+        quote: "Mid-trained checkpoint have completed mid-training but have not undergone WSM merging (or learning-rate decay) or post-training."
+      - name: WSM merge
+        note: "Checkpoint merge in place of LR decay; released as Ling-3.0-flash-base."
+        quote: "Merged checkpoints have undergone"
+    source: card
+    at: "README.md; Introduction"

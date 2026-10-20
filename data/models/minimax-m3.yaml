@@ -1,0 +1,191 @@
+name: MiniMax-M3
+org: MiniMax
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/MiniMaxAI/MiniMax-M3/resolve/f0e1c1e04d40177e4673a22097036854f536e9c0/README.md, kind: model-card}
+  config: {url: https://huggingface.co/MiniMaxAI/MiniMax-M3/resolve/f0e1c1e04d40177e4673a22097036854f536e9c0/config.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/minimax_m3_vl/modeling_minimax_m3_vl.py, kind: code}
+  index: {url: https://huggingface.co/MiniMaxAI/MiniMax-M3/resolve/f0e1c1e04d40177e4673a22097036854f536e9c0/model.safetensors.index.json, kind: config}
+  msa-report: {url: https://arxiv.org/pdf/2606.13392v1, kind: paper}
+
+not_disclosed:
+  - mtp.depth
+  - ctx.pretrain
+  - ctx.final
+  - train.tokens
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+  - params.active_non_embedding
+
+facts:
+  meta.released:
+    value: "2026-06-11"
+    source: msa-report
+    at: "p.1 abstract; arXiv stamp"
+    quote: "arXiv:2606.13392v1 [cs.AI] 11 Jun 2026"
+    note: "Technical report linked from the model card; its abstract says M3 has been publicly released on Hugging Face. The Hugging Face repository was created 2026-06-02, but its commit history starts 2026-06-12."
+  meta.license:
+    value: "other (minimax-community)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: minimax-community"
+
+  params.active:
+    value: 23_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "It has ~428B parameters and ~23B activated parameters."
+  params.note:
+    value: "Approximate (~) publisher figures for a native multimodal model; whether the vision encoder is included is not stated."
+    source: card
+    at: "README.md; intro"
+    quote: "MiniMax-M3 is a native multimodal model with 1M context. It has ~428B parameters and ~23B activated parameters."
+  params.total:
+    value: 428_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "It has ~428B parameters and ~23B activated parameters."
+
+  shape.d_model: {value: 6144, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 60, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab: {value: 200_064, source: config, at: "/text_config/vocab_size"}
+
+  attn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLAttention.__init__"
+    quote: "self.q_proj = nn.Linear(config.hidden_size, config.num_attention_heads * self.head_dim, bias=False)"
+  attn.global_layers:
+    value: 60
+    source: config
+    at: "/text_config/num_hidden_layers"
+    note: "3 dense GQA + 57 MSA layers; MSA is block-sparse global attention."
+  attn.head_dim: {value: 128, source: config, at: "/text_config/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: "GQA, MSA"
+    source: card
+    at: "README.md; MiniMax Sparse Attention (MSA)"
+    quote: "M3 introduces MiniMax Sparse Attention (MSA) to improve long context efficiency."
+  attn.kv_heads: {value: 4, source: config, at: "/text_config/num_key_value_heads"}
+  attn.layout:
+    value: "3 GQA + 57 MSA"
+    source: config
+    at: "config.json text_config.sparse_attention_config.sparse_attention_freq"
+    quote: "\"sparse_attention_freq\": [ 0, 0, 0, 1,"
+    note: "sparse_attention_freq has 3 zeros (layers 0–2) and 57 ones."
+  attn.position:
+    value: "partial RoPE (64 of 128 dims)"
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLAttention docstring"
+    quote: "M3 attention: per-head Gemma QK-norm + partial RoPE"
+    note: "/text_config/rotary_dim 64 of /text_config/head_dim 128."
+  attn.qk_norm:
+    value: true
+    source: config
+    at: "/text_config/use_qk_norm"
+    note: "Per head (/text_config/qk_norm_type per_head; MiniMaxM3VLAttention q_norm/k_norm over head_dim)."
+  attn.rope_fraction: {value: 0.5, source: config, at: "/text_config/partial_rotary_factor"}
+  attn.rope_theta: {value: 5_000_000, source: config, at: "/text_config/rope_theta"}
+  attn.sparse:
+    value: "MSA: indexer picks 16 key blocks of 128 tokens per query and KV group, the query's own block always among them; 4 index heads × 128 dims"
+    source: config
+    at: "config.json text_config.sparse_attention_config"
+    quote: "\"sparse_topk_blocks\": 16, \"sparse_block_size\": 128,"
+    note: "Max-pooled block scores (sparse_score_type max); local-block boost and per-KV-group selection in MiniMaxM3VLIndexer.forward (sparse_local_block 1 forces block position_id // 128); index-value path disabled on all sparse layers (sparse_disable_index_value); use_sparse_attention true."
+
+  attn.indexer_dim:
+    value: 128
+    source: config
+    at: "/text_config/sparse_attention_config/sparse_index_dim"
+    note: "One index key head shared across KV groups (MiniMaxM3VLIndexer.k_proj outputs index_head_dim); 4 index query heads (sparse_num_index_heads); cached only in the 57 MSA layers."
+
+  ffn.activation:
+    value: "SwiGLU (swigluoai: gate·σ(1.702·gate)·(up + 1))"
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLDenseMLP.forward"
+    quote: "glu = gate * torch.sigmoid(gate * self.swiglu_alpha)"
+    note: "Config hidden_act = swigluoai, swiglu_alpha = 1.702; output (up + 1.0) * glu; inputs clamped (see ffn.clamp)."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLDenseMLP.__init__"
+    quote: "self.gate_up_proj = nn.Linear(config.hidden_size, 2 * inter, bias=False)"
+  ffn.clamp:
+    value: "gate clamped at max 7, up clamped to [−7, 7] before the GLU; all dense, shared and routed FFNs"
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLDenseMLP.forward, MiniMaxM3VLExperts._apply_gate"
+    quote: "up = up.clamp(min=-self.swiglu_limit, max=self.swiglu_limit)"
+    note: "/text_config/swiglu_limit = 7.0."
+  ffn.dim: {value: 12288, source: config, at: "/text_config/dense_intermediate_size"}
+
+  moe.balancing:
+    value: "score-correction bias added to sigmoid scores for top-k selection only"
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLTopKRouter.forward"
+    quote: "scores_for_choice = routing_weights + self.e_score_correction_bias"
+    note: "Inference routing code (config /text_config/use_routing_bias true); the training-time bias update and any auxiliary loss are not disclosed."
+  moe.dense_layers: {value: 3, source: config, at: "/text_config/moe_layer_freq | count 0"}
+  moe.expert_dim: {value: 3072, source: config, at: "/text_config/intermediate_size"}
+  moe.experts: {value: 128, source: config, at: "/text_config/num_local_experts"}
+  moe.norm_topk:
+    value: true
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLTopKRouter.forward"
+    quote: "top_k_weights /= top_k_weights.sum(dim=-1, keepdim=True)"
+  moe.routed_scale:
+    value: 2.0
+    source: config
+    at: "/text_config/routed_scaling_factor"
+    note: "Multiplies the routed-expert output before the shared expert is added (MiniMaxM3VLSparseMoeBlock.forward)."
+  moe.router: {value: sigmoid, source: config, at: "/text_config/scoring_func"}
+  moe.shared: {value: 1, source: config, at: "/text_config/n_shared_experts"}
+  moe.shared_dim: {value: 3072, source: config, at: "/text_config/shared_intermediate_size"}
+  moe.top_k: {value: 4, source: config, at: "/text_config/num_experts_per_tok"}
+
+  mtp.released:
+    value: false
+    source: index
+    at: "/weight_map | has mtp."
+    note: "Config declares num_mtp_modules=7 and num_nextn_predict_layers=1; the checkpoint has no mtp.* tensors."
+
+  norm.eps: {value: 1.0e-6, source: config, at: "/text_config/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: hf-transformers
+    at: "modeling_minimax_m3_vl.py; MiniMaxM3VLRMSNorm"
+    quote: "Gemma-style RMSNorm: normalizes in fp32 and scales by `weight + 1`."
+    note: "Config /text_config/use_gemma_norm true."
+
+  ctx.max:
+    value: 1_048_576
+    source: config
+    at: "/text_config/max_position_embeddings"
+    note: "Card: \"native multimodal model with 1M context\"."
+
+  train.objective:
+    value: "native multimodal: mixed text, image and video training from the first step"
+    source: card
+    at: "README.md; Highlights"
+    quote: "M3 undergoes mixed-modality training from the very first step, enabling deeper semantic fusion across text, image, and video."
+  scaling.ladder:
+    value: "MSA ablations: 109B-A6B MoE (41 layers, d_model 3072) at 3T tokens; 10.53B-A1.47B pilot (16 layers, d_model 2048)"
+    source: msa-report
+    at: "MSA report p.8 §5.1; App. B.1"
+    quote: "All models use the same 41-layer MoE backbone, with approximately 109B total parameters and 6B activated parameters per token."

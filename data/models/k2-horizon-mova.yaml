@@ -1,0 +1,280 @@
+name: K2-Horizon-MoVA-36B-A4B (mid_4_10000)
+org: MBZUAI IFM
+kind: base
+note: "Describes tag mid_4_10000, the final Midtraining Stage 4 checkpoint (before SFT). Stage 4 trains on a mix shifted toward agentic and reasoning SFT data, so this is not a pure pretraining checkpoint (that is pretrain_1100000, at 8K context)."
+
+sources:
+  config: {url: https://huggingface.co/IFM/K2-Horizon-MoVA-36B-A4B/resolve/35c37ffac1422cdc9efffa6f9da1136951e9cda0/config.json, kind: config}
+  modeling_k2_horizon: {url: https://huggingface.co/IFM/K2-Horizon-MoVA-36B-A4B/resolve/35c37ffac1422cdc9efffa6f9da1136951e9cda0/modeling_k2_horizon.py, kind: code}
+  card: {url: https://huggingface.co/IFM/K2-Horizon-MoVA-36B-A4B/resolve/e9ce717642b2074082875be233c02c729ba47960/README.md, kind: model-card}
+  blog: {url: "http://web.archive.org/web/20260903154432/https://ifm.ai/blog/k2/", kind: blog}
+  xllm_transformer: {url: https://raw.githubusercontent.com/ifm-ai/xllm/3578359ad320e4d18efaca071854ba2019201f31/xllm/models/transformer.py, kind: code}
+  xllm_launch: {url: https://raw.githubusercontent.com/ifm-ai/xllm/3578359ad320e4d18efaca071854ba2019201f31/examples/k2-horizon-mova-36B-a4B.sh, kind: code}
+  xllm_config: {url: https://raw.githubusercontent.com/ifm-ai/xllm/3578359ad320e4d18efaca071854ba2019201f31/xllm/config.py, kind: code}
+  xllm_optimizer: {url: https://raw.githubusercontent.com/ifm-ai/xllm/3578359ad320e4d18efaca071854ba2019201f31/xllm/optim/optimizer.py, kind: code}
+
+not_disclosed: [params.active_non_embedding, train.lr_min]
+
+facts:
+  meta.released:
+    value: "2026-09-03"
+    source: blog
+    at: "ifm.ai/blog/k2 (Wayback snapshot 2026-09-03); header"
+    quote: "September 3, 2026"
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  params.total:
+    value: 36_000_000_000
+    source: card
+    at: "README.md; introduction"
+    quote: "a Mixture-of-Experts model with Mixture-of-Values attention (MoVA) that stores 36B parameters and runs 4B per token"
+  params.active:
+    value: 4_000_000_000
+    source: card
+    at: "README.md; introduction"
+    quote: "a Mixture-of-Experts model with Mixture-of-Values attention (MoVA) that stores 36B parameters and runs 4B per token"
+  params.note:
+    value: "Scope of the 36B and 4B counts is not stated. xLLM's num_parameters formula on this config gives 36.2B total and 4.7B active excluding the embedding and output head (1.28B together)."
+    source: xllm_transformer
+    at: "xllm/models/transformer.py; num_parameters"
+    quote: "activated_value_params = self.model_dim * self.num_kv_heads * self.head_dim * self.num_activated_values"
+    basis: inferred
+    note: "Per MoVA+MoE layer: 34.1M Q/K/O/gate + 64 × 2.62M value experts (4 active) + 100 × 5.9M routed experts (8 active) + 5.9M shared + routers; × 45 layers, plus 3 dense layers of 83.9M."
+
+  shape.d_model: {value: 2560, source: config, at: "/hidden_size"}
+  shape.layers: {value: 48, source: config, at: "/num_hidden_layers"}
+  shape.vocab: {value: 250_624, source: config, at: "/vocab_size"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+
+  attn.kind:
+    value: "GQA (MoVA: routed value projections in 45 of 48 layers)"
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonMoVAAttention"
+    quote: "MoVA attention with routed value experts and optional post-attention gate."
+    note: "MoVA (Mixture-of-Value Attention) replaces v_proj with 64 value experts (/mova_num_experts), each a 2560→8×128 linear map; a sigmoid router picks 4 per token (/mova_num_experts_per_tok), and the SiLU'd expert outputs are summed with renormalized weights × 2.5. Q and K are ordinary GQA, every token attends to all earlier tokens, and the mixed V is cached like a normal V, so the KV cache is the standard 8 × (128 + 128) per layer. sliding_window null, use_sliding_window false."
+  attn.layout:
+    value: "3 GQA, then 45 GQA with MoVA values"
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonDecoderLayer.__init__"
+    quote: "if is_sparse_layer and config.mova_num_experts > 0:"
+    note: "MoVA layers are exactly the MoE-FFN layers; layers 0-2 (/mlp_only_layers) use a plain v_proj and a dense FFN."
+  attn.global_layers: {value: 48, source: config, at: "/num_hidden_layers"}
+  attn.heads: {value: 32, source: config, at: "/num_attention_heads"}
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.position:
+    value: RoPE
+    source: config
+    at: "config.json; rope_head_dim, head_dim"
+    quote: '"rope_head_dim": 128'
+    note: "rope_head_dim equals head_dim, so all 128 QK dims rotate (unlike the 375B sibling's 64)."
+  attn.rope_fraction:
+    value: 1.0
+    source: config
+    at: "config.json; rope_head_dim, head_dim"
+    quote: '"rope_head_dim": 128'
+    basis: inferred
+    note: "rope_head_dim 128 divided by head_dim 128."
+  attn.rope_theta: {value: 10_000_000, source: config, at: "/rope_parameters/rope_theta"}
+  attn.qk_norm: {value: false, source: config, at: "/query_key_norm"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.gate:
+    value: "softplus (β = ln 2) gate per head dimension on the attention output, before o_proj, in all layers"
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonAttention.forward and K2HorizonMoVAAttention.forward"
+    quote: "gate = F.softplus(gate, beta=math.log(2))"
+    note: "Gate is gate_proj(x), 2560 → 32 × 128, selected by /attention_gate_func."
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonMLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU (/hidden_act); dense FFN, routed and shared experts all use K2HorizonMLP."
+  ffn.bias:
+    value: false
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 6144, source: config, at: "/intermediate_size"}
+
+  moe.experts: {value: 100, source: config, at: "/num_experts"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+  moe.shared: {value: 1, source: config, at: "/num_shared_experts"}
+  moe.expert_dim: {value: 768, source: config, at: "/moe_intermediate_size"}
+  moe.shared_dim:
+    value: 768
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonSparseMoeBlock.__init__"
+    quote: "intermediate_size=config.moe_intermediate_size * config.num_shared_experts)"
+    note: "768 × 1 shared expert."
+  moe.dense_layers:
+    value: 3
+    source: config
+    at: "/mlp_only_layers | len"
+    note: "Layers 0, 1, 2 use the 6144-wide dense FFN; decoder_sparse_step 1 makes every later layer MoE."
+  moe.router: {value: sigmoid, source: config, at: "/router_score_func"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/router_scaling_factor"}
+  moe.balancing:
+    value: "per-expert bias for top-k selection only (update rate 1e-3) plus 'dot' auxiliary loss, coefficient 1e-4"
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; TRAINING_CFGS"
+    quote: "--moe_aux_loss_coeff 1e-4"
+    note: "Bias update rate from ConfStore[\"k2-horizon-mova-36B-a4B\"] (moe_router_bias_update_rate=1e-3; HF config moe_gate_bias, router_aux_loss_coef 1e-4). The MoVA value routers use the same router settings; xLLM averages their aux loss with the FFN router's."
+
+  norm.type:
+    value: "RMSNorm (2 groups of 1280)"
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonRMSNorm.forward"
+    quote: "hidden_states = hidden_states.reshape(*hidden_states.shape[:-1], self.n_groups, -1)"
+    note: "layernorm_num_groups 2: each half of d_model is normalized separately, in block and final norms."
+  norm.placement:
+    value: pre
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.pretrain:
+    value: 8192
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Pretraining | 1100000 | 22.9T | 8K | Pretraining."
+  ctx.final:
+    value: 524_288
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Midtraining — Stage 3 | 5500 | 110B | 512K | Context extension."
+    note: "512K = 524,288 tokens (Highlights)."
+  ctx.max:
+    value: 524_288
+    source: card
+    at: "README.md; Highlights"
+    quote: "Native 524,288-token context from the midtraining stages onward."
+    note: "config max_position_embeddings 524288."
+  ctx.extension:
+    value: "8K → 32K (1.1T) → 128K (498B) → 512K (110B, then 199B with agentic/reasoning SFT data)"
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Midtraining — Stage 1 | 55000 | 1.1T | 32K | Context extension."
+    note: "RoPE base raised with length: config rope_theta 500000 at pretrain_1100000 (commit 3cc4264), 1e6 at mid_1_55000 (632ec2f), 1e7 from mid_2_25000 (358bc8f); rope_type default, no scaling."
+
+  mtp.depth:
+    value: 0
+    source: xllm_transformer
+    at: "xllm/models/transformer.py; TransformerOutputLayer.forward"
+    quote: "loss = vocab_parallel_cross_entropy(logits, y)"
+    basis: inferred
+    note: "xLLM, the training code, has no MTP implementation; the loss is next-token cross-entropy, and model.safetensors.index.json has no MTP weights."
+
+  train.tokens:
+    value: 24_807_000_000_000
+    source: card
+    at: "README.md; Training Overview"
+    quote: "Token budgets cover only the additional training in that stage or phase."
+    basis: inferred
+    note: "Sum of the per-stage budgets in train.stages (22.9T + 1.1T + 498B + 110B + 199B) through mid_4_10000; includes the 199B Stage 4 tokens with SFT data in the mix."
+  train.stages:
+    value:
+      - name: pretraining
+        tokens: 22_900_000_000_000
+        seq_len: 8192
+        steps: 1_100_000
+        quote: "Pretraining | 1100000 | 22.9T | 8K | Pretraining."
+      - name: midtraining-1
+        tokens: 1_100_000_000_000
+        seq_len: 32768
+        steps: 55_000
+        note: "Context extension."
+        quote: "Midtraining — Stage 1 | 55000 | 1.1T | 32K | Context extension."
+      - name: midtraining-2
+        tokens: 498_000_000_000
+        seq_len: 131_072
+        steps: 25_000
+        note: "Context extension."
+        quote: "Midtraining — Stage 2 | 25000 | 498B | 128K | Context extension."
+      - name: midtraining-3
+        tokens: 110_000_000_000
+        seq_len: 524_288
+        steps: 5500
+        note: "Context extension."
+        quote: "Midtraining — Stage 3 | 5500 | 110B | 512K | Context extension."
+      - name: midtraining-4
+        tokens: 199_000_000_000
+        seq_len: 524_288
+        steps: 10_000
+        note: "Mix shifted toward agentic and reasoning SFT data; final checkpoint is tag mid_4_10000."
+        quote: "Midtraining — Stage 4 | 10000 | 199B | 512K | Continued context extension from Stage 3, with the data mix shifted toward agentic and reasoning SFT data."
+    source: card
+    at: "README.md; Training Overview table"
+  train.data:
+    value: "Same pretraining tokens as K2 Horizon 3.7B, 7B and 32B; Midtraining Stage 4 shifts the mix toward agentic and reasoning SFT data"
+    source: blog
+    at: "ifm.ai/blog/k2; Pre-training Dynamics"
+    quote: "and 36B-A4B were trained on exactly the same 22 trillion tokens."
+    note: "The blog says 22 trillion; the card's pretraining stage says 22.9T."
+
+  train.optimizer:
+    value: AdamW
+    source: xllm_optimizer
+    at: "xllm/optim/optimizer.py; build_optimizer"
+    quote: "optimizer = AdamW("
+  train.lr_peak:
+    value: 4e-4
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; variables"
+    quote: "LR=4e-4"
+    note: "IFM's launch script for this model; its --steps 1100000 matches the card's pretraining stage."
+  train.schedule:
+    value: "WSD with no decay phase in pretraining: linear warmup, then constant 4e-4 to step 1,100,000"
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; OPTIM_CFGS"
+    quote: "--optim.wsd_decay_duration_steps 0"
+    note: "xLLM lr_wsd holds the peak through total_steps when the decay duration is 0; the LR used in midtraining is not in these sources."
+  train.warmup:
+    value: "3,000 steps, linear from 1e-4 × peak"
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; OPTIM_CFGS"
+    quote: "--optim.warmup 3000"
+  train.batch:
+    value: "16 × 8,192 per data-parallel rank; global batch not stated"
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; variables and TRAINING_CFGS"
+    quote: "BSZ=16"
+    note: "xLLM batch_size is per DP rank. The script's 38 nodes × 8 GPUs with model_parallel_size 2 give 152 ranks (~19.9M tokens/step), but 22.9T / 1.1M steps is ~20.8M, so the global batch is left unstated."
+  train.weight_decay:
+    value: 0.06
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; variables"
+    quote: "WD=0.06"
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; OPTIM_CFGS"
+    quote: "--optim.beta1 0.9 --optim.beta2 0.95"
+  train.grad_clip:
+    value: 1.0
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; OPTIM_CFGS"
+    quote: "--optim.clip 1.0"
+  train.precision:
+    value: BF16
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; TRAINING_CFGS"
+    quote: '--dtype "bf16"'
+  train.init:
+    value: "Gaussian, std 0.02"
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; MODEL_CFGS"
+    quote: '--model.init_mode "gaussian" --model.init_std 0.02'
+    note: "Matches config initializer_range 0.02, which by itself is a loader value."
+  train.masking:
+    value: "no attention across document boundaries (BOS-delimited segments)"
+    source: xllm_config
+    at: "xllm/config.py; TrainerConf.multi_segments"
+    quote: "This will prevent attention across document boundaries."
+    note: "The launch script sets --multi_segments true."

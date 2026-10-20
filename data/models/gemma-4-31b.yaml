@@ -1,0 +1,179 @@
+name: Gemma-4-31B
+org: Google DeepMind
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/google/gemma-4-31B/resolve/5bbc2fb1c1b2c611d06e3d9f23c170ba21659d89/README.md, kind: model-card}
+  config: {url: https://huggingface.co/google/gemma-4-31B/resolve/5bbc2fb1c1b2c611d06e3d9f23c170ba21659d89/config.json, kind: config}
+  modeling_gemma4: {url: https://raw.githubusercontent.com/huggingface/transformers/e0eb2810ac1b2caf6d082f247d8d37162ecf67a0/src/transformers/models/gemma4/modeling_gemma4.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2607.02770v2, kind: paper}
+  configuration_gemma4: {url: https://raw.githubusercontent.com/huggingface/transformers/e0eb2810ac1b2caf6d082f247d8d37162ecf67a0/src/transformers/models/gemma4/configuration_gemma4.py, kind: code}
+  blog: {url: https://web.archive.org/web/20261012212433/https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/, kind: blog}
+
+not_disclosed: [mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  vocab_size_per_layer_input: "per-layer embedding table; not built since hidden_size_per_layer_input is 0"
+
+facts:
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  meta.released:
+    value: "2026-04-02"
+    source: blog
+    at: "Gemma 4 launch post header"
+    quote: "Gemma 4: Byte for byte, the most capable open models Apr 02, 2026"
+  params.embedding:
+    value: 1_410_000_000
+    source: report
+    at: "PDF page 2; Table 1"
+    quote: "31B - 550M 1,410M 29,290M 500M"
+  params.non_embedding:
+    value: 29_290_000_000
+    source: report
+    at: "PDF page 2; Table 1"
+    quote: "31B - 550M 1,410M 29,290M 500M"
+  params.note:
+    value: "Language model only (1,410M embedder + 29,290M einsums). Excludes the 550M frozen vision encoder and the 500M MTP drafter."
+    source: report
+    at: "PDF page 2; Table 1"
+    quote: "31B - 550M 1,410M 29,290M 500M"
+  params.active:
+    value: 30_700_000_000
+    source: card
+    at: "README.md; Dense Models table"
+    quote: "11.95B | 30.7B"
+    basis: inferred
+    note: "Dense model; active equals the stated total."
+  params.active_non_embedding:
+    value: 29_290_000_000
+    source: report
+    at: "PDF page 2; Table 1"
+    quote: "31B - 550M 1,410M 29,290M 500M"
+    note: "Einsums column of the dense model; the tied 1,410M embedder is counted separately."
+  params.total:
+    value: 30_700_000_000
+    source: card
+    at: "README.md; Dense Models table"
+    quote: "11.95B | 30.7B"
+
+  shape.d_model: {value: 5376, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 60, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: true, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "SentencePiece, same as Gemini: split digits, preserved whitespace, byte-level encodings"
+    source: report
+    at: "PDF page 3; §2.4 Tokenizer"
+    quote: "digits, preserved whitespace, and byte-level en"
+  shape.vocab: {value: 262_144, source: config, at: "/text_config/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+  attn.global_layers: {value: 10, source: config, at: "/text_config/layer_types | count full_attention"}
+  attn.head_dim:
+    value: 512
+    source: config
+    at: "/text_config/global_head_dim"
+    note: "Global layers only; sliding-window layers use head_dim 256."
+  attn.heads: {value: 32, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: "GQA, SWA"
+    source: card
+    at: "README.md; Models Overview"
+    quote: "interleaves local sliding window attention with full global attention, ensuring the final layer is always global."
+    note: "Global layers reuse keys as values (attention_k_eq_v: no v_proj; V is the K projection before RoPE and k_norm). use_bidirectional_attention vision: image tokens attend bidirectionally, text is causal."
+  attn.kv_heads: {value: 4, source: config, at: "/text_config/num_global_key_value_heads"}
+  attn.layout:
+    value: "5 SWA : 1 global"
+    source: report
+    at: "PDF page 2; §2 Long-context efficiency"
+    quote: "for E2B and 5-to-1 for the rest."
+  attn.local_head_dim:
+    value: 256
+    source: config
+    at: "/text_config/head_dim"
+    note: "configuration_gemma4.py overrides head_dim (global_head_dim) and num_key_value_heads (num_global_key_value_heads) only for full_attention layers; sliding layers keep head_dim, num_key_value_heads and num_attention_heads."
+  attn.local_heads: {value: 32, source: config, at: "/text_config/num_attention_heads", note: "Same num_attention_heads attribute for both layer types (Gemma4TextAttention)."}
+  attn.local_rope_theta: {value: 10_000, source: config, at: "/text_config/rope_parameters/sliding_attention/rope_theta", note: "rope_type default."}
+  attn.local_kv_heads:
+    value: 16
+    source: configuration_gemma4
+    at: "configuration_gemma4.py; Gemma4TextConfig.__post_init__"
+    quote: "num_key_value_heads = num_global_key_value_heads if getattr(self, \"attention_k_eq_v\", True) else None"
+    note: "This override is applied only to full_attention layers, so sliding layers use /text_config/num_key_value_heads = 16."
+  attn.local_layers: {value: 50, source: config, at: "/text_config/layer_types | count sliding_attention"}
+  attn.position:
+    value: "partial RoPE (global, p-RoPE p=0.25), RoPE (SWA)"
+    source: report
+    at: "PDF page 2; §2 Long-context efficiency"
+    quote: "with p-RoPE with p = 0.25 on global attention"
+  attn.qk_norm:
+    value: true
+    source: report
+    at: "PDF page 2; §2"
+    quote: "and QKNorm (Henry et al., 2020)."
+  attn.rope_fraction: {value: 0.25, source: config, at: "/text_config/rope_parameters/full_attention/partial_rotary_factor", note: "Global layers use rope_type proportional (p-RoPE)."}
+  attn.rope_theta: {value: 1_000_000, source: config, at: "/text_config/rope_parameters/full_attention/rope_theta"}
+  attn.scale:
+    value: "1.0 (no 1/sqrt(head_dim)); V RMS-normalized without learned scale"
+    source: modeling_gemma4
+    at: "modeling_gemma4.py; Gemma4TextAttention.__init__"
+    quote: "self.num_key_value_groups = config.num_attention_heads // layer_config.num_key_value_heads self.scaling = 1.0"
+    note: "v_norm is Gemma4RMSNorm(head_dim, with_scale=False), applied in every attention layer."
+  attn.window: {value: 1024, source: config, at: "/text_config/sliding_window"}
+
+  ffn.activation:
+    value: "GeGLU (tanh-approximate GELU)"
+    source: modeling_gemma4
+    at: "modeling_gemma4.py; Gemma4TextMLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn = ACT2FN[/text_config/hidden_activation] = gelu_pytorch_tanh."
+  ffn.bias:
+    value: false
+    source: modeling_gemma4
+    at: "modeling_gemma4.py; Gemma4TextMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 21504, source: config, at: "/text_config/intermediate_size"}
+
+  norm.embedding:
+    value: "× sqrt(d_model)"
+    source: modeling_gemma4
+    at: "modeling_gemma4.py; Gemma4TextModel.__init__"
+    quote: "config.vocab_size, config.hidden_size, self.padding_idx, embed_scale=self.config.hidden_size**0.5"
+  norm.eps: {value: 1.0e-6, source: config, at: "/text_config/rms_norm_eps"}
+  norm.logit_softcap: {value: 30.0, source: config, at: "/text_config/final_logit_softcapping"}
+  norm.placement:
+    value: sandwich
+    source: report
+    at: "PDF page 2; §2"
+    quote: "Our models have pre-norm and post-norm"
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "PDF page 2; §2"
+    quote: "with RMSNorm (Zhang and Sennrich, 2019),"
+
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Dense Models table"
+    quote: "Context Length | 128K tokens | 128K tokens | 256K tokens | 256K tokens"
+    note: "config max_position_embeddings is also 262144."
+
+  train.cutoff:
+    value: "January 2025"
+    source: report
+    at: "PDF page 3; §2.4 Training data"
+    quote: "with a cutoff date of January 2025."
+  train.data:
+    value: "Web documents (140+ languages), code, mathematics, images"
+    source: card
+    at: "README.md; Training Dataset"
+    quote: "The training dataset includes content in over 140 languages."
+  train.hardware:
+    value: "10,240 TPUv6e chips (16 data × 16 sequence × 40 replica)"
+    source: report
+    at: "PDF page 2; Table 2"
+    quote: "31B v6e 10,240 16 16 40"

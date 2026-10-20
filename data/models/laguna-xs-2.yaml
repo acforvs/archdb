@@ -1,0 +1,313 @@
+name: Laguna-XS.2
+org: Poolside
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/poolside/Laguna-XS.2/resolve/a397bde04501591d0ac3d74a5d9d0a4ec298ffb8/README.md, kind: model-card}
+  config: {url: https://huggingface.co/poolside/Laguna-XS.2/resolve/a397bde04501591d0ac3d74a5d9d0a4ec298ffb8/config.json, kind: config}
+  configuration_laguna: {url: https://huggingface.co/poolside/Laguna-XS.2/resolve/a397bde04501591d0ac3d74a5d9d0a4ec298ffb8/configuration_laguna.py, kind: code}
+  modeling_laguna: {url: https://huggingface.co/poolside/Laguna-XS.2/resolve/a397bde04501591d0ac3d74a5d9d0a4ec298ffb8/modeling_laguna.py, kind: code}
+  report: {url: https://web.archive.org/web/20261004102254id_/https://poolside.ai/assets/laguna/laguna-m1-xs2-technical-report.pdf, kind: paper}
+  blog: {url: https://web.archive.org/web/20260903084301/https://poolside.ai/blog/introducing-laguna-xs2-m1, kind: blog}
+
+not_disclosed: [mtp.depth, train.warmup, train.weight_decay, train.betas, train.grad_clip]
+
+facts:
+  meta.released:
+    value: "2026-04-28"
+    source: blog
+    at: "Introducing Laguna XS.2 and Laguna M.1; post date and Get started"
+    quote: 'category:"announcements",date:"2026-04-28"'
+    note: "Same post: \"Weights are live today under Apache 2.0.\""
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+
+  params.active:
+    value: 3_000_000_000
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "with 3B parameters (including embeddings) activated per token"
+  params.active_non_embedding:
+    value: 2_590_000_000
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "with 3B parameters (including embeddings) activated per token"
+    basis: inferred
+    note: "~3B − 2 × 100,352 × 2,048 (input embedding and untied LM head) = ~2.59B."
+  params.note:
+    value: "Active count includes embeddings."
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "with 3B parameters (including embeddings) activated per token"
+  params.total:
+    value: 33_400_000_000
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "LAGUNA XS.2 has a total parameter count of 33.4B"
+
+  shape.d_model: {value: 2048, source: config, at: "/hidden_size"}
+  shape.layers: {value: 40, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 100_352, source: config, at: "/vocab_size"}
+  shape.tokenizer:
+    value: "BPE trained on internal data; shared with M.1"
+    source: report
+    at: "p.5 §3.1"
+    quote: "Both models share the same tokenizer with a vocabulary size of 100,352 tokens, trained with Byte-Pair Encoding [75] on our internal datasets."
+
+  attn.gate:
+    value: "softplus, per head, on attention output before o_proj"
+    source: report
+    at: "p.5 §3.1"
+    quote: "we use Grouped Query Attention (GQA) [3] with 8 KV heads, a head dimension of 128, and softplus-based per-head gating [67]."
+    note: "The model card says \"sigmoid gating\"; the report and released code (F.softplus on a per-head g_proj) use softplus. Config /gating (true) is not read by this modeling_laguna.py."
+  attn.global_layers: {value: 10, source: config, at: "/layer_types | count full_attention"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads:
+    value: 48
+    source: config
+    at: "/num_attention_heads"
+    note: "Global layers; SWA layers use 64 (attn.local_heads)."
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/num_attention_heads_per_layer/1"
+    note: "Layer 1 is sliding_attention; every sliding_attention entry is 64, every full_attention entry 48. modeling_laguna.py LagunaDecoderLayer.__init__ passes the per-layer count to LagunaAttention."
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "p.5 §3.1"
+    quote: "In both types of layers, we use Grouped Query Attention (GQA)"
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "3 SWA : 1 global"
+    source: report
+    at: "p.5 §3.1"
+    quote: "interleaved Sliding Window Attention (SWA) and Global Attention (GA) [11, 27] with a 3:1 ratio"
+    note: "Config /layer_types starts each group of four with the global layer."
+  attn.local_kv_heads:
+    value: 8
+    source: config
+    at: "/num_key_value_heads"
+    note: "LagunaAttention builds k_proj/v_proj from config.num_key_value_heads and config.head_dim for both layer types."
+  attn.local_head_dim:
+    value: 128
+    source: report
+    at: "p.5 §3.1"
+    quote: "In both types of layers, we use Grouped Query Attention (GQA) [3] with 8 KV heads, a head dimension of 128"
+  attn.local_rope_theta: {value: 10000, source: config, at: "/rope_parameters/sliding_attention/rope_theta"}
+  attn.local_layers: {value: 30, source: config, at: "/layer_types | count sliding_attention"}
+  attn.position:
+    value: "partial RoPE (global, first 50%), RoPE (SWA)"
+    source: report
+    at: "p.5 §3.1"
+    quote: "GA layers use 48 Q-heads, θ = 500,000, and partial RoPE applied to the first 50% of the head dimension"
+  attn.qk_norm:
+    value: true
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaAttention.__init__"
+    quote: "self.q_norm = LagunaRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+  attn.rope_fraction:
+    value: 0.5
+    source: config
+    at: "/rope_parameters/full_attention/partial_rotary_factor"
+    note: "Global layers; SWA layers rotate all dims (/rope_parameters/sliding_attention/partial_rotary_factor = 1.0)."
+  attn.rope_theta:
+    value: 500_000
+    source: config
+    at: "/rope_parameters/full_attention/rope_theta"
+    note: "Global layers; SWA layers use 10,000."
+  attn.v_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.window: {value: 512, source: config, at: "/sliding_window"}
+
+  ffn.dim: {value: 8192, source: config, at: "/intermediate_size"}
+  ffn.activation:
+    value: SwiGLU
+    source: configuration_laguna
+    at: "configuration_laguna.py; LagunaConfig defaults"
+    quote: "hidden_act: str = \"silu\""
+    note: "config.json sets no hidden_act; LagunaMLP computes down_proj(act_fn(gate_proj(x)) * up_proj(x))."
+  ffn.bias:
+    value: false
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.balancing:
+    value: "global-batch auxiliary loss (Qiu et al.) over non-padding tokens; padding tokens skip routing"
+    source: report
+    at: "p.5 §3.1"
+    quote: "For load-balancing, we use an auxiliary loss from Qiu et al. [66] across the non-padding tokens of the global batch."
+    note: "Coefficient not disclosed. Padding skip: §3.1.3."
+  moe.dense_layers: {value: 1, source: config, at: "/mlp_layer_types | count dense"}
+  moe.expert_dim: {value: 512, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/num_experts"}
+  moe.router:
+    value: sigmoid
+    source: report
+    at: "p.5 §3.1"
+    quote: "We use a linear layer followed by a sigmoid activation as the routing function"
+  moe.norm_topk:
+    value: true
+    source: report
+    at: "p.5 §3.1"
+    quote: "apply normalization to the scores after top-k"
+  moe.routed_scale:
+    value: 2.5
+    source: report
+    at: "p.5 §3.1"
+    quote: "The output of the routed experts is modulated by a coefficient of 2.5 before combining with the output of the shared expert."
+    note: "Added in XS.2; M.1 has no routed-expert modulation (config /moe_routed_scaling_factor 2.5 here)."
+  moe.shared:
+    value: 1
+    source: report
+    at: "p.5 §3.1"
+    quote: "plus a shared expert [20] that processes every token"
+  moe.shared_dim: {value: 512, source: config, at: "/shared_expert_intermediate_size"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  norm.placement:
+    value: pre
+    source: report
+    at: "p.5 §3.1"
+    quote: "using a pre-norm Transformer architecture"
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "p.5 §3.1"
+    quote: "with RMSNorm [103] as the normalization layer"
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.extension:
+    value: "YaRN on global layers only; 4K → 32K → 128K (100B tokens each); 256K by doubling the global RoPE scale without training"
+    source: report
+    at: "p.6 §3.1.1 Long-Context Training"
+    quote: "Both sub-stages apply YaRN [62] to global attention layers only"
+    note: "Released config /rope_parameters/full_attention: rope_type yarn, factor 64, original_max_position_embeddings 4,096, beta_fast 64, beta_slow 1, attention_factor 1.416; max_position_embeddings 262,144."
+  ctx.final:
+    value: 131_072
+    source: report
+    at: "p.6 §3.1.1 Long-Context Training"
+    quote: "the second extends the context to 128K tokens"
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Model overview"
+    quote: "Context window: 262,144 tokens"
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "The pre-training stage uses a context length of 4K tokens"
+
+  train.batch:
+    value: "24M tokens"
+    source: report
+    at: "p.6 §3.1.1 Peak Learning Rate from a WSD Scaling Law"
+    quote: "trains at B = 24M tokens"
+    note: "Long-context stages also use 24M tokens."
+  train.batch_tokens:
+    value: 24_000_000
+    source: report
+    at: "p.6 §3.1.1 Peak Learning Rate from a WSD Scaling Law"
+    quote: "trains at B = 24M tokens"
+  train.lr_min:
+    value: 2.5e-5
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "ends at 5% of the peak (2.5×10−5 )"
+    note: "End of the main decay; long-context stages then decay to 5e-6."
+  train.lr_peak:
+    value: 5e-4
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "linear warmup to a peak learning rate of 5×10−4"
+    note: "WSD LR scaling law predicts ~5.5e-4; 5e-4 used for margin."
+  train.optimizer:
+    value: "Muon + AdamW (Moonlight variant; AdamW for non-matrix parameters)"
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "We use the Muon optimizer [39], specifically the Moonlight variant of Liu et al. [49], across all training stages"
+    note: "AdamW for non-matrix parameters with Moonlight-style LR scaling: §3.1.3."
+  train.precision:
+    value: "BF16 mixed precision, FP32 master weights; selective FP32 in RMSNorm, RoPE and the LM-head input-gradient all-reduce"
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "We use BF16 mixed precision training throughout all stages with the master weights in FP32 and most computations in BF16"
+  train.schedule:
+    value: "WSD: linear warmup, stable at peak, 1−√ decay over the last 30% of steps to 5% of peak"
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "a final decay phase covering the last 30% of training steps that follows a 1−√⋅ shape and ends at 5% of the peak"
+  train.stages:
+    value:
+      - name: main
+        seq_len: 4096
+        lr: 5e-4
+        batch_tokens: 24_000_000
+        note: "WSD; tokens not disclosed"
+        quote: "The pre-training stage uses a context length of 4K tokens"
+      - name: extend-32K
+        tokens: 100_000_000_000
+        seq_len: 32_768
+        lr: 2.5e-5
+        batch_tokens: 24_000_000
+        note: "cosine 2.5e-5 → 5e-6, no re-warmup; YaRN on global layers"
+        quote: "split it into two equal-token sub-stages of 100B tokens each. The first sub-stage extends the context to 32K tokens"
+      - name: extend-128K
+        tokens: 100_000_000_000
+        seq_len: 131_072
+        lr: 2.5e-5
+        batch_tokens: 24_000_000
+        note: "cosine 2.5e-5 → 5e-6; EMA of the last 10 checkpoints is the final base"
+        quote: "the second extends the context to 128K tokens"
+    source: report
+    at: "p.6 §3.1.1"
+  train.tokens:
+    value: ">30T"
+    source: report
+    at: "p.9 §3.2"
+    quote: "In total, both models were trained on more than 30T tokens."
+  train.data:
+    value: "AutoMixer mix: raw code 30.6%, web 25.2%, synthetic/code-text 25.4%, math 9.0%, knowledge 6.6%, instruction-like 1.4%, academic papers 1.1%, books 0.7%; sampled from a ~27T unique-token pool"
+    source: report
+    at: "p.16 Table 4"
+    quote: "Raw code 30.6% Web 25.2% Synthetic/code-text 25.4% Math 9.0% Knowledge 6.6% Instruction-like 1.4% Academic papers 1.1% Books 0.7%"
+    note: "Pool size: §3.2. Synthetic data is ~13% of the mix across all stages, from ~4.4T generated tokens (§3.2.2)."
+  train.hardware:
+    value: "2,048 H200"
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
+  train.stability:
+    value: "FP32 LM-head input-gradient all-reduce; no z-loss; padding tokens skip routing and load balancing"
+    source: report
+    at: "p.9 §3.1.3"
+    quote: "We therefore enforce the LM head input-gradient all-reduce in FP32 while keeping the layer tensor-parallel, resolving this numerical instability."
+    note: "Same section states \"no z-loss\" and the padding-token routing skip added for XS.2."
+  train.masking:
+    value: "document masking; position ids reset at document boundaries"
+    source: report
+    at: "p.6 §3.1.2 Model Factory component: Titan"
+    quote: "resetting position indices at document boundaries to avoid RoPE-related rounding under document masking in attention"
+  train.averaging:
+    value: "EMA over the 10 most recent checkpoints at the end of the 128K stage"
+    source: report
+    at: "p.6 §3.1.1 Long-Context Training"
+    quote: "we apply an exponential moving average (EMA) over the 10 most recent checkpoints from the end of the 128K stage and use the EMA weights as the final base checkpoint."
+  scaling.hp_rule:
+    value: "peak LR from WSD scaling law lr⋆(N, D) = 10^4.488 · N^−0.4639 · D^−0.2661 (N active params, D tokens incl. cooldown), scaled by √(B/B0) from B0 = 8M; predicts ~5.5e-4 at N = 3.0B, B = 24M; 5e-4 used"
+    source: report
+    at: "p.6 §3.1.1 Peak Learning Rate from a WSD Scaling Law, Eq. 1"
+    quote: "To pick the peak LR for LAGUNA XS.2 at production scale, we therefore fit a WSD-specific scaling law"
+  scaling.ladder:
+    value: "LR-law sweep: 4 MoE sizes (2B–16B total / 0.3B–2.2B active) × 6 LRs × 5 token budgets (30B–480B) at 8M batch; architecture ablations on a 16.6B-total / 2.3B-active proxy (22 layers, d_model 2048, 128 experts top-8, 335B tokens); data mixture from ~60 × ~0.5B MoE proxies on ~60B tokens"
+    source: report
+    at: "p.6 §3.1.1; App. A.1–A.2, Table 8; §3.2.3 AutoMixer"
+    quote: "sweeping four MoE sizes (2B–16B total / 0.3B–2.2B active) across six learning rates and five token budgets"
+    note: "Appendix A.1 instead lists D ∈ {60, 120, 240, 480, 960}B and B0 = 8.4M tokens."

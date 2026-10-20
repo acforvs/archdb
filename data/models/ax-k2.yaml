@@ -1,0 +1,305 @@
+name: A.X K2
+org: SK Telecom
+kind: reasoning
+note: "Post-trained checkpoint (Think-Fusion SFT and RL); pretraining facts are from the technical report."
+
+sources:
+  card: {url: https://huggingface.co/skt/A.X-K2/resolve/2287ca456927eed33b899c404c0b2ffaf17aa09f/README.md, kind: model-card}
+  config: {url: https://huggingface.co/skt/A.X-K2/resolve/2287ca456927eed33b899c404c0b2ffaf17aa09f/config.json, kind: config}
+  weights-index: {url: https://huggingface.co/skt/A.X-K2/resolve/2287ca456927eed33b899c404c0b2ffaf17aa09f/model.safetensors.index.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/axk2/modeling_axk2.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2608.30181v1, kind: paper}
+  press: {url: "https://web.archive.org/web/20261019095225/https://news.sktelecom.com/en/3204", kind: blog}
+
+not_disclosed:
+  - params.active_non_embedding
+  - mtp.depth
+  - train.weight_decay
+  - train.grad_clip
+
+config_unused:
+  attention_output_gate: "not read by modeling_axk2.py; the output gate is always applied"
+  attn_gate_fused: "not read by modeling_axk2.py"
+  gated_norm: "not read by modeling_axk2.py; Gated Norm is always built (gated_norm_rank)"
+  topk_method: "not read by modeling_axk2.py; router always adds e_score_correction_bias for selection"
+  num_key_value_heads: "MLA: equals num_attention_heads, K/V are up-projected per head from the cached latent"
+
+facts:
+  meta.released:
+    value: "2026-07-29"
+    source: press
+    at: "SKT press release 'SK Telecom Unveils A.X K2', dated 2026.07.29; first paragraph"
+    quote: "Starting today, the 688-billion-parameter A.X K2 model is available through the open-source community Hugging Face."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  params.active:
+    value: 33_000_000_000
+    source: report
+    at: "p.3 §2.1"
+    quote: "The A.X K2 model is a large-scale MoE language model with 688B total parameters and 33B active"
+  params.total:
+    value: 688_000_000_000
+    source: report
+    at: "p.3 §2.1"
+    quote: "The A.X K2 model is a large-scale MoE language model with 688B total parameters and 33B active"
+
+  shape.d_model: {value: 7168, source: config, at: "/hidden_size"}
+  shape.layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  shape.tokenizer:
+    value: "byte-level BPE, 163,840 tokens, inherited unchanged from A.X K1"
+    source: report
+    at: "p.4 §2.1"
+    quote: "The tokenizer is inherited unchanged from A.X K1: a byte-level BPE (Sennrich et al., 2016) vocabulary of 163,840 tokens"
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 163_840, source: config, at: "/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.gate:
+    value: "head-specific sigmoid gate on the attention output before o_proj, projected jointly with the query"
+    source: hf-transformers
+    at: "modeling_axk2.py; AXK2Attention.forward"
+    quote: "attn_output = (attn_output * torch.sigmoid(gate_states.float())).to(attn_output.dtype)"
+    note: "Report p.3 §2.1: the gate is applied throughout pre-training."
+  attn.global_layers:
+    value: 61
+    source: report
+    at: "p.3 §2.1"
+    quote: "Of the 61 transformer layers, the first is a dense feed-forward layer and the remaining 60 are MoE layers"
+    note: "Every block uses MLA."
+  attn.head_dim: {value: 192, source: config, at: "/qk_nope_head_dim + /qk_rope_head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "MLA, DSA (SGA)"
+    source: report
+    at: "p.3 §2.1"
+    quote: "The backbone uses Multi-head Latent Attention (MLA) (Liu et al., 2024), which improves Key-Value cache efficiency"
+    note: "SGA = MLA plus the head-specific output gate and the top-k indexer (p.4 §2.2)."
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.layout:
+    value: "61 MLA"
+    source: report
+    at: "p.3 §2.1"
+    quote: "Of the 61 transformer layers, the first is a dense feed-forward layer and the remaining 60 are MoE layers"
+  attn.position:
+    value: "partial RoPE (64-dim decoupled RoPE key shared across heads, 128 NoPE dims per head)"
+    source: hf-transformers
+    at: "modeling_axk2.py; AXK2Attention.forward"
+    quote: "q_rot, k_rot = apply_rotary_pos_emb_interleave(q_rot, k_rot, cos, sin)"
+    note: "q_rot/k_rot are the /qk_rope_head_dim slices; the /qk_nope_head_dim slices are not rotated."
+  attn.q_lora_rank:
+    value: 1536
+    source: config
+    at: "/q_lora_rank"
+    note: "q_gate_proj up-projects the normalized and raw query latents concatenated (2 × 1536 inputs) to per-head queries and gates."
+  attn.qk_norm:
+    value: false
+    source: hf-transformers
+    at: "modeling_axk2.py; AXK2Attention.forward"
+    quote: "k_pass = self.kv_a_layernorm(kv_pass).view(batch_size, 1, seq_length, self.kv_lora_rank)"
+    note: "Report p.3 §2.1 says 'the query and key projections are normalized before the attention scores are computed (QK-normalization)', but the released code only RMS-normalizes the Q and KV latents (q_a_layernorm, kv_a_layernorm) before up-projection, as in DeepSeek-V3; per-head Q/K go to attention unnormalized."
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta: {value: 1_000_000, source: config, at: "/rope_parameters/rope_theta"}
+  attn.sparse:
+    value: "DSA-style indexer, top-2048 tokens per query; 64 indexer heads of dim 128, ReLU-scored"
+    source: report
+    at: "p.4 §2.2"
+    quote: "which uses a lightweight indexer to select a small set of top-k tokens (k = 2048) per query"
+    note: "Indexer shape from config /index_n_heads 64, /index_head_dim 128, /index_topk 2048; scores pass through ReLU (AXK2Indexer.forward)."
+  attn.v_head_dim: {value: 128, source: config, at: "/v_head_dim"}
+  attn.indexer_dim:
+    value: 128
+    source: config
+    at: "/index_head_dim"
+    note: "AXK2Indexer caches one key head: wk projects hidden_size to index_head_dim."
+
+  ffn.activation:
+    value: SwiGLU
+    source: hf-transformers
+    at: "modeling_axk2.py; AXK2MLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU (/hidden_act)."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_axk2.py; AXK2MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 18432, source: config, at: "/intermediate_size"}
+
+  moe.balancing:
+    value: "global auxiliary loss (4e-3 general and reasoning stages, 1e-3 long-context, 5e-4 SGA adaptation) plus a learnable expert bias (update rate 1e-3, lowered to 1e-4)"
+    source: report
+    at: "p.8 §3.6"
+    quote: "the (global, sequence-level) auxiliary-loss coefficients are set to (4 × 10−3 , off)"
+    note: "Sequence-level term is monitored but not applied in the general and reasoning stages; it is switched on at 1e-5 for the long-context stages and 2e-5 for SGA adaptation."
+  moe.dense_layers:
+    value: 1
+    source: config
+    at: "/first_k_dense_replace"
+    note: "moe_layer_freq 1: every later layer is MoE."
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/n_routed_experts"}
+  moe.groups:
+    value: "256 experts in 8 groups, top-4 groups per token"
+    source: report
+    at: "p.8 §3.6"
+    quote: "the 256 routed experts are partitioned into 8 groups, and each token activates the top 8 experts under a group top-k of 4"
+    note: "Config /n_group 8, /topk_group 4."
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/routed_scaling_factor"}
+  moe.router: {value: sigmoid, source: config, at: "/scoring_func"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim:
+    value: 2048
+    source: config
+    at: "/moe_intermediate_size"
+    note: "1 shared expert (/n_shared_experts) of the routed-expert width."
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.released:
+    value: false
+    source: weights-index
+    at: "/weight_map | has mtp."
+    note: "No MTP, nextn or layers.61 tensors in the weight map; /num_nextn_predict_layers is 0; the report does not mention MTP."
+
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_axk2.py; AXK2DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: hf-transformers
+    at: "modeling_axk2.py; AXK2GatedRMSNorm"
+    quote: "return (y * torch.sigmoid(self.mlp(y).float())).to(y.dtype)"
+    note: "Gated Norm: each block RMSNorm except the dense layer 0's pre-FFN norm is followed by an input-dependent sigmoid gate from a rank-16 SiLU MLP (/gated_norm_rank)."
+
+  ctx.extension:
+    value: "ABF: RoPE base 1e4 through stages 1-2, raised to 1e6 for the 32K and 128K stages; 256K at inference by raising the YaRN factor"
+    source: report
+    at: "p.7 §3.4"
+    quote: "the RoPE base is kept at its default value of 104 throughout Stages 1 and 2 (sequence length 4,096), raised to 106 at the start of the 32K extension (Stage 3A)"
+    note: "Released config: rope_type yarn, factor 2 over original_max_position_embeddings 131072, beta_fast 32, beta_slow 1, mscale 1, mscale_all_dim 1 (the code also multiplies the softmax scale by (0.1·ln 2 + 1)²)."
+  ctx.final:
+    value: 131_072
+    source: report
+    at: "p.7 §3.4"
+    quote: "we natively extend the context length to 32K (Stage 3A, approximately 0.22T tokens) and subsequently to 128K (Stage 3B)"
+  ctx.max: {value: 262_144, source: config, at: "/max_position_embeddings"}
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.6 §3.3"
+    quote: "A.X K2 is trained on a corpus of 6.4 trillion tokens at a sequence length of 4,096"
+
+  train.averaging:
+    value: "weight-space average of the last 6 checkpoints, ~1.6B tokens apart, with 1-sqrt weighting"
+    source: report
+    at: "p.8 §3.5"
+    quote: "we average the parameters of the last six checkpoints, spaced approximately 1.6B tokens apart (25 optimizer steps of ≈64M tokens each), directly in weight space."
+  train.batch:
+    value: "16,384 × 4,096 (67.1M tokens); ramped from 2,048 sequences in steps of 2,048 over the first 72M sequences (~295B tokens)"
+    source: report
+    at: "p.8 §3.6"
+    quote: "linearly increasing the batch size from 2,048 to 16,384 in increments of 2,048 over the first 72 million sequences (approximately 295B tokens at a sequence length of 4,096)"
+  train.batch_tokens:
+    value: 67_108_864
+    source: report
+    at: "p.8 §3.6"
+    quote: "the global batch size to 16,384 sequences (with a micro-batch size of 4), corresponding to approximately 64M tokens per step at a sequence length of 4,096"
+    basis: inferred
+    note: "16,384 sequences × 4,096 tokens, after the 2,048 → 16,384 ramp."
+  train.data:
+    value: "web, code, academic papers, STEM, books, Q&A and synthetic; stage-1 designed mix English 72.7%, Korean 15.4%, code 8.3%"
+    source: card
+    at: "README.md; Training Data"
+    quote: "The designed language mix of the first stage is English 72.7%, Korean 15.4%, code 8.3%"
+    note: "A 16.2T candidate pool was filtered to the 8.2T trained on (report p.5 §3.2); English web is primarily Nemotron-CC v2.1, code Nemotron-Pretraining-Code-v2, multilingual FineWeb2."
+  train.hardware:
+    value: "512 NVIDIA B200 GPUs (64 nodes of 8) for ~70 days"
+    source: report
+    at: "p.9 §3.7"
+    quote: "Pre-training was conducted on 512 NVIDIA B200 GPUs (64 nodes of 8 GPUs) over approximately 70 days."
+    note: "PP 8 with virtual-pipeline degree 2, EP 8, no tensor parallelism; CP 2 for the 32K stage and 8 for 128K."
+  train.lr_min:
+    value: 2.2e-5
+    source: report
+    at: "p.9 §3.6"
+    quote: "the 128K stage warms up to and then holds 2.2 × 10−5 , a level maintained through the SGA-adaptation stage"
+  train.lr_peak:
+    value: 2.2e-4
+    source: report
+    at: "p.8 §3.6"
+    quote: "The peak learning rate was set to 2.2 × 10−4 and the global batch size to 16,384 sequences"
+  train.optimizer:
+    value: "AdamW (eps 1e-8)"
+    source: report
+    at: "p.8 §3.6"
+    quote: "We optimize with AdamW (β 1 = 0.9, β 2 = 0.95, ϵ = 10−8 ), following GPT-3"
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: report
+    at: "p.8 §3.6"
+    quote: "We optimize with AdamW (β 1 = 0.9, β 2 = 0.95, ϵ = 10−8 ), following GPT-3"
+  train.precision:
+    value: "MXFP8 (E4M3) forward and backward, one scale per 32 consecutive elements; FP32 master weights and gradients, BF16 optimizer moments; FP8 parameter all-gather"
+    source: report
+    at: "p.10 §3.7"
+    quote: "We used the E4M3 format for both the forward and backward passes."
+    note: "Released checkpoint is blockwise FP8 with 128×128 weight blocks, a separate serving recipe."
+  train.schedule:
+    value: "WSD: warmup over ~25B tokens, constant 2.2e-4 through stage 1, cosine to 7e-5 across stage 2; 32K stage re-warms to 7e-5 and cosine-decays to 2.2e-5; 128K stage warms to and holds 2.2e-5"
+    source: report
+    at: "p.8-9 §3.6"
+    quote: "the 32K stage warms up to 7 × 10−5 and cosine-decays to 2.2 × 10−5"
+  train.stability:
+    value: "Gated Norm (sigmoid gate after the block RMSNorms), replacing the dual-normalization scheme of A.X K1"
+    source: report
+    at: "p.3 §2.1"
+    quote: "with GN in place, training remained sufficiently stable without the dual-normalization scheme used in A.X K1."
+    note: "Gating costs ~5% training throughput."
+  train.stages:
+    value:
+      - name: "stage 1 - general knowledge"
+        tokens: 6_400_000_000_000
+        seq_len: 4096
+        quote: "A.X K2 is trained on a corpus of 6.4 trillion tokens at a sequence length of 4,096"
+      - name: "stage 2 - high-quality reasoning"
+        tokens: 1_400_000_000_000
+        seq_len: 4096
+        quote: "Using a curated corpus of 1.4 trillion tokens at a sequence length of 4,096, this stage is strictly filtered for high-complexity web data"
+      - name: "stage 3A - 32K extension"
+        tokens: "~0.22T"
+        seq_len: 32768
+        quote: "we natively extend the context length to 32K (Stage 3A, approximately 0.22T tokens)"
+      - name: "stage 3B/3C - 128K extension and SGA adaptation"
+        tokens: "~0.14T"
+        seq_len: 131_072
+        quote: "Stages 3B and 3C together consume approximately 0.14T tokens."
+    source: report
+    at: "p.6-7 §3.3, §3.4"
+    note: "Stage 3C adds the sparse indexer: an indexer-only sparse warmup with the backbone frozen, then joint training with the indexer loss down-weighted."
+  train.tokens:
+    value: 8_200_000_000_000
+    source: report
+    at: "p.5 §3.1"
+    quote: "A.X K2 is pre-trained on approximately 8.2 trillion tokens"
+    note: "~8.5T including post-training (p.1 §1)."
+  train.warmup:
+    value: "~6.1M sequences (~25B tokens)"
+    source: report
+    at: "p.8 §3.6"
+    quote: "the learning rate is linearly warmed up over the first ∼6.1M sequences (≈25B tokens)"
+  scaling.hp_rule:
+    value: "LR and batch magnitudes from the MoE scaling laws of Tian et al. (2025)"
+    source: report
+    at: "p.8 §3.6"
+    quote: "The magnitudes of the learning rate and batch size were selected based on the MoE scaling laws proposed by Tian et al. (2025)"
+  scaling.ladder:
+    value: "20B-A3B dry run at sequence length 4096 (Gated Norm ablation)"
+    source: report
+    at: "p.4 Figure 3"
+    quote: "run, 20B-A3B, sequence length 4096). Adding GN"

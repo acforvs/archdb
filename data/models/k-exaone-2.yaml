@@ -1,0 +1,270 @@
+name: K-EXAONE 2.0
+org: LG AI Research
+kind: reasoning
+note: "Post-trained checkpoint (SFT and preference learning); pretraining facts are from the technical report."
+
+sources:
+  card: {url: https://huggingface.co/LGAI-EXAONE/K-EXAONE-2.0-750B-A37B/resolve/fec0c8dd25fdd20ffd09869d5af5277966d5523d/README.md, kind: model-card}
+  config: {url: https://huggingface.co/LGAI-EXAONE/K-EXAONE-2.0-750B-A37B/resolve/fec0c8dd25fdd20ffd09869d5af5277966d5523d/config.json, kind: config}
+  weights-index: {url: https://huggingface.co/LGAI-EXAONE/K-EXAONE-2.0-750B-A37B/resolve/fec0c8dd25fdd20ffd09869d5af5277966d5523d/model.safetensors.index.json, kind: config}
+  modeling: {url: https://raw.githubusercontent.com/nuxlear/transformers/969f8bdfc73d7d8bb0df1b426e057d80a1adf501/src/transformers/models/exaone_moe/modeling_exaone_moe.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2608.04505v1, kind: paper}
+  news: {url: "https://web.archive.org/web/20261011182321/https://www.lgresearch.ai/news/view?seq=678", kind: blog}
+
+not_disclosed:
+  - params.active_non_embedding
+  - mtp.loss_weight
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+config_unused:
+  n_group: "1: group-limited routing disabled"
+  topk_group: "1: group-limited routing disabled"
+  topk_method: "not read by modeling_exaone_moe.py; router always adds e_score_correction_bias for selection"
+  mtp_loss_scaling_factor: "0.05; training loss coefficient not stated in the report and not read by modeling_exaone_moe.py"
+
+facts:
+  meta.released:
+    value: "2026-07-31"
+    source: news
+    at: "LG AI Research news, 2026.07.31"
+    quote: "on the open-source platform Hugging Face on July 31"
+    note: "News post dated 2026.07.31."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  params.active:
+    value: 37_000_000_000
+    source: report
+    at: "p.2 §1"
+    quote: "The resulting model contains 750B total parameters-more than three times the total parameter count of its predecessor-with approximately 37B parameters activated per token."
+  params.total:
+    value: 750_000_000_000
+    source: report
+    at: "p.2 §1"
+    quote: "The resulting model contains 750B total parameters-more than three times the total parameter count of its predecessor-with approximately 37B parameters activated per token."
+  params.note:
+    value: "Main-block count; the MTP block adds 0.52B and the separately trained DSpark drafter 2.53B"
+    source: report
+    at: "p.4 Table 1"
+    quote: "MTP Block"
+    note: "Table 1 lists 0.52B for the MTP block and 2.53B for the 5-layer DSpark block."
+
+  shape.d_model: {value: 6144, source: config, at: "/hidden_size"}
+  shape.layers: {value: 78, source: config, at: "/num_hidden_layers"}
+  shape.tokenizer:
+    value: "inherited unchanged from K-EXAONE"
+    source: report
+    at: "p.4 §2.2"
+    quote: "The number of activated experts (top-8 plus one shared expert), the sliding-window size, the routing policy, and the tokenizer are inherited unchanged."
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 153_600, source: config, at: "/vocab_size"}
+
+  attn.bias: {value: false, source: weights-index, at: "/weight_map | has q_proj.bias"}
+  attn.global_layers: {value: 20, source: config, at: "/layer_types | count full_attention"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "p.3 §2.1"
+    quote: "The hybrid attention architecture, QK Norm, and SWA-only RoPE are retained"
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "1 global + 1 SWA (4096 window) + 19 × (3 SWA : 1 global)"
+    source: card
+    at: "README.md; Model Configurations; Attention"
+    quote: "19 x [3 x 128 SWA + 1 x Global] Blocks"
+    note: "Depth expansion repeated whole LLLG blocks, 12 → 19 (report p.4 §2.2)."
+  attn.local_layers: {value: 58, source: config, at: "/layer_types | count sliding_attention"}
+  attn.position:
+    value: "RoPE (SWA), NoPE (global)"
+    source: report
+    at: "p.3 §2.1"
+    quote: "The hybrid attention architecture, QK Norm, and SWA-only RoPE are retained"
+    note: "Card lists the first layer as '1 x Global (NoPE)'."
+  attn.qk_norm:
+    value: true
+    source: modeling
+    at: "modeling_exaone_moe.py; ExaoneMoeAttention.__init__"
+    quote: "self.q_norm = ExaoneMoeRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+    note: "Per-head RMSNorm on Q and K, applied before RoPE; per-layer q_norm/k_norm weights are in the weight map. Report p.3 §2.1 confirms QK Norm."
+  attn.local_rope_theta:
+    value: 1_000_000
+    source: config
+    at: "/rope_parameters/rope_theta"
+    note: "Only the sliding-window layers apply RoPE; global layers are NoPE."
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/num_attention_heads"
+    note: "ExaoneMoeAttention uses the same num_attention_heads, num_key_value_heads and head_dim for both layer types; only the window and RoPE differ."
+  attn.local_kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.local_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.window:
+    value: 128
+    source: config
+    at: "/sliding_windows/2"
+    note: "Layer 1 uses a 4096 window (attn.long_window); every other SWA layer uses 128."
+  attn.long_window: {value: 4096, source: config, at: "/sliding_windows/1"}
+  attn.long_window_layers: {value: 1, source: config, at: "/sliding_windows | count 4096"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling
+    at: "modeling_exaone_moe.py; ExaoneMoeMLP.forward"
+    quote: "return self.down_proj(self.act_fn(gate) * up)"
+    note: "act_fn is SiLU (/hidden_act)."
+  ffn.bias: {value: false, source: weights-index, at: "/weight_map | has up_proj.bias"}
+  ffn.clamp:
+    value: "Clamped SwiGLU, limit 7.0 on the last 16 MoE layers: gate clamped above, up clamped both sides"
+    source: report
+    at: "p.4 Figure 2 caption"
+    quote: "the last 16 layers of the main model apply Clamped SwiGLU with a limit value of 7.0 to the experts"
+    note: "Config /swiglu_limits is 7.0 on layers 62-77; released code clamps gate (max 7) and up (±7) before the product in routed and shared experts of those layers."
+  ffn.dim: {value: 18432, source: config, at: "/intermediate_size"}
+
+  moe.balancing:
+    value: "sequence-level load balancing plus DeepSeek-style per-expert score bias; dropless"
+    source: report
+    at: "p.3 §2.1"
+    quote: "employing sigmoid-based scoring, sequence-level load balancing, and a dropless routing policy"
+    note: "Per-expert bias from p.4 §2.2: 'K-EXAONE inherits the DeepSeek-style router with per-expert score biases'. Coefficients not disclosed."
+  moe.dense_layers: {value: 2, source: config, at: "/mlp_layer_types | count dense"}
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/num_experts"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/routed_scaling_factor"}
+  moe.router: {value: sigmoid, source: config, at: "/scoring_func"}
+  moe.shared: {value: 1, source: config, at: "/num_shared_experts"}
+  moe.shared_dim:
+    value: 2048
+    source: config
+    at: "/moe_intermediate_size"
+    note: "1 shared expert (/num_shared_experts) of the routed-expert width."
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 1
+    source: config
+    at: "/num_nextn_predict_layers"
+    note: "Report p.4 §2.3: the MTP head is trained jointly with the backbone from pre-training onward."
+  mtp.modules: {value: 1, source: config, at: "/mtp_layer_types | len"}
+  mtp.block:
+    value: "RMSNorm on embedding and on previous hidden state, concatenated and projected (fc 12288 → 6144); one SWA layer (window 128, 64/8 heads, QK norm) with dense SwiGLU FFN; final RMSNorm; shared LM head"
+    source: weights-index
+    at: "model.safetensors.index.json; mtp.* keys"
+    quote: '"mtp.pre_fc_norm_embedding.weight"'
+    note: "Keys mtp.pre_fc_norm_hidden, mtp.fc, mtp.layers.0.{self_attn,mlp}, mtp.norm; config mtp_layer_types sliding_attention, mtp_sliding_windows 128; widths from the shard headers."
+  mtp.ffn:
+    value: dense
+    source: weights-index
+    at: "model.safetensors.index.json; mtp.layers.0.mlp"
+    quote: '"mtp.layers.0.mlp.gate_proj.weight"'
+    note: "No expert or router tensors in the MTP layer; gate_proj is 18432 × 6144 (same width as ffn.dim)."
+  mtp.shares_embedding:
+    value: true
+    source: report
+    at: "p.3 Figure 2"
+    quote: "Embedding (Shared)"
+    note: "Figure 2 also labels the MTP 'LM Head (Shared)'; the weight map has no MTP embedding or head."
+  mtp.params:
+    value: 520_000_000
+    source: report
+    at: "p.4 Table 1; MTP Block"
+    quote: "Parameters 0.52B 0.52B"
+  mtp.released: {value: true, source: weights-index, at: "/weight_map | has mtp."}
+
+  norm.eps: {value: 1e-5, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: modeling
+    at: "modeling_exaone_moe.py; ExaoneMoeDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling
+    at: "modeling_exaone_moe.py; ExaoneMoeRMSNorm.forward"
+    quote: "return self.weight * hidden_states.to(input_dtype)"
+
+  ctx.extension:
+    value: "mid-training in two stages: 8K → 64K (400B tokens) → 256K (400B tokens)"
+    source: report
+    at: "p.7 §4"
+    quote: "In the first stage (Mid-Stage 1), the model is trained on 400B tokens with a 64K context window, followed by training on an additional 400B tokens with context windows exceeding 64K tokens in the second stage (Mid-Stage 2)."
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.7 §4"
+    quote: "progressively extending the context window from 8K to 64K and then to 256K tokens"
+  ctx.max: {value: 262_144, source: config, at: "/max_position_embeddings"}
+  ctx.pretrain:
+    value: 8192
+    source: report
+    at: "p.7 §4"
+    quote: "progressively extending the context window from 8K to 64K and then to 256K tokens"
+    note: "Stated as the context mid-training starts from."
+
+  train.cutoff:
+    value: "2025 2Q"
+    source: card
+    at: "README.md; Model Configurations; Knowledge Cutoff"
+    quote: "2025 2Q"
+  train.data:
+    value: "K-EXAONE mixture plus Active Reading synthetic data, institution-sourced Korean culture and history corpora, and FineWeb2 for four added languages"
+    source: report
+    at: "p.5 §3"
+    quote: "We also extend the data recipe with two new synthetic data generation methods to improve knowledge acquisition and reduce training loss."
+    note: "Second method extends thinking-augmented pre-training with latent intermediate reasoning."
+  train.init:
+    value: "upcycled from K-EXAONE: depth 48 → 78 layers (12 → 19 LLLG blocks, repeating blocks from the middle of the stack); width 128 → 256 experts (each expert duplicated with its router row, plus norm-preserving random rotation noise)"
+    source: report
+    at: "p.4 §2.2"
+    quote: "K-EXAONE 2.0 is upcycled from K-EXAONE by expanding the model along both the depth axis (48 → 78 layers) and the width axis (128 → 256 experts), followed by continued pre-training."
+    note: "Block and noise details from the Depth/Width up-scaling paragraphs (p.4 §2.2); per-expert dimension unchanged."
+  train.stability:
+    value: "Clamped SwiGLU (limit 7.0) on the last 16 layers"
+    source: report
+    at: "p.4 §2.2"
+    quote: "bounding the gate branch from above and the linear branch on both sides at a threshold of 7.0 and leaving the routing decision untouched"
+    note: "With the clamp disabled at inference, peak SwiGLU activation reaches 6862 at the last layer; the clamp holds it at 48.96 (p.5 Figure 3)."
+  train.stages:
+    value:
+      - name: "healing"
+        quote: "To maintain training stability following this expansion, we first perform a healing stage using a portion of the later-stage K-EXAONE training data."
+      - name: "continual pre-training"
+        tokens: 8_000_000_000_000
+        quote: "After healing, the model is further trained on an additional 8T tokens using the K-EXAONE 2.0 pre-training data mixture."
+      - name: "mid-stage 1"
+        tokens: 400_000_000_000
+        seq_len: 65_536
+        quote: "In the first stage (Mid-Stage 1), the model is trained on 400B tokens with a 64K context window"
+      - name: "mid-stage 2"
+        tokens: 400_000_000_000
+        seq_len: 262_144
+        quote: "followed by training on an additional 400B tokens with context windows exceeding 64K tokens in the second stage (Mid-Stage 2)."
+        note: "Context windows above 64K, up to 256K."
+    source: report
+    at: "p.4-7 §2.2, §3, §4"
+    note: "Starts from upcycled K-EXAONE weights (train.init); the report says depth up-scaling is applied during the early stage of pre-training (p.5 §3). Healing-stage token count is not disclosed; mid-training extends the context from 8K (p.7 §4)."
+  train.tokens:
+    value: 8_000_000_000_000
+    source: report
+    at: "p.5 §3"
+    quote: "the model is further trained on an additional 8T tokens using the K-EXAONE 2.0 pre-training data mixture"
+    note: "Continual pre-training after upcycling; excludes the K-EXAONE parent run, the healing stage and the 800B mid-training tokens."
+  scaling.ladder:
+    value: "small-scale K-EXAONE model (size not disclosed) for mid-training stage ablations"
+    source: report
+    at: "p.8 §4.2"
+    quote: "We evaluate the contribution of Mid-Stage 1 and Mid-Stage 2 using the small-scale model."

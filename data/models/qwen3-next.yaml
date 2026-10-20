@@ -1,0 +1,221 @@
+name: Qwen3-Next-80B-A3B-Instruct
+org: Qwen
+kind: instruct
+note: "Describes the Instruct checkpoint; the card gives the pretraining token count of the shared base."
+
+sources:
+  card: {url: https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/resolve/9c7f2fbe84465e40164a94cc16cd30b6999b0cc7/README.md, kind: model-card}
+  config: {url: https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/resolve/9c7f2fbe84465e40164a94cc16cd30b6999b0cc7/config.json, kind: config}
+  transformers-code: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/qwen3_next/modeling_qwen3_next.py, kind: code}
+  hf-config-code: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/qwen3_next/configuration_qwen3_next.py, kind: code}
+  weights-index: {url: https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/resolve/9c7f2fbe84465e40164a94cc16cd30b6999b0cc7/model.safetensors.index.json, kind: config}
+  blog: {url: https://web.archive.org/web/20260826125316id_/https://docs.qwenlm.ai/research/qwen3-next/index.json, kind: blog}
+  github: {url: https://raw.githubusercontent.com/QwenLM/Qwen3.8/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md, kind: model-card}
+
+not_disclosed: [mtp.depth, mtp.loss_weight, ctx.pretrain, ctx.final, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision, params.active_non_embedding]
+
+config_unused:
+  intermediate_size: "dense-MLP width; unused because decoder_sparse_step 1 and empty mlp_only_layers make every layer MoE"
+
+facts:
+  meta.released:
+    value: "2025-09-11"
+    source: github
+    at: "QwenLM GitHub README; News"
+    quote: "2025-09-11: We release Qwen3-Next-80B-A3B"
+  meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+
+  params.active:
+    value: 3_000_000_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "80B in total and 3B activated"
+  params.note:
+    value: "Rounded card figures. Whether the MTP module is counted is not stated."
+    source: card
+    at: "README.md; Model Overview"
+    quote: "Number of Paramaters (Non-Embedding): 79B"
+  params.total:
+    value: 80_000_000_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "80B in total and 3B activated"
+  params.non_embedding:
+    value: 79_000_000_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "Number of Paramaters (Non-Embedding): 79B"
+
+  shape.d_model: {value: 2048, source: config, at: "/hidden_size"}
+  shape.layers: {value: 48, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 151_936, source: config, at: "/vocab_size"}
+
+  attn.gate:
+    value: "sigmoid, elementwise on the attention output before o_proj; gate projected jointly with Q"
+    source: transformers-code
+    at: "modeling_qwen3_next.py; Qwen3NextAttention.forward"
+    quote: "attn_output = attn_output * torch.sigmoid(gate)"
+  attn.global_layers:
+    value: 12
+    source: card
+    at: "README.md; Model Overview; Hybrid Layout"
+    quote: '12 \* (3 \* (Gated DeltaNet -> MoE) -> 1 \* (Gated Attention -> MoE))'
+  attn.head_dim: {value: 256, source: config, at: "/head_dim"}
+  attn.heads: {value: 16, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "Gated DeltaNet, GQA"
+    source: card
+    at: "README.md; Highlights"
+    quote: "Replaces standard attention with the combination of Gated DeltaNet and Gated Attention"
+    note: "Gated Attention is GQA with 16 Q / 2 KV heads."
+  attn.kv_heads: {value: 2, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "3 Gated DeltaNet : 1 GQA"
+    source: card
+    at: "README.md; Model Overview; Hybrid Layout"
+    quote: '12 \* (3 \* (Gated DeltaNet -> MoE) -> 1 \* (Gated Attention -> MoE))'
+    note: "Config full_attention_interval 4; layer_types is derived from it in configuration_qwen3_next.py."
+  attn.bias:
+    value: false
+    source: hf-config-code
+    at: "configuration_qwen3_next.py; Qwen3NextConfig defaults"
+    quote: "attention_bias: bool = False"
+    note: "config.json does not set attention_bias; the class default applies to q/k/v/o projections."
+  attn.linear_layers:
+    value: 36
+    source: card
+    at: "README.md; Model Overview; Hybrid Layout"
+    quote: '12 \* (3 \* (Gated DeltaNet -> MoE) -> 1 \* (Gated Attention -> MoE))'
+    basis: inferred
+    note: "12 repeats × 3 Gated DeltaNet layers."
+  attn.position:
+    value: "partial RoPE"
+    source: card
+    at: "README.md; Model Overview; Gated Attention"
+    quote: "Rotary Position Embedding Dimension: 64"
+    note: "64 of 256 head dims rotated."
+  attn.qk_norm:
+    value: true
+    source: transformers-code
+    at: "modeling_qwen3_next.py; Qwen3NextAttention.__init__"
+    quote: "self.q_norm = Qwen3NextRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+    note: "Per-head RMSNorm on Q and K in the full-attention layers."
+  attn.rope_fraction: {value: 0.25, source: config, at: "/partial_rotary_factor"}
+  attn.rope_theta: {value: 10_000_000, source: config, at: "/rope_theta"}
+  attn.conv: {value: 4, source: config, at: "/linear_conv_kernel_dim"}
+  attn.linear_head_dim: {value: 128, source: config, at: "/linear_value_head_dim"}
+  attn.linear_heads: {value: 32, source: config, at: "/linear_num_value_heads"}
+  attn.linear_kind:
+    value: "Gated DeltaNet: 16 QK heads, 32 V heads, head dim 128, short conv 4, SiLU-gated RMSNorm on output"
+    source: card
+    at: "README.md; Model Overview; Gated DeltaNet"
+    quote: "Number of Linear Attention Heads: 32 for V and 16 for QK"
+    note: "QK heads/dim from config linear_num_key_heads and linear_key_head_dim; conv kernel from linear_conv_kernel_dim; SiLU output gate from Qwen3NextRMSNormGated in modeling_qwen3_next.py."
+
+  ffn.activation:
+    value: "SwiGLU"
+    source: transformers-code
+    at: "modeling_qwen3_next.py; Qwen3NextExperts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn is SiLU (config hidden_act silu)."
+  ffn.bias:
+    value: false
+    source: transformers-code
+    at: "modeling_qwen3_next.py; Qwen3NextMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Shared-expert MLP; routed experts are bias-free weight tensors."
+
+  moe.expert_dim: {value: 512, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 512, source: config, at: "/num_experts"}
+  moe.router:
+    value: softmax
+    source: transformers-code
+    at: "modeling_qwen3_next.py; Qwen3NextTopKRouter.forward"
+    quote: "router_probs = torch.nn.functional.softmax(router_logits, dtype=torch.float, dim=-1)"
+    note: "Top-k taken after softmax; shared expert has its own sigmoid gate."
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model Overview; Mixture of Experts"
+    quote: "Number of Shared Experts: 1"
+  moe.shared_dim: {value: 512, source: config, at: "/shared_expert_intermediate_size"}
+  moe.top_k: {value: 10, source: config, at: "/num_experts_per_tok"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.dense_layers:
+    value: 0
+    source: card
+    at: "README.md; Model Overview; Hybrid Layout"
+    quote: '12 \* (3 \* (Gated DeltaNet -> MoE) -> 1 \* (Gated Attention -> MoE))'
+    note: "Config decoder_sparse_step 1 and empty mlp_only_layers: every layer is MoE."
+  moe.balancing:
+    value: "global-batch load-balancing loss"
+    source: blog
+    at: "Qwen3-Next blog; Key Features; Ultra-Sparse MoE"
+    quote: "Experiments show that, with global load balancing"
+    note: "Cites 'Demons in the Detail' (global-batch balancing); coefficient not stated."
+
+  mtp.block:
+    value: "one decoder layer (gated attention + MoE); RMSNormed hidden state and RMSNormed next-token embedding fused by linear fc; final RMSNorm"
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.* entries"
+    quote: "mtp.pre_fc_norm_embedding.weight"
+    note: "From weight names: pre_fc_norm_hidden, pre_fc_norm_embedding, fc, layers.0 (self_attn with q_norm/k_norm, MoE mlp), norm; no mtp.layers.1. Card: MTP trained with multi-step training."
+  mtp.ffn:
+    value: "MoE"
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.layers.0.mlp"
+    quote: "mtp.layers.0.mlp.shared_expert_gate.weight"
+
+  mtp.released:
+    value: true
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.* entries"
+    quote: "mtp.fc.weight"
+
+  norm.placement:
+    value: pre
+    source: transformers-code
+    at: "modeling_qwen3_next.py; Qwen3NextDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: card
+    at: "README.md; Highlights; Stability Optimizations"
+    quote: "zero-centered and weight-decayed layernorm"
+    note: "Card: zero-centered gains with weight decay; code applies 1 + weight."
+  norm.eps: {value: 1.0e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.max:
+    value: 1_010_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "262,144 natively and extensible up to 1,010,000 tokens"
+    note: "262,144 native (config max_position_embeddings); beyond that via inference-time YaRN, factor 4."
+
+  train.tokens:
+    value: 15_000_000_000_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "Pretraining (15T tokens)"
+  train.data:
+    value: "uniformly sampled 15T-token subset of the Qwen3 36T-token corpus"
+    source: blog
+    at: "Qwen3-Next blog; Pre-training"
+    quote: "Qwen3-Next is trained on a uniformly sampled subset (15T tokens) of Qwen3"
+  train.compute:
+    value: "<80% of Qwen3-30B-A3B GPU hours; 9.3% of Qwen3-32B compute cost"
+    source: blog
+    at: "Qwen3-Next blog; Pre-training"
+    quote: "It uses less than 80% of the GPU hours needed by Qwen3-30A-3B, and only 9.3% of the compute cost of Qwen3-32B"
+  train.init:
+    value: "MoE router parameters normalized at initialization"
+    source: blog
+    at: "Qwen3-Next blog; Key Features; Training-Stability-Friendly Designs"
+    quote: "We also normalize MoE router parameters during initialization"
+  train.stability:
+    value: "zero-centered, weight-decayed norm gains"
+    source: card
+    at: "README.md; Highlights; Stability Optimizations"
+    quote: "zero-centered and weight-decayed layernorm"
+    note: "Card also cites unspecified other stabilizing enhancements."

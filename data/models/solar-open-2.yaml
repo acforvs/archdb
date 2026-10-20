@@ -1,0 +1,220 @@
+name: Solar-Open2-250B
+org: Upstage
+kind: reasoning
+note: "No base checkpoint is public; the record describes the post-trained Solar-Open2-250B release."
+
+sources:
+  card: {url: https://huggingface.co/upstage/Solar-Open2-250B/resolve/9190fbe63a2ad8e17fc766ccceb36de7c66f004b/README.md, kind: model-card}
+  config: {url: https://huggingface.co/upstage/Solar-Open2-250B/resolve/9190fbe63a2ad8e17fc766ccceb36de7c66f004b/config.json, kind: config}
+  index: {url: https://huggingface.co/upstage/Solar-Open2-250B/resolve/9190fbe63a2ad8e17fc766ccceb36de7c66f004b/model.safetensors.index.json, kind: config}
+  modeling_solar_open2: {url: https://raw.githubusercontent.com/upstageAI/transformers/ef5c37485091057070b36dd0620798f74988eb01/src/transformers/models/solar_open2/modeling_solar_open2.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2607.20062v2, kind: paper}
+  blog: {url: https://web.archive.org/web/20261019101128/https://www.upstage.ai/blog/en/solar-open-2, kind: blog}
+
+not_disclosed: [moe.balancing, mtp.depth, ctx.pretrain, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision, params.active_non_embedding]
+
+config_unused:
+  partial_rotary_factor: RoPE disabled (use_rope false); code reads rope_parameters, not this key
+  intermediate_size: no dense FFN layers (first_k_dense_replace 0)
+
+facts:
+  meta.released:
+    value: "2026-07-22"
+    source: blog
+    at: "upstage.ai/blog/en/solar-open-2; header"
+    quote: "July 22, 2026"
+    note: "arXiv v1 of the report is also dated 22 Jul 2026."
+  meta.license:
+    value: "other (Upstage Solar License)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: upstage-solar-license"
+  params.total:
+    value: 250_287_794_944
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "250B (250,287,794,944)"
+  params.active:
+    value: 15_000_000_000
+    source: report
+    at: "p.2 §2"
+    quote: "Solar Open 2 is a sparse Mixture-of-Experts (MoE) Transformer with 250B total parameters and 15B active parameters per token."
+
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.layers: {value: 48, source: config, at: "/num_hidden_layers"}
+  shape.vocab: {value: 196_608, source: config, at: "/vocab_size"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "byte-level BPE, 196,608 vocab, digit splitting; inherited unchanged from Solar Open 1"
+    source: report
+    at: "p.2 §2.1"
+    quote: "It is a custom byte-level BPE tokenizer with a 196,608-token vocabulary, trained on a corpus that oversamples Korean and the target domains, with digit splitting and whitespace preservation for arithmetic and code fidelity."
+
+  attn.kind:
+    value: "GQA, KDA"
+    source: report
+    at: "p.3 §2.2"
+    quote: "It adopts GQA (Ainslie et al., 2023) for the softmax layers and KDA (Kimi Delta Attention) (Yang et al., 2025; Kimi Team, 2025) for the linear layers"
+  attn.layout:
+    value: "3 KDA : 1 GQA (GQA first in each block of 4)"
+    source: report
+    at: "p.3 §2.2"
+    quote: "Within each block the softmax layer comes first (S-L-L-L), unlike the linear-first ordering (L-L-L-S) adopted by Kimi Linear and Qwen3.5."
+    note: "Config /gqa_layers puts GQA at layers 0, 4, …, 44 (gqa_interval 3 KDA layers between)."
+  attn.global_layers: {value: 12, source: config, at: "/gqa_layers | len"}
+  attn.linear_layers:
+    value: 36
+    source: report
+    at: "p.3 §2.2"
+    quote: "so that 12 of the 48 layers (25%) are softmax and 36 (75%) are linear"
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.position:
+    value: NoPE
+    source: report
+    at: "p.4 §2.2"
+    quote: "Solar Open 2 removes positional encoding entirely"
+    note: "Config /use_rope is false, so SolarOpen2Attention skips RoPE and /rope_theta is unused; KDA layers carry token order."
+  attn.qk_norm:
+    value: false
+    source: index
+    at: "/weight_map | has q_norm"
+    note: "GQA layers have no q/k norm weights; KDA layers L2-normalize q and k inside the kernel."
+  attn.gate:
+    value: "elementwise sigmoid gate on SDPA output (g_proj from layer input), GQA layers"
+    source: modeling_solar_open2
+    at: "modeling_solar_open2.py; SolarOpen2Attention.forward"
+    quote: "attn_output = attn_output * torch.sigmoid(self.g_proj(hidden_states))"
+    note: "Config use_gqa_gate true. KDA layers use a sigmoid-gated RMSNorm on their output (SolarOpen2RMSNormGated)."
+  attn.bias:
+    value: false
+    source: index
+    at: "/weight_map | has q_proj.bias"
+  attn.linear_kind:
+    value: "KDA with negative eigenvalues (β = 2σ(·) ∈ (0, 2)); 64 heads × 128, no KV grouping; short conv 4 on q/k/v; low-rank (rank 128) decay and output-gate projections"
+    source: report
+    at: "p.4 §2.2"
+    quote: "Solar Open 2 instead sets allow_neg_eigval=True: widening the write strength to β = 2σ(·) ∈ (0, 2)"
+    note: "Config kda_allow_neg_eigval true. Heads, dims and conv from config /linear_attn_config; low-rank gates from /kda_use_full_proj false (f_a_proj/g_a_proj project to head_dim)."
+  attn.linear_heads: {value: 64, source: config, at: "/linear_attn_config/num_heads"}
+  attn.linear_head_dim: {value: 128, source: config, at: "/linear_attn_config/head_dim"}
+  attn.conv: {value: 4, source: config, at: "/linear_attn_config/short_conv_kernel_size"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_solar_open2
+    at: "modeling_solar_open2.py; SolarOpen2Experts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn is SiLU (report Table 1); the shared expert uses the same gate × up form (SolarOpen2MLP)."
+  ffn.bias:
+    value: false
+    source: modeling_solar_open2
+    at: "modeling_solar_open2.py; SolarOpen2MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.experts: {value: 320, source: config, at: "/n_routed_experts"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.expert_dim: {value: 1280, source: config, at: "/moe_intermediate_size"}
+  moe.shared_dim:
+    value: 1280
+    source: modeling_solar_open2
+    at: "modeling_solar_open2.py; SolarOpen2MoE.__init__"
+    quote: "config=config, intermediate_size=config.moe_intermediate_size * config.n_shared_experts"
+    note: "moe_intermediate_size 1280 × 1 shared expert."
+  moe.dense_layers: {value: 0, source: config, at: "/first_k_dense_replace"}
+  moe.router:
+    value: sigmoid
+    source: modeling_solar_open2
+    at: "modeling_solar_open2.py; SolarOpen2TopkRouter.forward"
+    quote: "scores = router_logits.sigmoid()"
+    note: "Expert selection adds a per-expert e_score_correction_bias (present in the weights); the report does not describe the balancing method."
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 1.0, source: config, at: "/routed_scaling_factor"}
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_solar_open2
+    at: "modeling_solar_open2.py; SolarOpen2DecoderLayer.__init__"
+    quote: "self.input_layernorm = SolarOpen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.placement:
+    value: pre
+    source: report
+    at: "p.2 §2"
+    quote: "a single shared expert with no dense layers, and pre-norm residuals."
+  norm.eps: {value: 1e-5, source: config, at: "/rms_norm_eps"}
+
+  ctx.final:
+    value: 1_048_576
+    source: report
+    at: "p.9 §3.3"
+    quote: "augments it with long-document data including repo-level code, and extends training to a 1M context length."
+  ctx.max:
+    value: 1_048_576
+    source: report
+    at: "p.5 Table 1"
+    quote: "Context Length 131,072 (128K) 1,048,576 (1M)"
+    note: "Config max_position_embeddings 1048576."
+  ctx.extension:
+    value: "Stage 4 Length Expansion (865B tokens): continued training to 1M on a higher-quality corpus plus long documents and repo-level code; NoPE"
+    source: report
+    at: "p.6 §3"
+    quote: "Length Expansion closes pre-training with 0.9T tokens of continued training that extend the context window to 1M and inject reasoning and agent data."
+
+  train.tokens:
+    value: "~12T"
+    source: report
+    at: "p.6 Figure 5"
+    quote: "Stages 2–4 then train on about 12T tokens in total"
+    note: "Stages sum to 11.865T (10T + 1T + 865B, Figure 8); excludes Solar Open 1 training behind the 5.69B transferred weights."
+  train.init:
+    value: "selective weight transfer from Solar Open 1: 5.69B params (2.3%) transferred (embedding/output, norms, GQA q/k/v/o, shared expert; KDA q/o re-mapped from GQA q/o); routed experts, router, KDA k/v, decay/write gates, conv and GQA output gate randomly initialized"
+    source: report
+    at: "p.7 §3.1, Table 2"
+    quote: "Only the compatible portion is reused: about 2.3% of parameters, or 5.69B."
+  train.data:
+    value: "10T tokens curated from a 20T deduplicated pool by quality and rarity; real:synthetic 4:6; math and code each ≥15%; English >80%"
+    source: report
+    at: "p.8 §3.2"
+    quote: "the resulting recipe sets (1) a real-to-synthetic ratio of 4:6, (2) a domain mix in which math and code each occupy at least 15%, and (3) an English share above 80%."
+  train.averaging:
+    value: "merge of four intermediate checkpoints from Stage 4 (Length Expansion)"
+    source: report
+    at: "p.9 §3.3"
+    quote: "To compensate, we selected four intermediate checkpoints and merged them, obtaining a pre-trained language model (PLM) stronger than any single checkpoint."
+    note: "The merged PLM is the post-training starting point and is not released; merge weights are not stated."
+  train.hardware:
+    value: "NVIDIA B200 GPUs"
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "Training Hardware | NVIDIA B200 GPUs"
+  train.compute:
+    value: "2M GPU hours"
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "Training GPU Time | 2M GPU Hours"
+    note: "Scope (pretraining only or including post-training) not stated."
+  train.stages:
+    value:
+      - name: general pre-training
+        tokens: 10_000_000_000_000
+        note: "Curated 10T mixture."
+        quote: "General Pre-training is the main stage, training on 10T tokens of a broad-coverage, high-quality data mixture"
+      - name: intensive pre-training
+        tokens: 1_000_000_000_000
+        note: "Best 1T tokens of the stage-2 data re-filtered at a higher quality threshold."
+        quote: "Stage 3 (Intensive Pre-training) raises the quality threshold and trains again on the best 1T tokens of the Stage-2 data"
+      - name: length expansion
+        tokens: 865_000_000_000
+        seq_len: 1_048_576
+        note: "Higher-quality base corpus plus long documents, repo-level code, reasoning and agent data; four checkpoints merged."
+        quote: "and Stage 4 (Length Expansion, 865B)."
+    source: report
+    at: "pp.6–9 §3, §3.3, Figure 8"
+
+  scaling.ladder:
+    value: "10B-A1B proxy for architecture ablations; 200B-A15B proxy for the weight-transfer initialization"
+    source: report
+    at: "p.6 §2.2; p.7 §3.1"
+    quote: "We ablated each of these changes on a 10B-A1B proxy before committing to the final design."

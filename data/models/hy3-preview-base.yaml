@@ -1,0 +1,178 @@
+name: Hy3-preview-Base
+org: Tencent
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/tencent/Hy3-preview-Base/resolve/54a62bb00a50195423bffb6b55e91aa28b6a8ce2/README.md, kind: model-card}
+  config: {url: https://huggingface.co/tencent/Hy3-preview-Base/resolve/54a62bb00a50195423bffb6b55e91aa28b6a8ce2/config.json, kind: config}
+  index: {url: https://huggingface.co/tencent/Hy3-preview-Base/resolve/54a62bb00a50195423bffb6b55e91aa28b6a8ce2/model.safetensors.index.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/hy_v3/modeling_hy_v3.py, kind: code}
+
+not_disclosed: [params.active_non_embedding, mtp.loss_weight, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  enable_lm_head_fp32: not read by modeling_hy_v3.py
+  expert_hidden_dim: duplicate of moe_intermediate_size; not read by modeling_hy_v3.py
+
+facts:
+  meta.released:
+    value: "2026-04-23"
+    source: card
+    at: "README.md; News"
+    quote: "[2026-04-23] 🔥 We open-source Hy3 preview model weights"
+  meta.license:
+    value: "other (Tencent Hy Community License Agreement)"
+    source: card
+    at: "README.md; License"
+    quote: "Hy3 preview is released under the Tencent Hy Community License Agreement"
+
+  params.active:
+    value: 21_000_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "is a 295B-parameter Mixture-of-Experts (MoE) model with 21B active parameters and 3.8B MTP layer parameters"
+  params.note:
+    value: "Excludes the 3.8B MTP layer, which the card lists separately (checkpoint index total_size 597.6 GB in BF16 ≈ 298.8B)."
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "is a 295B-parameter Mixture-of-Experts (MoE) model with 21B active parameters and 3.8B MTP layer parameters"
+  params.total:
+    value: 295_000_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "is a 295B-parameter Mixture-of-Experts (MoE) model with 21B active parameters and 3.8B MTP layer parameters"
+
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.layers: {value: 80, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 120_832, source: config, at: "/vocab_size"}
+
+  attn.bias:
+    value: false
+    source: index
+    at: "/weight_map | has self_attn.q_proj.bias"
+    note: "No QKV bias tensors; config omits attention_bias (transformers default false)."
+  attn.global_layers:
+    value: 80
+    source: config
+    at: "/num_hidden_layers"
+    note: "Every layer is full GQA; the config has no sliding-window or linear layers."
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: GQA
+    source: card
+    at: "README.md; Model Introduction table"
+    quote: "Attention Heads 64 (GQA, 8 KV heads, head dim 128)"
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.position:
+    value: RoPE
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3Attention.forward"
+    quote: "query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)"
+  attn.qk_norm: {value: true, source: config, at: "/qk_norm"}
+  attn.rope_theta: {value: 11_158_840, source: config, at: "/rope_parameters/rope_theta"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3MLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is config /hidden_act silu; routed experts compute act_fn(gate) * up."
+  ffn.dim:
+    value: 13312
+    source: config
+    at: "/intermediate_size"
+    note: "Dense FFN in layer 0 only."
+
+  moe.dense_layers: {value: 1, source: config, at: "/first_k_dense_replace"}
+  moe.expert_dim: {value: 1536, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 192, source: config, at: "/num_experts"}
+  moe.router:
+    value: sigmoid
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3TopKRouter.forward"
+    quote: "routing_weights = torch.sigmoid(router_logits)"
+    note: "Config /moe_router_use_sigmoid true."
+  moe.balancing:
+    value: "expert bias added to selection scores (e_score_correction_bias); update rule and any aux loss not disclosed"
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3TopKRouter.forward; config /moe_router_enable_expert_bias"
+    quote: "scores_for_choice = routing_weights + e_score_correction_bias"
+  moe.routed_scale:
+    value: 2.826
+    source: config
+    at: "/router_scaling_factor"
+    note: "Applied to the renormalized top-k weights (modeling_hy_v3.py HYV3TopKRouter.forward)."
+  moe.norm_topk:
+    value: true
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3TopKRouter.forward"
+    quote: "top_k_weights = top_k_weights / (top_k_weights.sum(dim=-1, keepdim=True) + 1e-20)"
+    note: "Config /route_norm true."
+  moe.shared: {value: 1, source: config, at: "/num_shared_experts"}
+  moe.shared_dim:
+    value: 1536
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3MoE.__init__"
+    quote: "shared_intermediate = config.moe_intermediate_size * config.num_shared_experts"
+    basis: inferred
+    note: "moe_intermediate_size 1536 × num_shared_experts 1 (config)."
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 1
+    source: card
+    at: "README.md; Model Introduction table"
+    quote: "Number of MTP Layers 1"
+    note: "The pre-trained base checkpoint ships the trained MTP layer."
+  mtp.modules: {value: 1, source: config, at: "/num_nextn_predict_layers"}
+  mtp.params:
+    value: 3_800_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "3.8B MTP layer parameters"
+  mtp.block:
+    value: "enorm(embedding) and hnorm(hidden) concatenated, eh_proj 2d→d, then one GQA (QK norm) + MoE block with final RMSNorm"
+    source: index
+    at: "model.safetensors.index.json; model.layers.80.* weights"
+    quote: '"model.layers.80.eh_proj.weight"'
+    basis: inferred
+    note: "From the layer-80 tensor names (enorm, hnorm, eh_proj, q/k_norm, router + 192 experts + shared_mlp, final_layernorm); transformers modeling_hy_v3.py does not implement the MTP layer."
+  mtp.ffn:
+    value: MoE
+    source: index
+    at: "model.safetensors.index.json; model.layers.80.mlp"
+    quote: '"model.layers.80.mlp.router.gate.weight"'
+    note: "192 routed experts and a shared expert, as in the backbone."
+  mtp.shares_embedding:
+    value: true
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.layers.80.eh_proj.weight"'
+    basis: inferred
+    note: "No embed_tokens or shared_head tensors under model.layers.80; the module reuses model.embed_tokens and lm_head."
+  mtp.released:
+    value: true
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.layers.80.eh_proj.weight"'
+    note: "Stored as layer 80."
+
+  norm.eps: {value: 1.0e-5, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: hf-transformers
+    at: "modeling_hy_v3.py; HYV3DecoderLayer.__init__"
+    quote: "self.input_layernorm = HYV3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Model Introduction table; config /max_position_embeddings"
+    quote: "Context Length 256K"

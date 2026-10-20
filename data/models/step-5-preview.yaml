@@ -1,0 +1,298 @@
+name: Step-5-Preview
+org: StepFun
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/stepfun-ai/Step-5-Preview/resolve/364b3b03fed2477aa0953fe855a2c4c8c48ee3cc/README.md, kind: model-card}
+  config: {url: https://huggingface.co/stepfun-ai/Step-5-Preview/resolve/364b3b03fed2477aa0953fe855a2c4c8c48ee3cc/config.json, kind: config}
+  hf-index: {url: https://huggingface.co/stepfun-ai/Step-5-Preview/resolve/364b3b03fed2477aa0953fe855a2c4c8c48ee3cc/model.safetensors.index.json, kind: config}
+  inference-model: {url: https://huggingface.co/stepfun-ai/Step-5-Preview/resolve/364b3b03fed2477aa0953fe855a2c4c8c48ee3cc/inference/model.py, kind: code}
+  inference-kernel: {url: https://huggingface.co/stepfun-ai/Step-5-Preview/resolve/364b3b03fed2477aa0953fe855a2c4c8c48ee3cc/inference/kernel.py, kind: code}
+  blog: {url: https://web.archive.org/web/20261019095405/https://platform.stepfun.ai/blog/inside-step-5-preview, kind: blog}
+
+not_disclosed:
+  - params.active_non_embedding
+  - moe.balancing
+  - ctx.pretrain
+  - ctx.final
+  - train.tokens
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+
+config_unused:
+  num_sliding_attention_heads: "not read by inference/model.py; equals num_attention_heads"
+  head_dim_full_attention: "not read by inference/model.py; equals head_dim"
+  head_dim_sliding_attention: "not read by inference/model.py; equals head_dim"
+  num_attention_groups_full_attention: "not read by inference/model.py; equals num_attention_groups"
+  num_attention_groups_sliding_attention: "not read by inference/model.py; equals num_attention_groups"
+  attention_type: "attention_other_setting block, not read by inference/model.py; layer types come from layer_types"
+  true_head_dim: "attention_other_setting block, not read by inference/model.py; equals head_dim"
+  moe_layers_enum: "string duplicate of moe_layer_list, not read by inference/model.py"
+  max_seq_len: "not read by inference/model.py; equals max_position_embeddings"
+
+facts:
+  meta.released:
+    value: "2026-10-15"
+    source: blog
+    at: "Inside Step 5 Preview: Architecture and Training for Agentic Work; byline"
+    quote: "Oct 15, 2026"
+    note: "Weights and technical blog published the same day; the Hugging Face repo, created 2026-09-20 at API launch, was private until then."
+
+  meta.license:
+    value: "other (StepFun Model License 1.0)"
+    source: card
+    at: "README.md; License"
+    quote: "is licensed under the StepFun Model License 1.0."
+
+  params.active:
+    value: 27_000_000_000
+    source: card
+    at: "README.md; Introduction"
+    quote: "Step 5 Preview is a sparse Mixture-of-Experts (MoE) model with 600B total parameters and 27B active parameters."
+  params.note:
+    value: "Rounded publisher figures; inclusion of the 3 MTP layers and the vision encoder is not stated."
+    source: card
+    at: "README.md; Model Specifications"
+    quote: "Total Parameters 600B"
+  params.total:
+    value: 600_000_000_000
+    source: card
+    at: "README.md; Introduction"
+    quote: "Step 5 Preview is a sparse Mixture-of-Experts (MoE) model with 600B total parameters and 27B active parameters."
+
+  shape.d_model: {value: 4096, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 92, source: config, at: "/text_config/num_hidden_layers"}
+  shape.vocab: {value: 128_896, source: config, at: "/text_config/vocab_size"}
+  shape.tied_embeddings:
+    value: false
+    source: inference-model
+    at: "inference/model.py; Step5ForConditionalGenerationConfig.__init__"
+    quote: "kwargs.setdefault(\"tie_word_embeddings\", False)"
+    note: "Step5ForCausalLM builds a separate lm_head (_tied_weights_keys empty); config.json has no tie_word_embeddings key."
+
+  attn.bias:
+    value: false
+    source: inference-model
+    at: "inference/model.py; Step5Attention.__init__"
+    quote: "config.hidden_size, self.kv_size, bias=False, **factory"
+    note: "q, k, v, o and gate projections are all built with bias=False."
+  attn.gate:
+    value: "head-wise sigmoid on the attention output, before o_proj"
+    source: inference-model
+    at: "inference/model.py; Step5Attention.forward"
+    quote: "gate = self.g_proj(hidden_states).sigmoid().unsqueeze(-1)"
+    note: "Enabled by /text_config/use_head_wise_attn_gate; applies to both layer types."
+  attn.global_layers: {value: 23, source: config, at: "/text_config/layer_types/0:92 | count full_attention"}
+  attn.head_dim:
+    value: 192
+    source: config
+    at: "/text_config/head_dim"
+    note: "Step5Attention reads /text_config/head_dim for both layer types."
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: "SWA, DSA (Sparse GQA)"
+    source: blog
+    at: "Architectural Design Philosophy"
+    quote: "we propose Sparse GQA, introducing a sparse indexing mechanism into standard GQA inspired by DSA"
+    note: "Sparse GQA runs on the \"full_attention\" layers (inference/model.py Step5Config.is_sparse_layer); the others are 512-token sliding-window GQA."
+  attn.kv_heads:
+    value: 4
+    source: config
+    at: "/text_config/num_attention_groups"
+    note: "Step5Attention reads /text_config/num_attention_groups for both layer types."
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/text_config/num_attention_heads"
+    note: "Step5Attention reads num_attention_heads, num_attention_groups and head_dim for both layer types."
+  attn.local_kv_heads: {value: 4, source: config, at: "/text_config/num_attention_groups"}
+  attn.local_head_dim: {value: 192, source: config, at: "/text_config/head_dim"}
+  attn.local_rope_theta:
+    value: 10000
+    source: config
+    at: "/text_config/rope_theta/0"
+    note: "Per-layer list; 10000 on every sliding_attention layer."
+  attn.indexer_dim:
+    value: 256
+    source: config
+    at: "/text_config/sparse_config/proxy_dim"
+    note: "One indexer key (sparse_indexer_num_k_heads 1) per 8-token region, not per token; KV fields are computed from attn.kv_groups."
+  attn.kv_groups:
+    value:
+      - name: DSA K/V
+        layers: 23
+        elements: 1536
+        tokens_per_entry: 1
+        note: "4 KV heads × 192 dims, K and V."
+        quote: "retain full K/V and completed-region summaries"
+      - name: DSA indexer region summaries
+        layers: 23
+        elements: 256
+        tokens_per_entry: 8
+        note: "proxy_dim 256 per 8-token region (region_block_size); stored FP8 in kernel.py DSALayerCache."
+        quote: "retain full K/V and completed-region summaries"
+      - name: SWA K/V
+        layers: 69
+        elements: 1536
+        tokens_per_entry: 1
+        window: 512
+        note: "4 KV heads × 192 dims, K and V."
+        quote: "Ring buffer of the last ``window`` tokens for one sliding-attention layer."
+    source: inference-model
+    at: "inference/model.py; Step5Cache, DenseLayerCache"
+  attn.layout:
+    value: "3 SWA : 1 DSA"
+    source: config
+    at: "config.json text_config.layer_types"
+    quote: "\"layer_types\": [ \"sliding_attention\", \"sliding_attention\", \"sliding_attention\", \"full_attention\", \"sliding_attention\","
+    note: "Repeats 23 times; the last main layer (91) is DSA."
+  attn.local_layers:
+    value: 69
+    source: config
+    at: "/text_config/layer_types/0:92 | count sliding_attention"
+    note: "/text_config/layer_types has 95 entries; the last 3 are the MTP layers."
+  attn.position:
+    value: "partial RoPE (DSA, 64 of 192 dims), RoPE (SWA)"
+    source: inference-model
+    at: "inference/model.py; Step5Attention.__init__"
+    quote: "rotary_span = int(round(self.head_dim * config.partial_rotary_factors[layer_idx]))"
+    note: "/text_config/partial_rotary_factors is 1/3 on full_attention layers and 1.0 on sliding_attention layers."
+  attn.qk_norm:
+    value: true
+    source: inference-model
+    at: "inference/model.py; Step5Attention.forward"
+    quote: "query = self._apply_rope(self.q_norm(query), positions)"
+  attn.rope_fraction:
+    value: 0.3333333333333333
+    source: config
+    at: "/text_config/partial_rotary_factors/3"
+    note: "Full-attention (DSA) layers: 64 of 192 dims. SWA layers rotate all dims (1.0)."
+  attn.rope_theta:
+    value: 10_000_000
+    source: config
+    at: "/text_config/rope_theta/3"
+    note: "Full-attention (DSA) layers; rope_scaling (rope_type llama3, factor 1.0, original_max_position_embeddings 1048576, low_freq_factor 1.0, high_freq_factor 32.0) applies only to yarn_only_types full_attention and is an identity at factor 1.0."
+  attn.sparse:
+    value: "DSA indexer (16 heads, proxy dim 256) scores 8-token region summaries; each query attends to its top-512 regions"
+    source: inference-kernel
+    at: "inference/kernel.py; REGION_BLOCK_SIZE"
+    quote: "Step-5 compresses each region of 8 consecutive tokens into one summary vector."
+    note: "/text_config/sparse_config (enabled, apply_to_layer_types full_attention, attention_impl sparse_gqa, compression_method csa_block_compress): topk 512 regions of region_block_size 8; sparse_indexer_num_heads 16 in num_provider_groups 4 aligned with KV groups; sparse_indexer_num_k_heads 1; proxy_dim 256; sparse_indexer_use_rope with sparse_indexer_rope_dim 32; sparse_indexer_q_norm_type rmsnorm, sparse_indexer_k_norm_type layernorm, sparse_indexer_csa_z_norm_type none; sparse_indexer_softmax_variant ssmax and sparse_indexer_ssmax_s_granularity are unused (indexer scores with weighted ReLU)."
+  attn.window: {value: 512, source: config, at: "/text_config/sliding_window"}
+
+  ffn.activation:
+    value: "SwiGLU"
+    source: inference-model
+    at: "inference/model.py; clamped_swiglu"
+    quote: "silu(gate).clamp(max=limit) * up.clamp(-limit, limit)"
+    note: "See ffn.clamp."
+  ffn.bias:
+    value: false
+    source: inference-model
+    at: "inference/model.py; Step5MLP.__init__"
+    quote: "self.gate_proj = ColumnParallelLinear(config.hidden_size, intermediate_size, tp_size=tp, bias=False, **factory)"
+  ffn.clamp:
+    value: "SwiGLU limit 7 (silu(gate) ≤ 7, up in [−7, 7]) on all dense, shared and routed FFNs"
+    source: inference-model
+    at: "inference/model.py; clamped_swiglu"
+    quote: "activated = torch.nn.functional.silu(gate.float()).clamp(max=limit)"
+    note: "Released inference code; the docstring motivates it by FP8 expert-GEMM range, and use in training is not stated. /text_config/swiglu_limits and swiglu_limits_shared are 7.0 on all layers."
+  ffn.dim:
+    value: 13824
+    source: config
+    at: "/text_config/intermediate_size"
+    note: "Dense FFN in layers 0–2 and the last layer (91)."
+
+  moe.dense_layers:
+    value: 3
+    source: config
+    at: "/text_config/moe_layer_list/0"
+    note: "MoE layers are 3–90 (use_moe true); layer 91 is also dense."
+  moe.expert_dim: {value: 1536, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.experts: {value: 352, source: config, at: "/text_config/moe_num_experts"}
+  moe.norm_topk:
+    value: true
+    source: config
+    at: "/text_config/norm_expert_weight"
+    note: "Step5MoE.route renormalizes the unbiased top-k sigmoid scores."
+  moe.routed_scale:
+    value: 3.0
+    source: config
+    at: "/text_config/moe_router_scaling_factor"
+    note: "Step5MoE.route returns weights * scaling_factor."
+  moe.router:
+    value: sigmoid
+    source: inference-model
+    at: "inference/model.py; Step5MoE.forward"
+    quote: "gate_prob = torch.sigmoid(logits)"
+    note: "FP32 router (need_fp32_gate); selection-only expert bias (use_moe_router_bias) added for top-k and removed from the weights."
+  moe.shared:
+    value: 1
+    source: inference-model
+    at: "inference/model.py; Step5DecoderLayer.__init__"
+    quote: "self.share_expert = Step5MLP("
+  moe.shared_dim: {value: 1536, source: config, at: "/text_config/share_expert_dim"}
+  moe.top_k:
+    value: 8
+    source: config
+    at: "/text_config/moe_top_k"
+    note: "Step5Config drops the duplicate num_experts_per_tok and reads moe_top_k."
+
+
+  mtp.depth:
+    value: 0
+    source: blog
+    at: "Agentic RL; High-Throughput and Low-Redundancy Infrastructure"
+    quote: "an MTP-3 head trained after SFT provides roughly 30% end-to-end speedup"
+    note: "The released 3-layer MTP head was trained after SFT for speculative decoding, not during pretraining."
+  mtp.released:
+    value: true
+    source: hf-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: "\"model.layers.94.eh_proj.weight\""
+    note: "Three MTP layers (92–94, /text_config/num_nextn_predict_layers), trained after SFT (see mtp.depth)."
+
+  norm.placement:
+    value: pre
+    source: inference-model
+    at: "inference/model.py; Step5DecoderLayer.forward"
+    quote: "hidden = self.input_layernorm(residual)"
+  norm.eps: {value: 1.0e-5, source: config, at: "/text_config/rms_norm_eps"}
+  norm.residual:
+    value: "FP32 residual stream (hidden states and their gradients)"
+    source: blog
+    at: "Training Stability; FP32 hidden state"
+    quote: "we find that using FP32 for hidden states [8] and their corresponding gradients works well"
+    note: "Inference code keeps it via /text_config/fp32_residual_connection (Step5DecoderLayer, Step5Model.forward)."
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: inference-model
+    at: "inference/model.py; Step5RMSNorm"
+    quote: "Zero-centered RMSNorm: ``x / rms(x) * (1 + w)``, reduced in fp32."
+    note: "norm_dtype float32."
+
+  train.precision:
+    value: "FP8 mixed precision"
+    source: blog
+    at: "Training Stability"
+    quote: "we adopt a mixed-precision FP8 strategy to train Step 5 Preview"
+  train.stability:
+    value: "FP32 hidden states and gradients; FP32 RMSNorm gains; fine-grained gradient clamp (top 0.00004% of gradient values per layer)"
+    source: blog
+    at: "Training Stability; Fine-grained gradient clamp"
+    quote: "We find clamping only 0.00004% of gradient values per layer leads to excellent gradient spike suppression"
+    note: "FP32 gains replace BF16 because zero-centered gains near −1 oscillated in BF16."
+
+  ctx.max:
+    value: 1_048_576
+    source: config
+    at: "/text_config/max_position_embeddings"
+    note: "Card: \"It supports up to 1 million tokens of context\"."

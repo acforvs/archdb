@@ -1,0 +1,328 @@
+name: Apertus-v1.5-70B-base
+org: Swiss AI
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/swiss-ai/Apertus-v1.5-70B-base/resolve/0f3fbdd07bad839bb0c71b23d5adad0433dfcd16/README.md, kind: model-card}
+  config: {url: https://huggingface.co/swiss-ai/Apertus-v1.5-70B-base/resolve/0f3fbdd07bad839bb0c71b23d5adad0433dfcd16/config.json, kind: config}
+  index: {url: https://huggingface.co/swiss-ai/Apertus-v1.5-70B-base/resolve/0f3fbdd07bad839bb0c71b23d5adad0433dfcd16/model.safetensors.index.json, kind: config}
+  modeling_apertus1p5: {url: https://raw.githubusercontent.com/swiss-ai/transformers/0c5e12f18a5ff5c93cb1ef755aebbd557e26e884/src/transformers/models/apertus1p5/modeling_apertus1p5.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2610.15542v1, kind: paper}
+  report_v1: {url: https://arxiv.org/pdf/2509.14233v2, kind: paper}
+  announcement: {url: "https://web.archive.org/web/20261019095313/https://ai.epfl.ch/apertus-1-5-building-the-next-generation-of-open-ai-infrastructure/", kind: blog}
+
+not_disclosed:
+  - params.active_non_embedding
+  - mtp.depth
+
+facts:
+  meta.released:
+    value: "2026-07-24"
+    source: announcement
+    at: "EPFL AI Center news, Apertus 1.5: Building the next generation of open AI infrastructure"
+    quote: "Published 24 July, 2026 EPFL, ETH Zurich and the Swiss National Supercomputing Centre (CSCS) today released Apertus 1.5"
+    note: "Release of the Apertus 1.5 suite on Hugging Face; the separate -base repository was created 2026-09-23 and the report is dated 2026-10-11."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  params.total:
+    value: 70_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "Apertus 1.5 is a family of 8B and 70B fully open, multilingual, and multimodal models"
+    note: "Size designation; no exact count is reported."
+  params.active:
+    value: 70_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "Apertus 1.5 is a family of 8B and 70B fully open, multilingual, and multimodal models"
+    basis: inferred
+    note: "Dense model; active equals the stated size."
+  params.note:
+    value: "70B is a size designation; the checkpoint's 71,942,010,689 parameters include the image and audio tokenizers and the 266,752-row input embedding."
+    source: index
+    at: "model.safetensors.index.json; metadata"
+    quote: '"total_parameters": 71942010689'
+
+  shape.layers: {value: 80, source: config, at: "/text_config/num_hidden_layers"}
+  shape.d_model: {value: 8192, source: config, at: "/text_config/hidden_size"}
+  shape.vocab:
+    value: 266_752
+    source: config
+    at: "/text_config/vocab_size"
+    note: "Input embedding only: 131,072 text + 200 reserved + 131,072 image + 4,096 audio + 312 padding rows; the output head keeps the 131,072 text rows (/text_config/output_vocab_size)."
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "byte-level BPE (Mistral-Nemo tekken, 131,072) extended with 200 reserved slots, 131,072 image codes (Emu3.5 vision tokenizer, one per 16×16 patch) and 4,096 audio codes (WavTokenizer)"
+    source: report
+    at: "p.9 §2.1 Vocabulary Extension"
+    quote: "We extend the 131,072-entry vocabulary of Apertus 1.0 with 200 reserved multimodal slots, including structure markers, followed by 131,072 image codes"
+    note: "Text tokenizer adapted from Mistral-Nemo-Base-2407 per the Apertus 1.0 report §2.2."
+
+  attn.kind:
+    value: GQA
+    source: report_v1
+    at: "p.9 §2.1 Model Architecture"
+    quote: "such as grouped-query attention (GQA), RoPE, and RMSNorm"
+  attn.layout:
+    value: "80 GQA"
+    source: report_v1
+    at: "p.9 §2.1"
+    quote: "Apertus 70B, with 80 layers and 64 parallel attention heads."
+  attn.global_layers: {value: 80, source: config, at: "/text_config/num_hidden_layers"}
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}
+  attn.kv_heads: {value: 8, source: config, at: "/text_config/num_key_value_heads"}
+  attn.head_dim:
+    value: 128
+    source: modeling_apertus1p5
+    at: "modeling_apertus1p5.py; Apertus1p5TextAttention.__init__"
+    quote: 'self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)'
+    basis: inferred
+    note: "text_config has no head_dim, so hidden_size 8192 / 64 heads = 128."
+  attn.position:
+    value: "RoPE (Llama-3-style frequency scaling)"
+    source: report_v1
+    at: "p.9 §2.1 Rotary Positional Embeddings"
+    quote: "following the LLaMA-3 implementation"
+    note: "Released config: rope_type llama3, factor 32, low_freq_factor 1, high_freq_factor 4, original_max_position_embeddings 8192."
+  attn.rope_theta:
+    value: 4_000_000
+    source: config
+    at: "/text_config/rope_parameters/rope_theta"
+    note: "500,000 during Apertus 1.0 pretraining and Apertus 1.5 stages 1–3; 2M at 32K, 4M from 65K."
+  attn.qk_norm:
+    value: true
+    source: modeling_apertus1p5
+    at: "modeling_apertus1p5.py; Apertus1p5TextAttention.__init__"
+    quote: "self.q_norm = Apertus1p5TextRMSNorm(self.head_dim, config.rms_norm_eps)"
+    note: "Per-head RMSNorm on Q and K before RoPE; config qk_norm true, code builds the norms unconditionally."
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+
+  ffn.activation:
+    value: "xIELU (non-gated; trainable α_p, α_n per layer)"
+    source: modeling_apertus1p5
+    at: "modeling_apertus1p5.py; Apertus1p5TextMLP.forward"
+    quote: "return self.down_proj(self.act_fn(self.up_proj(x)))"
+    note: "Config hidden_act xielu. xIELU(x) = α_p·x² + 0.5x for x > 0, α_n(eˣ − 1) − α_n·x + 0.5x otherwise (Apertus 1.0 report §2.1)."
+  ffn.dim: {value: 43008, source: config, at: "/text_config/intermediate_size"}
+  ffn.bias: {value: false, source: config, at: "/text_config/mlp_bias"}
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_apertus1p5
+    at: "modeling_apertus1p5.py; Apertus1p5TextDecoderLayer.__init__"
+    quote: "self.attention_layernorm = Apertus1p5TextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.placement:
+    value: pre
+    source: modeling_apertus1p5
+    at: "modeling_apertus1p5.py; Apertus1p5TextDecoderLayer.forward"
+    quote: "hidden_states = self.attention_layernorm(hidden_states)"
+  norm.eps: {value: 1e-5, source: config, at: "/text_config/rms_norm_eps"}
+
+  ctx.pretrain:
+    value: 4096
+    source: report_v1
+    at: "p.10 §2.1 Context length"
+    quote: "Both Apertus 8B and Apertus 70B were trained with a context of 4,096 tokens (about 3,000 words) during pretraining."
+    note: "Apertus 1.5 continued pretraining stages 1–3 use 8,192."
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.23 §3.3"
+    quote: "from 8,192 to 32,768, 65,536, 131,072, and finally 262,144 tokens."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; intro"
+    quote: "handle contexts up to 262,144 tokens"
+    note: "Config max_position_embeddings 262144."
+  ctx.extension:
+    value: "8K → 32K → 65K → 131K → 262K after the stage-3 cooldown, 58.7B, 58.7B, 50.3B, 50.3B tokens; constant LR 2e-6, fresh optimizer per step; RoPE base 2M then 4M, Llama-3 scaling factor 8, 8, 16, 32; context parallelism 4, 8, 16, 32"
+    source: report
+    at: "p.107 App. G"
+    quote: "The RoPE base grows to 2M for the first step and 4M thereafter, with scaling factors of 8, 8, 16, and 32."
+    note: "Apertus 1.5 continued pretraining resumes from the Apertus 1.0 checkpoint after its cooldown, at RoPE base 500,000 and factor 8; the Apertus 1.0 4K → 64K extension is not in this lineage."
+
+  train.tokens:
+    value: 17_232_100_000_000
+    source: report
+    at: "p.6 §1; p.22 Table 3; p.106 Table F.2"
+    quote: "trained from scratch on 15T tokens of openly documented text"
+    basis: inferred
+    note: "Sum of train.stages: 15T Apertus 1.0 + 2,014B Apertus 1.5 stages 1–3 (Table 3: 403B + 1,208B + 403B) + 218.1B long-context (Table F.2: 58.72B + 58.72B + 50.33B + 50.33B)."
+  train.optimizer:
+    value: "AdEMAMix (α 8, β3 0.9999, α and β3 warmup over 100,000 iterations)"
+    source: report
+    at: "p.107 App. G"
+    quote: "Both models train with AdEMAMix (β 1 = 0.9, β 2 = 0.999, α = 8, β 3 = 0.9999, with the β 3 and α warmup over 100,000 iterations)"
+    note: "Same settings in Apertus 1.0 pretraining (Apertus 1.0 report Table C.4); optimizer state reset at the start of continued pretraining."
+  train.betas:
+    value: "(0.9, 0.999)"
+    source: report
+    at: "p.107 App. G"
+    quote: "Both models train with AdEMAMix (β 1 = 0.9, β 2 = 0.999, α = 8, β 3 = 0.9999"
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.107 App. G"
+    quote: "gradient clipping at 0.1, and weight decay of 0.1, applied also to the xIELU parameters and the normalization gains."
+  train.grad_clip:
+    value: 0.1
+    source: report_v1
+    at: "p.15 §2.6 Gradient Clipping"
+    quote: "Our experiments led to set a clipping value of 0.1."
+    note: "Clipping is active at almost every step; also 0.1 in continued pretraining (Apertus 1.5 report App. G)."
+  train.lr_peak:
+    value: 1.0e-5
+    source: report_v1
+    at: "p.11 Table 2"
+    quote: "Apertus 70B AdEMAMix 4096 8.4M → 16.8M 1.1M 1.0e-5 15T"
+    note: "Apertus 1.0 pretraining; Apertus 1.5 continued pretraining re-warms to 2e-5."
+  train.lr_min:
+    value: 2e-6
+    source: report
+    at: "p.107 Table G.1"
+    quote: "Minimum learning rate 1.1 × 10−5 2 × 10−6"
+    note: "End of the Apertus 1.5 stage-3 cooldown, held through context extension; Apertus 1.0 cooled down to 1e-6."
+  train.schedule:
+    value: "Apertus 1.0: WSD, warmup from 0.1× peak, constant 1e-5, 1-sqrt cooldown to 1e-6 over 13.5T–15T; Apertus 1.5: re-warm 0 → 2e-5, constant through stages 1–2, 1-sqrt decay to 2e-6 over stage 3, constant 2e-6 in context extension"
+    source: report
+    at: "p.20 §3.2"
+    quote: "the learning rate then stays at its peak through the first two stages and decays to 10% of the peak with a 1 − sqrt decay over the third."
+    note: "Apertus 1.0 schedule: Apertus 1.0 report §2.3 Learning Rate Schedule and Cooldown."
+  train.warmup:
+    value: "16.78B tokens from 0.1× peak (Apertus 1.0); 250 iterations, 4.2B tokens, from 0 (Apertus 1.5)"
+    source: report_v1
+    at: "p.12 §2.3; p.82 Table C.4"
+    quote: "Our LR warmup for both models starts from 0.1 the peak LR and is linearly increased for 16.8B tokens."
+    note: "Table C.4: 16.78BT. Apertus 1.5 warmup from Table G.1 and §3.2."
+  train.batch:
+    value: "Apertus 1.0: 2,048 × 4,096 (8.4M tokens), doubled to 16.8M tokens at 4.4T; Apertus 1.5: 2,048 × 8,192 (16.8M tokens), held constant through context extension"
+    source: report_v1
+    at: "p.12 §2.3 Batch Size and Sequence Length"
+    quote: "After 8T tokens for the 8B model and 4.4T for the 70B, we intentionally doubled both the number of nodes and the batch size at this stage, while keeping the learning rate unchanged."
+    note: "Apertus 1.5 values: Table G.1 global batch 2,048 at 8,192 and §3.3 (sequences halved per doubling of length)."
+  train.batch_tokens:
+    value: 16_777_216
+    source: report_v1
+    at: "p.12 §2.3 Batch Size and Sequence Length"
+    quote: "an initial batch size of 1024 (4.2M tokens) and 2048 (8.4M tokens) for the 8B and 70B models, respectively"
+    basis: inferred
+    note: "Apertus 1.0 after the doubling at 4.4T: 2 × 2,048 × 4,096; Apertus 1.5 keeps it (2,048 × 8,192)."
+  train.precision:
+    value: "BF16 (Apertus 1.0 pretraining; an FP8 trial on the 8B was rolled back)"
+    source: report_v1
+    at: "p.16 §2.6 FP8 Training"
+    quote: "We therefore decided to roll back and continue with the BF16 training normally."
+    note: "The Apertus 1.5 report does not state the continued-pretraining precision."
+  train.init:
+    value: "Apertus 1.0: std 0.008944; Apertus 1.5: new image/audio embedding and output rows random at ~1/10 the norm of trained text rows"
+    source: report_v1
+    at: "p.82 Table C.4"
+    quote: "Initialization std 0.008944"
+    note: "Table C.4 lists one value without a per-size split. Row init from the Apertus 1.5 report §3.2."
+  train.stability:
+    value: "QK-norm; grad clip 0.1; weight decay on norm gains and xIELU parameters"
+    source: report
+    at: "p.21 §3.2"
+    quote: "including normalization gains and the trainable parameters of the xIELU activation (Huang & Schlag, 2024), which we find helps reduce large activation and activation-gradient norms."
+    note: "Decay on gains and xIELU parameters is stated for continued pretraining; QK-norm and clip from the Apertus 1.0 report §2.1, §2.6."
+  train.masking:
+    value: "cross-document attention masking; position ids reset at document boundaries"
+    source: report
+    at: "p.107 App. G"
+    quote: "All stages pack documents with cross-document attention masking: position identifiers reset at document boundaries, and end-of-document positions are excluded from the loss."
+    note: "Apertus 1.0 pretraining also masks cross-document attention (Apertus 1.0 report §2.1)."
+  train.objective:
+    value: "Goldfish loss (k = 50, h = 50: ~2% of targets dropped by hashed 50-token context); image and audio tokens are targets only in Apertus 1.5 stage 1"
+    source: report
+    at: "p.21 §3.2"
+    quote: "We keep the Goldfish loss of Apertus 1.0 with its parameters unchanged"
+    note: "k and h from Apertus 1.0 report Table C.4; ~0.3T of the 15T masked."
+  train.data:
+    value: "Apertus 1.0: 15T text in 1811 languages, robots.txt opt-outs applied retroactively, five data phases with rising math/code share (DCLM-Edu and FineWeb-2-HQ top 10% from 12T); Apertus 1.5 stages 1–3: 668B vision, 234B audio (both incl. paired text), 1,111B text-only tokens"
+    source: report_v1
+    at: "p.17 §3; p.22 §3.3"
+    quote: "Our data contains 1811 languages (1868 language-script pairs)"
+    note: "Apertus 1.5 per-stage modality split in its Table 3 and text mix in its Table 4."
+  train.hardware:
+    value: "NVIDIA GH200 on Alps (CSCS); Apertus 1.0 70B on 2048–4096 GPUs over several months; Apertus 1.5 on 512 nodes (2048 GPUs)"
+    source: report_v1
+    at: "p.43 §6.1.2"
+    quote: "running, for the 70B model, at scales from 2048 to 4096 GPUs over several months."
+    note: "Apertus 1.5 node count from its Table G.1 and §6.1 (four GH200 per node)."
+  train.compute:
+    value: "6.74e24 FLOPs and ~6M GPU-hours for the 15T Apertus 1.0 run; ~1.50M GPU-hours (logged segments) for Apertus 1.5 stages 1–3"
+    source: report_v1
+    at: "p.44 §6.2"
+    quote: "the main run has consumed around 6 million GPU hours"
+    note: "FLOPs from Apertus 1.0 report App. E; continued-pretraining GPU-hours from Apertus 1.5 report §6.3, excluding context extension."
+  train.stages:
+    value:
+      - name: Apertus 1.0 pretraining
+        tokens: 15_000_000_000_000
+        seq_len: 4096
+        lr: 1.0e-5
+        note: "From scratch; five data phases; batch 8.4M → 16.8M tokens at 4.4T; 1-sqrt cooldown 13.5T–15T to 1e-6."
+        quote: "trained from scratch on 15T tokens of openly documented text spanning over 1000 languages"
+      - name: "Apertus 1.5 stage 1: unpaired multimodal"
+        tokens: 403_000_000_000
+        seq_len: 8192
+        lr: 2e-5
+        batch_sequences: 2048
+        note: "Text 74.8%, image 12.2%, audio 13.0%; loss on all modalities; fresh optimizer state, re-warmup over 250 iterations."
+        quote: "1 49B (12.2%) 52B (13.0%) 301B (74.8%) 403B"
+      - name: "Apertus 1.5 stage 2: paired multimodal"
+        tokens: 1_208_000_000_000
+        seq_len: 8192
+        lr: 2e-5
+        batch_sequences: 2048
+        note: "Image-text and audio-transcript pairs plus text; loss on text tokens only."
+        quote: "2 512B (42.4%) 90B (7.4%) 606B (50.1%) 1,208B"
+      - name: "Apertus 1.5 stage 3: cooldown"
+        tokens: 403_000_000_000
+        seq_len: 8192
+        lr: 2e-5
+        batch_sequences: 2048
+        note: "Higher-quality data, ~3B instruction-formatted tokens; 1-sqrt decay 2e-5 → 2e-6."
+        quote: "3 107B (26.6%) 92B (22.7%) 204B (50.7%) 403B"
+      - name: "Apertus 1.5 long-context 32K"
+        tokens: 58_720_000_000
+        seq_len: 32768
+        lr: 2e-6
+        note: "RoPE base 2M, factor 8; context parallelism 4."
+        quote: "Total 58,720,000,000 58,720,000,000 50,330,000,000 50,330,000,000"
+      - name: "Apertus 1.5 long-context 65K"
+        tokens: 58_720_000_000
+        seq_len: 65536
+        lr: 2e-6
+        note: "RoPE base 4M, factor 8; context parallelism 8."
+        quote: "Total 58,720,000,000 58,720,000,000 50,330,000,000 50,330,000,000"
+      - name: "Apertus 1.5 long-context 131K"
+        tokens: 50_330_000_000
+        seq_len: 131072
+        lr: 2e-6
+        note: "RoPE base 4M, factor 16; context parallelism 16."
+        quote: "Total 58,720,000,000 58,720,000,000 50,330,000,000 50,330,000,000"
+      - name: "Apertus 1.5 long-context 262K"
+        tokens: 50_330_000_000
+        seq_len: 262144
+        lr: 2e-6
+        note: "RoPE base 4M, factor 32; context parallelism 32."
+        quote: "Total 58,720,000,000 58,720,000,000 50,330,000,000 50,330,000,000"
+    source: report
+    at: "p.6 §1; p.22 Table 3; p.106 Table F.2; p.107 App. G"
+  scaling.hp_rule:
+    value: "peak LR 2e-5 = 2× Apertus 1.0 70B peak, chosen by ablation"
+    source: report
+    at: "p.20 §3.2"
+    quote: "For the 70B model, we double the peak of Apertus 1.0 70B to 2 × 10−5 , which outperforms the original value in ablations"
+    note: "Apertus 1.0 set no LR scaling rule (report_v1 p.16 §2.5)."
+  scaling.ladder:
+    value: "1.5B per-change ablations at 100B tokens, merged into a 3B run at 100B tokens"
+    source: report_v1
+    at: "p.13 §2.4 Table 3"
+    quote: "we run a separate ablation experiment on a 1.5B model scale with 100B tokens of our main datamix. The baseline is a standard Llama-style decoder with AdamW and a tuned cosine learning rate schedule. After verification, we merge all successful changes into a 3B model with 100B tokens"
+    note: "Apertus 1.0 architecture and optimizer ablations; Apertus 1.5 continues the 1.0 70B checkpoint."

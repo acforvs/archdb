@@ -1,0 +1,332 @@
+name: Nemotron-3-Super-120B-A12B-Base
+org: NVIDIA
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16/resolve/b4cc202094ea3644bc4461c9fe58ec8b6a3695eb/README.md, kind: model-card}
+  config: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16/resolve/b4cc202094ea3644bc4461c9fe58ec8b6a3695eb/config.json, kind: config}
+  index: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16/resolve/b4cc202094ea3644bc4461c9fe58ec8b6a3695eb/model.safetensors.index.json, kind: config}
+  modeling_nemotron_h: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16/resolve/b4cc202094ea3644bc4461c9fe58ec8b6a3695eb/modeling_nemotron_h.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2604.12374v1, kind: paper}
+  blog: {url: https://web.archive.org/web/20261019100953/https://blogs.nvidia.com/blog/nemotron-3-super-agentic-ai/, kind: blog}
+
+not_disclosed: [train.grad_clip]
+
+config_unused:
+  chunk_size: "Mamba-2 SSD scan chunk length, kernel tiling only"
+  expand: "not read by modeling_nemotron_h.py; Mamba inner width is mamba_num_heads × mamba_head_dim"
+  intermediate_size: "dense MLP width; the pattern has no dense ('-') blocks"
+  norm_eps: "not read by modeling_nemotron_h.py; layer_norm_epsilon is used"
+  partial_rotary_factor: "no rotary embedding (NoPE)"
+  rescale_prenorm_residual: "initialization flag in _init_weights, not evidence of training init"
+  time_step_floor: "dt bias initialization range in _init_weights"
+  time_step_max: "dt bias initialization range in _init_weights"
+  time_step_min: "dt bias initialization range in _init_weights; also a dt floor in the torch fallback path only (kernel path uses time_step_limit, default (0, inf))"
+
+facts:
+  meta.released:
+    value: "2026-03-11"
+    source: blog
+    at: "blogs.nvidia.com; post header"
+    quote: "March 11, 2026"
+    note: "Hugging Face base repository created 2026-03-10; the card's Release Date line says 03/04/2026."
+  meta.license:
+    value: "other (nvidia-nemotron-open-model-license)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: nvidia-nemotron-open-model-license"
+
+  params.active:
+    value: 12_700_000_000
+    source: report
+    at: "PDF page 4; §2.1"
+    quote: "maintaining a constrained active budget of 12.7B parameters (12.1B excluding embeddings)"
+  params.active_non_embedding:
+    value: 12_100_000_000
+    source: report
+    at: "PDF page 4; §2.1"
+    quote: "maintaining a constrained active budget of 12.7B parameters (12.1B excluding embeddings)"
+    note: "The 0.6B gap is close to one 131,072 × 4,096 matrix (0.54B), so the output head may still be counted."
+  params.note:
+    value: "Counts include embeddings (12.1B active without). MTP inclusion not stated; the checkpoint index lists 123.6B parameters with the MTP block."
+    source: report
+    at: "PDF page 4; §2.1"
+    quote: "maintaining a constrained active budget of 12.7B parameters (12.1B excluding embeddings)"
+  params.total:
+    value: 120_600_000_000
+    source: report
+    at: "PDF page 4; §2.1"
+    quote: "to 120.6B total parameters"
+
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.layers:
+    value: 48
+    source: config
+    at: "config.json; hybrid_override_pattern"
+    quote: '"hybrid_override_pattern": "MEMEMEM*EMEMEMEM*EMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEM*EMEMEMEME"'
+    basis: inferred
+    note: "One block per token mixer: 40 Mamba-2 (M) + 8 attention (*). 40 blocks are followed by a MoE FFN (E); the 8 Mamba-2 layers right before each attention layer have none. The publisher's 88 layers (Table 1, num_hidden_layers) count mixer and MoE sublayers separately."
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 131_072, source: config, at: "/vocab_size"}
+
+  attn.global_layers: {value: 8, source: config, at: "/hybrid_override_pattern | count *"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads: {value: 32, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "GQA, Mamba-2"
+    source: report
+    at: "PDF page 7; §2.1.3"
+    quote: "The attention layers employ Grouped-Query Attention (GQA) with 32 query heads and 2 KV heads"
+  attn.kv_heads: {value: 2, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "40 Mamba-2 + 8 GQA"
+    source: config
+    at: "config.json; hybrid_override_pattern"
+    quote: '"hybrid_override_pattern": "MEMEMEM*EMEMEMEM*EMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEM*EMEMEMEME"'
+    basis: inferred
+    note: "Irregular: Mamba-2 runs before, between and after the 8 attention layers are 4, 4, 4, 5, 5, 5, 5, 4, 4."
+  attn.linear_layers: {value: 40, source: config, at: "/hybrid_override_pattern | count M"}
+  attn.linear_kind:
+    value: "Mamba-2: 128 heads × head dim 64, state 128, 8 groups, conv kernel 4"
+    source: report
+    at: "PDF page 3; Table 1"
+    quote: "Mamba State Dimension 128 Mamba Groups 8 Mamba Heads 128 Mamba Head Dimension 64"
+    note: "Conv kernel from config /conv_kernel (use_conv_bias true); groups = n_groups, state = ssm_state_size; mamba_hidden_act silu on x and the output gate."
+  attn.linear_heads: {value: 128, source: config, at: "/mamba_num_heads"}
+  attn.linear_head_dim: {value: 64, source: config, at: "/mamba_head_dim"}
+  attn.conv: {value: 4, source: config, at: "/conv_kernel"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.position:
+    value: NoPE
+    source: report
+    at: "PDF page 7; §2.1.3"
+    quote: "Consistent with prior Nemotron models, we omit positional embeddings"
+    note: "config rope_theta is unused; the modeling code applies no rotary embedding. Config max_position_embeddings is 1048576."
+  attn.qk_norm:
+    value: false
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHAttention.forward"
+    quote: "query_states = self.q_proj(hidden_states) key_states = self.k_proj(hidden_states) value_states = self.v_proj(hidden_states) query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)"
+
+  ffn.activation:
+    value: "ReLU²"
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHMLP.forward"
+    quote: "return self.down_proj(self.act_fn(self.up_proj(x)))"
+    note: "Not gated (up → act → down); act_fn = ACT2FN[mlp_hidden_act] with config mlp_hidden_act relu2."
+  ffn.bias: {value: false, source: config, at: "/mlp_bias"}
+
+  moe.balancing:
+    value: "aux-loss-free bias (update rate 1e-3) + load-balancing loss 1e-4"
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "we adopted an auxiliary-loss-free load balancing strategy (Wang et al., 2024; DeepSeek-AI, 2025c) with an update rate of 10−3 , paired with a standard load balancing loss with coefficient of 10−4"
+  moe.expert_dim:
+    value: 2688
+    source: config
+    at: "/moe_intermediate_size"
+    note: "Routed experts map the 1024-wide latent to 2688 and back (LatentMoE)."
+  moe.latent_dim:
+    value: 1024
+    source: config
+    at: "/moe_latent_size"
+    note: "One 4096→1024 down-projection and 1024→4096 up-projection per MoE layer wrap the routed experts; the router and shared expert act on the 4096-wide hidden state (§2.1.1; NemotronHMoE.forward)."
+  moe.experts: {value: 512, source: config, at: "/n_routed_experts"}
+  moe.router:
+    value: sigmoid
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "We utilized a sigmoid router score function complemented by expert biasing."
+    note: "Config n_group = topk_group = 1: no group-limited routing."
+  moe.dense_layers: {value: 0, source: config, at: "/hybrid_override_pattern | count -"}
+  moe.routed_scale: {value: 5.0, source: config, at: "/routed_scaling_factor"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim: {value: 5376, source: config, at: "/moe_shared_expert_intermediate_size"}
+  moe.top_k: {value: 22, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 2
+    source: report
+    at: "PDF page 3; Table 1"
+    quote: "MTP layers (shared weight) 2"
+    basis: inferred
+    note: "One attention+MoE MTP block applied at two offsets with shared weights (§2.1.2: one head exposed to multiple offsets). The checkpoint stores one block (num_nextn_predict_layers 1)."
+  mtp.modules:
+    value: 1
+    source: report
+    at: "PDF page 6; §2.1.2"
+    quote: "sharing parameters across multiple MTP heads during training, yielding a unified prediction head"
+  mtp.block:
+    value: "next-token embedding and hidden state each normed (enorm, hnorm), concatenated and projected 2×4096→4096 (eh_proj); then one GQA attention layer and one LatentMoE layer; final norm"
+    source: config
+    at: "config.json; mtp_hybrid_override_pattern"
+    quote: '"mtp_hybrid_override_pattern": "*E"'
+    note: "Projection and norms from mtp.layers.0.{enorm,hnorm,eh_proj} in model.safetensors.index.json; eh_proj shape [4096, 8192] in the safetensors header."
+  mtp.ffn:
+    value: "MoE"
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"mtp.layers.1.mixer.fc1_latent_proj.weight"'
+    note: "LatentMoE with the backbone's widths: expert up_proj [2688, 1024], latent proj [1024, 4096], shared expert [5376, 4096] (safetensors header)."
+  mtp.shares_embedding:
+    value: true
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"lm_head.weight"'
+    basis: inferred
+    note: "The MTP tensors (mtp.*) contain no embedding or output head; the only ones are backbone.embeddings and lm_head."
+  mtp.loss_weight:
+    value: "0.3"
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "we used an MTP objective with loss scaling factor of 0.3."
+  mtp.released:
+    value: true
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"mtp.layers.0.eh_proj.weight"'
+
+  norm.placement:
+    value: pre
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHBlock docstring"
+    quote: "Each block applies pre-normalization followed by the mixer, then adds a residual connection."
+  norm.eps: {value: 1.0e-5, source: config, at: "/layer_norm_epsilon"}
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "PDF page 7; §2.1.3"
+    quote: "use RMSNorm for normalization"
+
+  ctx.extension:
+    value: "Long-context CPT at constant LR 4.5e-6: 34B tokens at 1M, then 17B tokens alternating 1M and 4K sequences"
+    source: report
+    at: "PDF page 16; §2.6"
+    quote: "We initially performed CPT on 1,048,576 (1m) context length."
+  ctx.final:
+    value: 1_048_576
+    source: report
+    at: "PDF page 16; §2.6"
+    quote: "We initially performed CPT on 1,048,576 (1m) context length."
+  ctx.max:
+    value: 1_048_576
+    source: report
+    at: "PDF page 7; §2.1.3"
+    quote: "This configuration supports context lengths of up to 1M tokens."
+  ctx.pretrain:
+    value: 8192
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "The model was trained with a sequence length of 8,192"
+
+  train.batch:
+    value: "3,072 × 8,192 (25.17M tokens)"
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "batch size of 3,072 sequences, resulting in approximately 25.17 million tokens per batch."
+  train.batch_tokens:
+    value: 25_165_824
+    source: report
+    at: "PDF page 15; §2.5"
+    quote: "our global batch size of 3,072×8,192 tokens"
+    basis: inferred
+    note: "3,072 × 8,192 = 25,165,824; no batch ramp stated."
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "momentum coefficients β1 = 0.9 and β2 = 0.95"
+  train.data:
+    value: "Nemotron 3 Nano mixture, 16 categories: web crawl in 5 quality tiers (incl. synthetic rephrasings), math, Wikipedia, code, academic, multilingual, finepdfs, SFT-style incl. reasoning; phase 1 diversity-focused, phase 2 (from 80% of tokens) high-quality"
+    source: report
+    at: "PDF page 13; §2.3.7"
+    quote: "Our pretraining corpus spans 16 high-level categories."
+  train.cutoff:
+    value: "December 2025"
+    source: card
+    at: "README.md; Model Overview, Data Freshness"
+    quote: "The pre-training data has a cutoff date of December 2025."
+  train.hardware:
+    value: "GB200"
+    source: report
+    at: "PDF page 16; §2.6"
+    quote: "context parallelism, 2-way tensor parallelism, and 64-way expert parallelism to train on GB200 GPUs."
+    note: "Stated only for the long-context phase."
+  train.averaging:
+    value: "Final base checkpoint is a 500B-token merge (weighted average over a sliding window of checkpoints, minus-sqrt decay-emulation coefficients)"
+    source: report
+    at: "PDF page 15; §2.5"
+    quote: "The final base model checkpoint selected for downstream alignment was itself a 500B merge"
+    note: "Ordering relative to the long-context phase is not stated."
+  train.lr_min:
+    value: 4.5e-6
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "annealing the LR to a minimum of 4.5 × 10−6 ."
+  train.lr_peak:
+    value: 4.5e-4
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "The learning rate (LR) was warmed up over the initial 200 billion tokens to a peak value of 4.5 × 10−4 ."
+  train.optimizer:
+    value: AdamW
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "We used AdamW (Loshchilov & Hutter, 2017) optimizer with a weight decay of 0.1"
+  train.precision:
+    value: "NVFP4 (E2M1, 16-element blocks, E4M3 block scales + FP32 global scale; 2D weight blocks; RHT on wgrad inputs; stochastic rounding on gradients). BF16 for the final 15% of layers, latent projections, MTP, QKV/attention projections and embeddings; MXFP8 for the Mamba output projection."
+    source: report
+    at: "PDF page 8; §2.2, Table 3"
+    quote: "The NVFP4 format utilizes an E2M1 element format with 16-element micro-blocks, E4M3 micro-block scaling factors, and a second-level FP32 global scale."
+  train.schedule:
+    value: "WSD: 200B-token warmup, stable, minus-sqrt decay over the final 5T tokens"
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "we implemented a minus-sqrt decay schedule for the final 5 trillion tokens"
+  train.stages:
+    value:
+      - name: phase-1
+        tokens: 20_000_000_000_000
+        seq_len: 8192
+        batch_sequences: 3072
+        note: "Diversity-focused blend; warmup and stable LR."
+        quote: "The first phase accounted for 80% of pre-training (20 trillion tokens)"
+      - name: phase-2
+        tokens: 5_000_000_000_000
+        seq_len: 8192
+        batch_sequences: 3072
+        note: "High-quality blend; spans the minus-sqrt LR decay."
+        quote: "the second phase accounted for 20% of pre-training (5 trillion tokens)"
+      - name: long-context-1
+        tokens: 34_000_000_000
+        seq_len: 1_048_576
+        lr: 4.5e-6
+        batch_sequences: 16
+        note: "20% long-context document QA, 80% downscaled phase-2 data."
+        quote: "Such stage lasted for 34 billion tokens."
+      - name: long-context-2
+        tokens: 17_000_000_000
+        seq_len: 1_048_576
+        lr: 4.5e-6
+        batch_sequences: 16
+        note: "Alternates 1M and 4K sequences."
+        quote: "The second stage lasted for 17 billion tokens."
+    source: report
+    at: "PDF pages 1, 14, 16; §1, §2.4, §2.6"
+  train.tokens:
+    value: 25_000_000_000_000
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "learning rate schedule over a total horizon of 25 trillion tokens"
+    note: "Excludes the 51B-token long-context phase."
+  train.warmup:
+    value: "200B tokens"
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "warmed up over the initial 200 billion tokens"
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "PDF page 14; §2.4"
+    quote: "optimizer with a weight decay of 0.1"

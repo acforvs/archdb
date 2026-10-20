@@ -1,0 +1,25 @@
+{
+  "name": "archdb-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test:e2e": "node --test e2e/*.test.cjs",
+    "test:unit": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "11.1.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "6.1.2",
+    "playwright": "1.64.1",
+    "typescript": "5.6.3",
+    "vite": "8.3.4"
+  }
+}

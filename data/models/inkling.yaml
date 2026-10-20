@@ -1,0 +1,237 @@
+name: Inkling
+org: Thinking Machines Lab
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  announcement: {url: https://web.archive.org/web/20261007195943/https://thinkingmachines.ai/news/introducing-inkling/, kind: blog}
+  config: {url: https://huggingface.co/thinkingmachines/Inkling/resolve/828496eeae4c243ff1a22f7f28ff83694f2f7bc9/config.json, kind: config}
+  configuration_inkling: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/inkling/configuration_inkling.py, kind: code}
+  transformers-code: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/inkling/modeling_inkling.py, kind: code}
+  weight_index: {url: https://huggingface.co/thinkingmachines/Inkling/resolve/828496eeae4c243ff1a22f7f28ff83694f2f7bc9/model.safetensors.index.json, kind: config}
+  card: {url: https://huggingface.co/thinkingmachines/Inkling/resolve/828496eeae4c243ff1a22f7f28ff83694f2f7bc9/README.md, kind: model-card}
+
+not_disclosed: [params.active_non_embedding, mtp.depth, ctx.pretrain, ctx.final, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+facts:
+  meta.released:
+    value: "2026-07-15"
+    source: announcement
+    at: "article header"
+    quote: "Inkling: Our Open-Weights Model Jul 15, 2026"
+  meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+
+  params.total:
+    value: 975_000_000_000
+    source: announcement
+    at: "Introduction"
+    quote: "a Mixture-of-Experts transformer with 975B total parameters, 41B active"
+  params.active:
+    value: 41_000_000_000
+    source: announcement
+    at: "Introduction"
+    quote: "a Mixture-of-Experts transformer with 975B total parameters, 41B active"
+
+  shape.d_model: {value: 6144, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 66, source: config, at: "/text_config/num_hidden_layers"}
+  shape.vocab:
+    value: 201_024
+    source: config
+    at: "/text_config/vocab_size"
+    note: "/text_config/unpadded_vocab_size is 200058."
+  shape.tied_embeddings:
+    value: false
+    source: transformers-code
+    at: "modeling_inkling.py; InklingForCausalLM"
+    quote: "`embed` and `unembed` are separate tensors in the checkpoints, never tied"
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: announcement
+    at: "The making of Inkling; Architecture"
+    quote: "we interleave sliding-window and global layers at a 5:1 ratio with 8 KV heads"
+  attn.layout:
+    value: "5 SWA : 1 global"
+    source: announcement
+    at: "The making of Inkling; Architecture"
+    quote: "we interleave sliding-window and global layers at a 5:1 ratio with 8 KV heads"
+    note: "Config /text_config/local_layer_ids omits 5, 11, ..., 65: global at every 6th layer."
+  attn.global_layers:
+    value: 11
+    source: configuration_inkling
+    at: "configuration_inkling.py; InklingTextConfig.__post_init__"
+    quote: '"hybrid_sliding" if i in local_layer_ids else "hybrid" for i in range(self.num_hidden_layers)'
+    basis: inferred
+    note: "66 layers (/text_config/num_hidden_layers) minus 55 /text_config/local_layer_ids; the rest are full-attention \"hybrid\" layers."
+  attn.local_layers: {value: 55, source: config, at: "/text_config/local_layer_ids | len"}
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}
+  attn.kv_heads:
+    value: 8
+    source: config
+    at: "/text_config/num_key_value_heads"
+    note: "Global layers only; SWA layers use /text_config/swa_num_key_value_heads (InklingAttention)."
+  attn.local_kv_heads: {value: 16, source: config, at: "/text_config/swa_num_key_value_heads"}
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/text_config/swa_num_attention_heads"
+    note: "InklingAttention reads the swa_* head counts and head dim for hybrid_sliding layers, the global ones otherwise."
+  attn.local_head_dim: {value: 128, source: config, at: "/text_config/swa_head_dim"}
+  attn.head_dim: {value: 128, source: config, at: "/text_config/head_dim"}
+  attn.window: {value: 512, source: config, at: "/text_config/sliding_window_size"}
+  attn.position:
+    value: "relative position bias (hidden-state-conditioned, all layers)"
+    source: announcement
+    at: "The making of Inkling; Architecture"
+    quote: "We find that encoding position with a relative positional embedding"
+    note: "No rotary embedding. InklingRelativeLogits: per-head d_rel=16 feature from r_proj, bias zero beyond rel_extent (1024 on global layers, /text_config/rel_extent; 512 on SWA)."
+  attn.scale:
+    value: "1/head_dim; global layers also multiply q and the position bias by 1 + 0.1·ln(n/128000) at query position n > 128000"
+    source: transformers-code
+    at: "modeling_inkling.py; InklingAttention.forward"
+    quote: "tau = 1.0 + self.config.log_scaling_alpha * torch.log( (effective_n / self.config.log_scaling_n_floor).clamp(min=1.0)"
+    note: "log_scaling_alpha 0.1 and log_scaling_n_floor 128000 from /text_config; base scaling is self.scaling = 1.0 / self.head_dim."
+  attn.bias:
+    value: false
+    source: transformers-code
+    at: "modeling_inkling.py; InklingAttention.__init__"
+    quote: "self.k_proj = nn.Linear(config.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)"
+    note: "q_proj, v_proj and o_proj are also bias-free."
+  attn.conv:
+    value: 4
+    source: config
+    at: "/text_config/sconv_kernel_size"
+    note: "Depthwise causal convs after k_proj and v_proj in every attention layer, and on the attention and MLP branch outputs (InklingShortConvolution; /text_config/use_sconv)."
+  attn.qk_norm:
+    value: true
+    source: transformers-code
+    at: "modeling_inkling.py; InklingAttention.__init__"
+    quote: "self.q_norm = InklingRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+
+  ffn.activation:
+    value: SwiGLU
+    source: transformers-code
+    at: "modeling_inkling.py; InklingMLP.forward"
+    quote: "hidden_states = self.down_proj(self.act_fn(self.gate_proj(hidden_states)) * self.up_proj(hidden_states))"
+    note: "config.json omits hidden_act, so the InklingTextConfig default silu applies."
+  ffn.dim: {value: 24576, source: config, at: "/text_config/dense_intermediate_size"}
+  ffn.bias:
+    value: false
+    source: transformers-code
+    at: "modeling_inkling.py; InklingMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Routed and shared expert weights are bias-free 3D parameters."
+
+  moe.dense_layers:
+    value: 2
+    source: config
+    at: "/text_config/dense_mlp_idx"
+    note: "Layers i < dense_mlp_idx are dense (configuration_inkling.py __post_init__)."
+  moe.expert_dim:
+    value: 3072
+    source: config
+    at: "/text_config/intermediate_size"
+    note: "With dense_intermediate_size set, intermediate_size is the routed-expert width (configuration_inkling.py __post_init__)."
+  moe.experts: {value: 256, source: config, at: "/text_config/n_routed_experts"}
+  moe.shared: {value: 2, source: config, at: "/text_config/n_shared_experts"}
+  moe.shared_dim:
+    value: 6144
+    source: transformers-code
+    at: "modeling_inkling.py; InklingSharedExperts.__init__"
+    quote: "intermediate_dim = config.moe_intermediate_size"
+    basis: inferred
+    note: "2 shared experts (/text_config/n_shared_experts) × 3072 each."
+  moe.top_k: {value: 6, source: config, at: "/text_config/num_experts_per_tok"}
+  moe.router:
+    value: sigmoid
+    source: transformers-code
+    at: "modeling_inkling.py; InklingTopkRouter.forward"
+    quote: "scores = router_logits.sigmoid()"
+    note: "Config /text_config/gate_activation is not read by the modeling code."
+  moe.balancing:
+    value: "auxiliary-loss-free bias"
+    source: announcement
+    at: "The making of Inkling; Architecture"
+    quote: "Inkling uses a sigmoid-based router with an auxiliary-loss-free load-balancing bias."
+    note: "Bias e_score_correction_bias (/text_config/use_gate_bias) affects routed-expert selection only; selected routed and shared expert scores are normalized jointly (/text_config/shared_expert_sink)."
+  moe.norm_topk:
+    value: true
+    source: announcement
+    at: "The making of Inkling; Architecture; config /text_config/norm_after_topk"
+    quote: "The scores of the selected routed experts and the shared experts are normalized jointly and used to weight their combined outputs."
+    note: "Normalized over the 6 routed plus 2 shared experts together."
+  moe.routed_scale:
+    value: 8.0
+    source: config
+    at: "/text_config/route_scale"
+    note: "Multiplies the jointly normalized routed and shared weights, together with a learned scalar global_scale (InklingTopkRouter.forward; /text_config/use_global_scale)."
+
+  mtp.released:
+    value: true
+    source: weight_index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.mtp.layers.7.input_proj.weight": "mtp.safetensors"'
+    note: "8 MTP layers (/mtp_config/num_nextn_predict_layers) in mtp.safetensors; their use in pretraining is not stated."
+
+  norm.placement:
+    value: pre
+    source: transformers-code
+    at: "modeling_inkling.py; InklingDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: transformers-code
+    at: "modeling_inkling.py; InklingDecoderLayer.__init__"
+    quote: "self.input_layernorm = InklingRMSNorm(config.hidden_size, config.rms_norm_eps)"
+  norm.eps: {value: 1.0e-6, source: config, at: "/text_config/rms_norm_eps"}
+  norm.residual:
+    value: "attention and MLP branch outputs y become y + conv(y) (depthwise causal conv, kernel 4) before the residual add"
+    source: announcement
+    at: "The making of Inkling; Architecture"
+    quote: "on the attention and MLP residual branch outputs before they rejoin the main residual stream"
+  norm.embedding:
+    value: "RMSNorm after embedding lookup"
+    source: transformers-code
+    at: "modeling_inkling.py; InklingNormedEmbedding.forward; config /text_config/use_embed_norm"
+    quote: "return self.embed_norm(super().forward(input_ids))"
+  norm.output_scale:
+    value: "final hidden states ÷ 24 before the LM head"
+    source: transformers-code
+    at: "modeling_inkling.py; InklingForConditionalGeneration.forward"
+    quote: "hidden_states = outputs[0] / self.config.text_config.logits_mup_width_multiplier"
+    note: "/text_config/logits_mup_width_multiplier is 24.0."
+
+  ctx.max:
+    value: 1_048_576
+    source: config
+    at: "/text_config/model_max_length"
+    note: "Announcement: up to 1M tokens."
+
+  train.tokens:
+    value: 45_000_000_000_000
+    source: announcement
+    at: "The making of Inkling; Training"
+    quote: "Inkling was pretrained on 45 trillion tokens from a variety of content types, including text, images, audio and video."
+    note: "Multimodal token count."
+  train.optimizer:
+    value: "Muon + Adam (Muon for large matrix weights)"
+    source: announcement
+    at: "The making of Inkling; Training"
+    quote: "Muon for large matrix weights, Adam for other parameters"
+    note: "Weight decay coupled to the square of the learning rate."
+  train.data:
+    value: "text, images, audio and video"
+    source: announcement
+    at: "The making of Inkling; Training"
+    quote: "Inkling was pretrained on 45 trillion tokens from a variety of content types, including text, images, audio and video."
+  train.hardware:
+    value: "NVIDIA GB300 NVL72"
+    source: announcement
+    at: "The making of Inkling; Training"
+    quote: "was trained on NVIDIA GB300 NVL72 systems"
+  scaling.parametrization:
+    value: "μP (final hidden state ÷ 24 width multiplier before the LM head)"
+    source: configuration_inkling
+    at: "configuration_inkling.py; InklingTextConfig docstring, logits_mup_width_multiplier"
+    quote: "muP width multiplier the final hidden states are divided by before the language modeling head."
+    note: "/text_config/logits_mup_width_multiplier is 24.0."

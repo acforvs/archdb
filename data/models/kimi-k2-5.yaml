@@ -1,0 +1,204 @@
+name: Kimi-K2.5
+org: Moonshot AI
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/moonshotai/Kimi-K2.5/resolve/4d01dfe0332d63057c186e0b262165819efb6611/README.md, kind: model-card}
+  config: {url: https://huggingface.co/moonshotai/Kimi-K2.5/resolve/4d01dfe0332d63057c186e0b262165819efb6611/config.json, kind: config}
+  modeling_deepseek: {url: https://huggingface.co/moonshotai/Kimi-K2.5/resolve/4d01dfe0332d63057c186e0b262165819efb6611/modeling_deepseek.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2602.02276v2, kind: paper}
+  weight-index: {url: https://huggingface.co/moonshotai/Kimi-K2.5/resolve/4d01dfe0332d63057c186e0b262165819efb6611/model.safetensors.index.json, kind: config}
+  blog: {url: https://web.archive.org/web/20260817080036/https://www.kimi.com/blog/, kind: blog}
+
+not_disclosed: [params.active_non_embedding, mtp.depth, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  num_key_value_heads: "not read by DeepseekV3Attention (MLA)"
+
+facts:
+  meta.released:
+    value: "2026-01-27"
+    source: blog
+    at: "kimi.com blog index (Wayback 2026-08-17); Kimi K2.5 entry"
+    quote: "Kimi K2.5 2026-01-27"
+  meta.license:
+    value: "other (modified-mit)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: modified-mit"
+
+  params.active:
+    value: 32_000_000_000
+    source: card
+    at: "README.md; 2. Model Summary"
+    quote: "Activated Parameters | 32B"
+  params.note:
+    value: "Rounded card figures; whether they include the 400M MoonViT encoder is not stated."
+    source: card
+    at: "README.md; 2. Model Summary"
+    quote: "Parameters of Vision Encoder | 400M"
+  params.total:
+    value: 1_000_000_000_000
+    source: card
+    at: "README.md; 2. Model Summary"
+    quote: "Total Parameters | 1T"
+
+  shape.d_model: {value: 7168, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 61, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab: {value: 163_840, source: config, at: "/text_config/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+  attn.global_layers: {value: 61, source: config, at: "/text_config/num_hidden_layers"}
+  attn.head_dim: {value: 192, source: config, at: "/text_config/qk_nope_head_dim + /text_config/qk_rope_head_dim"}
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: MLA
+    source: card
+    at: "README.md; 2. Model Summary"
+    quote: "Attention Mechanism | MLA"
+  attn.kv_lora_rank: {value: 512, source: config, at: "/text_config/kv_lora_rank"}
+  attn.layout:
+    value: "61 MLA"
+    source: card
+    at: "README.md; 2. Model Summary"
+    quote: "Number of Layers (Dense layer included) | 61"
+  attn.position:
+    value: "partial RoPE (MLA decoupled, 64 of 192 QK dims)"
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3Attention.forward"
+    quote: "q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)"
+  attn.q_lora_rank: {value: 1536, source: config, at: "/text_config/q_lora_rank"}
+  attn.qk_norm:
+    value: false
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3Attention.forward"
+    quote: "q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))"
+    note: "RMSNorm only on the Q and KV latents before up-projection; no per-head Q/K norm."
+  attn.rope_dim: {value: 64, source: config, at: "/text_config/qk_rope_head_dim"}
+  attn.rope_theta: {value: 50000, source: config, at: "/text_config/rope_theta"}
+  attn.v_head_dim: {value: 128, source: config, at: "/text_config/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3MLP.forward"
+    quote: "self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU (config /text_config/hidden_act)."
+  ffn.dim: {value: 18432, source: config, at: "/text_config/intermediate_size"}
+
+  moe.balancing:
+    value: "aux-loss-free selection bias (e_score_correction_bias added to sigmoid scores for top-k only)"
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; MoEGate.forward"
+    quote: "bsz * seq_len, -1) + self.e_score_correction_bias.unsqueeze(0)"
+    note: "config topk_method = noaux_tc; the report does not describe the bias update rule or any auxiliary loss."
+  moe.dense_layers:
+    value: 1
+    source: config
+    at: "/text_config/first_k_dense_replace"
+    note: "moe_layer_freq = 1."
+  moe.groups:
+    value: "none"
+    source: config
+    at: "config.json text_config.n_group, topk_group"
+    quote: "\"n_group\": 1,"
+    note: "n_group = topk_group = 1."
+  moe.norm_topk: {value: true, source: config, at: "/text_config/norm_topk_prob"}
+  moe.routed_scale: {value: 2.827, source: config, at: "/text_config/routed_scaling_factor"}
+  moe.shared_dim:
+    value: 2048
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3MoE.__init__"
+    quote: "intermediate_size = config.moe_intermediate_size * config.n_shared_experts"
+    basis: inferred
+    note: "2048 × 1 shared expert."
+  moe.expert_dim: {value: 2048, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.experts: {value: 384, source: config, at: "/text_config/n_routed_experts"}
+  moe.router: {value: sigmoid, source: config, at: "/text_config/scoring_func"}
+  moe.shared: {value: 1, source: config, at: "/text_config/n_shared_experts"}
+  moe.top_k: {value: 8, source: config, at: "/text_config/num_experts_per_tok"}
+
+  mtp.released:
+    value: false
+    source: weight-index
+    at: "/weight_map | has eh_proj"
+    note: "Backbone layers 0–60 only; config /text_config/num_nextn_predict_layers 0."
+
+  norm.eps: {value: 1.0e-5, source: config, at: "/text_config/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3DecoderLayer.__init__"
+    quote: "self.input_layernorm = DeepseekV3RMSNorm("
+
+  ctx.extension:
+    value: "YaRN, 32K → 256K during long-context mid-training (500B → 200B tokens)"
+    source: report
+    at: "p.8 §4.3"
+    quote: "sequentially extending context length via YaRN"
+    note: "Release rope_scaling: type yarn, factor 64 over original_max_position_embeddings 4096, beta_fast 32, beta_slow 1, mscale = mscale_all_dim = 1."
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.7 Table 3"
+    quote: "32768→262144"
+  ctx.max: {value: 262_144, source: config, at: "/text_config/max_position_embeddings"}
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.8 §4.3"
+    quote: "The joint pre-training stage continues from a near-end Kimi K2 checkpoint over additional 15T vision-text tokens at 4K sequence length."
+
+  train.data:
+    value: "Kimi K2 distribution extended with new unique tokens, higher coding weight and per-source epoch caps, plus interleaved image, video and OS-screenshot data"
+    source: report
+    at: "p.8 §4.3"
+    quote: "The data recipe extends Kimi K2’s pre-training distribution by introducing unique tokens, adjusting data proportions with increased weight on coding-related content, and controlling maximum epochs per data source."
+    note: "Joint pre-training data types from Table 3 (p.7)."
+  train.hardware:
+    value: "NVIDIA H800, 8×400 Gbps RoCE between nodes"
+    source: report
+    at: "App. C"
+    quote: "Kimi K2.5 is trained on NVIDIA H800 GPU clusters with 8×400 Gbps RoCE interconnects across nodes."
+  train.init:
+    value: "Language model continued from a near-end Kimi K2 checkpoint; MoonViT-3D from SigLIP-SO-400M"
+    source: report
+    at: "p.8 §4.3"
+    quote: "The joint pre-training stage continues from a near-end Kimi K2 checkpoint"
+  train.objective:
+    value: "Joint vision-text next-token prediction with a constant vision ratio from the start of continued pretraining"
+    source: report
+    at: "p.2 §1"
+    quote: "K2.5 mixes text and vision tokens with a constant ratio throughout the entire training process."
+    note: "The production vision:text ratio is not disclosed."
+  train.stages:
+    value:
+      - name: vit
+        tokens: 1_000_000_000_000
+        seq_len: 4096
+        note: "MoonViT-3D only, caption loss aligned to Moonlight-16B-A3B; then a short projector-only stage."
+        quote: "consuming about 1T tokens with very few training FLOPs."
+      - name: joint
+        tokens: 15_000_000_000_000
+        seq_len: 4096
+        note: "ViT and LLM trained."
+        quote: "over additional 15T vision-text tokens at 4K sequence length."
+      - name: long-context
+        seq_len: 262144
+        note: "Two phases, 500B tokens at 32K then 200B at 256K; high-quality text, multimodal, long text, long video, reasoning and long-CoT data."
+        quote: "500B→200B"
+    source: report
+    at: "p.7 Table 3; p.7–8 §4.3"
+  train.tokens:
+    value: 15_000_000_000_000
+    source: report
+    at: "p.8 §4.3"
+    quote: "over additional 15T vision-text tokens at 4K sequence length."
+    note: "Joint continued-pretraining tokens on top of Kimi K2; excludes the 1T ViT-only stage and the 500B→200B long-context mid-training."

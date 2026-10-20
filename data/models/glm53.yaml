@@ -1,0 +1,245 @@
+name: GLM-5.3
+org: Z.ai
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint, which uses the same base model as GLM-5.2."
+
+sources:
+  card: {url: https://huggingface.co/zai-org/GLM-5.3/resolve/ba32f8c19c8738e2c57c71798c601d477a7bf844/README.md, kind: model-card}
+  config: {url: https://huggingface.co/zai-org/GLM-5.3/resolve/ba32f8c19c8738e2c57c71798c601d477a7bf844/config.json, kind: config}
+  hf-index: {url: https://huggingface.co/zai-org/GLM-5.3/resolve/ba32f8c19c8738e2c57c71798c601d477a7bf844/model.safetensors.index.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/glm_moe_dsa/modeling_glm_moe_dsa.py, kind: code}
+  github: {url: https://raw.githubusercontent.com/zai-org/GLM-5/83c03d317378f86f0a012f7c4cd48b6243c7e69b/README.md, kind: model-card}
+  blog-52: {url: https://web.archive.org/web/20261019100129id_/https://z.ai/blog/assets/glm-5.2-DXVc0kvW.js, kind: blog}
+  hf-discussion-1: {url: https://huggingface.co/api/models/zai-org/GLM-5.3/discussions/1, kind: api}
+
+# Searched: GLM-5.3 card and blog (2026-08-14), GLM-5.2 card and blog (the shared base), GitHub README.
+# The GLM-5 report (arXiv 2602.15763) describes GLM-5, not the GLM-5.2 base, and is not used.
+not_disclosed:
+  - params.active_non_embedding
+  - mtp.depth
+  - ctx.pretrain
+  - ctx.final
+  - train.tokens
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+config_unused:
+  num_key_value_heads: "MLA; only sets num_key_value_groups = 1 in GlmMoeDsaAttention"
+  index_share_for_mtp_iteration: "not read by modeling_glm_moe_dsa.py (no MTP implementation there)"
+  index_skip_topk_offset: "not read by modeling_glm_moe_dsa.py; layer pattern comes from /indexer_types"
+  index_topk_freq: "not read by modeling_glm_moe_dsa.py; layer pattern comes from /indexer_types"
+  moe_layer_freq: "not read by modeling_glm_moe_dsa.py; /mlp_layer_types is explicit"
+  topk_method: "not read by modeling_glm_moe_dsa.py; the router always adds e_score_correction_bias (see moe.balancing)"
+
+facts:
+  meta.released:
+    value: "2026-08-28"
+    source: hf-discussion-1
+    at: "/createdAt (first public discussion on the weights repo)"
+    quote: "\"createdAt\":\"2026-08-28T15:03:23"
+    note: "No dated publisher page for the weights: the 2026-08-14 blog deferred them by two weeks; the repo was created empty on 2026-08-25 and the weights committed 2026-08-27 17:16 UTC (\"Initial commit 0828\")."
+  meta.license:
+    value: "other (glm-5.3)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: glm-5.3"
+
+  params.total:
+    value: 744_000_000_000
+    source: github
+    at: "GLM-5 README; Download Model table, GLM-5.3 row"
+    quote: "(https://modelscope.cn/models/ZhipuAI/GLM-5.3) | 744B-A40B"
+  params.active:
+    value: 40_000_000_000
+    source: github
+    at: "GLM-5 README; Download Model table, GLM-5.3 row"
+    quote: "(https://modelscope.cn/models/ZhipuAI/GLM-5.3) | 744B-A40B"
+  params.note:
+    value: "Model Size column of the GitHub README; inclusion of the MTP layer is not stated."
+    source: card
+    at: "README.md; intro"
+    quote: "GLM-5.3 uses the same base model as GLM-5.2 — every gain comes from post-training."
+
+  shape.d_model: {value: 6144, source: config, at: "/hidden_size"}
+  shape.layers: {value: 78, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 154_880, source: config, at: "/vocab_size"}
+
+  attn.bias:
+    value: false
+    source: config
+    at: "/attention_bias"
+    note: "Read by GlmMoeDsaAttention for the q_a, kv_a and o projections; the others are bias-free."
+  attn.global_layers:
+    value: 78
+    source: config
+    at: "/num_hidden_layers"
+    note: "Every layer is MLA with DSA top-k selection."
+  attn.head_dim:
+    value: 256
+    source: config
+    at: "/qk_nope_head_dim + /qk_rope_head_dim"
+    note: "192 nope + 64 rope (= /qk_head_dim). The config's /head_dim=192 is not the attention head size."
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "MLA, DSA"
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaIndexer docstring"
+    quote: "DeepSeek Sparse Attention (DSA) indexer for selecting top-k tokens."
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.layout:
+    value: "78 DSA"
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaAttention.forward"
+    quote: "# DSA: select this layer's top-k tokens, or reuse the previous full layer's on `\"shared\"` layers."
+    note: "/indexer_types: 21 \"full\" layers (0, 1, 2, then every 4th from 6) and 57 \"shared\" layers."
+  attn.position:
+    value: "partial RoPE (MLA decoupled, interleaved, 64 of 256 QK dims)"
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaAttention.forward"
+    quote: "q_rot, k_rot = apply_rotary_pos_emb_interleave(q_rot, k_rot, cos, sin)"
+    note: "Interleaving is hard-coded for MLA and indexer; config /rope_interleave and /indexer_rope_interleave are true but not read."
+  attn.qk_norm:
+    value: false
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaAttention.forward"
+    quote: "q_resid = self.q_a_layernorm(self.q_a_proj(hidden_states))"
+    note: "RMSNorm only on the Q and KV latents; no per-head Q/K norm."
+  attn.indexer_dim:
+    value: 128
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaIndexer.__init__"
+    quote: "self.wk = nn.Linear(self.hidden_size, self.head_dim, bias=False)"
+    note: "One 128-dim key (/index_head_dim, LayerNorm k_norm) per token, cached only on the 21 \"full\" indexer layers; see attn.kv_groups."
+  attn.kv_groups:
+    value:
+      - name: MLA latent + RoPE key
+        layers: 78
+        elements: 576
+        tokens_per_entry: 1
+        note: "kv_lora_rank 512 + qk_rope_head_dim 64"
+        quote: "kv_pass, k_rot = torch.split(compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1)"
+      - name: DSA indexer key
+        layers: 21
+        elements: 128
+        tokens_per_entry: 1
+        note: "Only \"full\" layers own an indexer; 57 \"shared\" layers reuse its top-k."
+        quote: "self.indexer = None if self.skip_topk else GlmMoeDsaIndexer(config, layer_idx)"
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaAttention"
+  attn.q_lora_rank: {value: 2048, source: config, at: "/q_lora_rank"}
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta: {value: 8_000_000, source: config, at: "/rope_parameters/rope_theta"}
+  attn.sparse:
+    value: "DSA indexer, top-2048; 21 layers run their own indexer, 57 reuse the previous indexer layer's top-k"
+    source: config
+    at: "config.json index_topk"
+    quote: "\"index_topk\": 2048,"
+    note: "Indexer: 32 query heads × 128 dims (/index_n_heads, /index_head_dim), one key head; /indexer_types marks layers 0, 1, 2 and every 4th from 6 as \"full\"."
+  attn.v_head_dim: {value: 256, source: config, at: "/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaMLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU (config hidden_act)."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 12288, source: config, at: "/intermediate_size"}
+
+  moe.dense_layers:
+    value: 3
+    source: config
+    at: "/mlp_layer_types | count dense"
+    note: "Layers 0–2; matches /first_k_dense_replace. The code reads /mlp_layer_types."
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/n_routed_experts"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale:
+    value: 2.5
+    source: config
+    at: "/routed_scaling_factor"
+    note: "Applied after top-k renormalization in the MoE router (modeling_glm_moe_dsa.py)."
+  moe.router:
+    value: sigmoid
+    source: config
+    at: "/scoring_func"
+    note: "Router logits computed in FP32 in GlmMoeDsaTopkRouter (/moe_router_dtype float32)."
+  moe.shared_dim:
+    value: 2048
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaMoE.__init__"
+    quote: "config=config, intermediate_size=config.moe_intermediate_size * config.n_shared_experts"
+    basis: inferred
+    note: "2048 × 1 shared expert."
+  moe.balancing:
+    value: "expert-score correction bias on top-k selection"
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaTopkRouter.forward"
+    quote: "scores_for_choice = scores + self.e_score_correction_bias"
+    note: "Bias affects selection only; its update rule and any auxiliary loss are not disclosed."
+  moe.groups:
+    value: "none"
+    source: config
+    at: "config.json n_group, topk_group"
+    quote: "\"n_group\": 1,"
+    note: "/n_group = /topk_group = 1."
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.released:
+    value: true
+    source: hf-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: "\"model.layers.78.eh_proj.weight\""
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/num_nextn_predict_layers"
+    note: "Multi-step MTP shares this module's parameters across steps (GLM-5.2 blog, MTP with IndexShare and KVShare); the training step count is not stated."
+  mtp.block:
+    value: "enorm + hnorm, eh_proj, one MLA+DSA layer with its own indexer, MoE FFN, shared_head.norm"
+    source: hf-index
+    at: "model.safetensors.index.json; model.layers.78.* weight names"
+    quote: "\"model.layers.78.self_attn.indexer.wk.weight\""
+    note: "No embedding or output-head weights under layer 78."
+  mtp.ffn:
+    value: MoE
+    source: hf-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: "\"model.layers.78.mlp.gate.e_score_correction_bias\""
+
+  norm.eps: {value: 1.0e-5, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: hf-transformers
+    at: "modeling_glm_moe_dsa.py; GlmMoeDsaDecoderLayer.__init__"
+    quote: "self.input_layernorm = GlmMoeDsaRMSNorm(config.hidden_size, config.rms_norm_eps)"
+
+  ctx.max:
+    value: 1_048_576
+    source: config
+    at: "/max_position_embeddings"
+    note: "The card's evaluations use up to a 1M-token context window."
+  ctx.extension:
+    value: "IndexShare introduced in 128K mid-training of the GLM-5.2 base"
+    source: blog-52
+    at: "GLM-5.2 blog; IndexShare for DSA"
+    quote: "GLM-5.2 is trained with IndexShare from mid-training with 128K sequence length"

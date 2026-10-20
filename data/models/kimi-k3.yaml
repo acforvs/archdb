@@ -1,0 +1,304 @@
+name: Kimi-K3
+org: Moonshot AI
+kind: reasoning
+note: "Post-trained always-thinking checkpoint (MoE expert weights QAT-quantized to MXFP4); no base checkpoint is public."
+
+sources:
+  card: {url: https://huggingface.co/moonshotai/Kimi-K3/resolve/f831ab66814297da540d832a5235f8e904f29d06/README.md, kind: model-card}
+  config: {url: https://huggingface.co/moonshotai/Kimi-K3/resolve/f831ab66814297da540d832a5235f8e904f29d06/config.json, kind: config}
+  modeling_kimi_linear: {url: https://huggingface.co/moonshotai/Kimi-K3/resolve/f831ab66814297da540d832a5235f8e904f29d06/modeling_kimi_linear.py, kind: code}
+  report: {url: https://raw.githubusercontent.com/MoonshotAI/Kimi-K3/3cb39dfd32e51c3328e2e4b4af21341247d06c43/k3_tech_report.pdf, kind: paper}
+  weight-index: {url: https://huggingface.co/moonshotai/Kimi-K3/resolve/f831ab66814297da540d832a5235f8e904f29d06/model.safetensors.index.json, kind: config}
+  blog: {url: https://web.archive.org/web/20260817080036/https://www.kimi.com/blog/, kind: blog}
+
+not_disclosed: [params.active_non_embedding, mtp.ffn, mtp.shares_embedding, mtp.loss_weight, train.tokens, train.lr_peak, train.lr_min, train.batch, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  num_key_value_heads: "MLA; only sets num_key_value_groups = 1 in KimiMLAAttention"
+
+facts:
+  meta.released:
+    value: "2026-07-16"
+    source: blog
+    at: "kimi.com blog index (Wayback 2026-08-17); Kimi K3 entry"
+    quote: "Kimi K3 2026-07-16"
+  meta.license:
+    value: "other (kimi-k3)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: \"kimi-k3\""
+
+  params.active:
+    value: 104_200_000_000
+    source: report
+    at: "p.11 §3.2, Table 1"
+    quote: "Activated Parameters 32.6B 104.2B"
+    note: "Card and abstract round to 104B."
+  params.note:
+    value: "Table 1 figures (card rounds to 2.8T / 104B). The 401M MoonViT-V2 vision encoder is listed separately; whether the totals include it is not stated."
+    source: report
+    at: "p.11 §3.2, Table 1"
+    quote: "Total Parameters of ViT - 401M"
+  params.total:
+    value: 2_780_000_000_000
+    source: report
+    at: "p.11 §3.2, Table 1"
+    quote: "Total Parameters 1.04T 2.78T"
+    note: "Card and abstract round to 2.8T."
+
+  shape.d_model: {value: 7168, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 93, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab: {value: 163_840, source: config, at: "/text_config/vocab_size"}
+
+  attn.bias:
+    value: false
+    source: modeling_kimi_linear
+    at: "modeling_kimi_linear.py; KimiMLAAttention.__init__, KimiDeltaAttention.__init__"
+    quote: "self.v_proj = nn.Linear(self.hidden_size, projection_size, bias=False)"
+    note: "All MLA and KDA projections are built with bias=False."
+  attn.conv: {value: 4, source: config, at: "/text_config/linear_attn_config/short_conv_kernel_size"}
+  attn.gate:
+    value: "sigmoid, channel-wise full-rank, on MLA (and KDA) output before o_proj"
+    source: report
+    at: "p.5 §2.1.2, Eq. 7"
+    quote: "Kimi K3 augments MLA with an input-dependent, channel-wise full-rank output gate."
+    note: "config mla_use_output_gate = true; KDA gate from linear_attn_config use_full_rank_gate."
+  attn.global_layers:
+    value: 24
+    source: report
+    at: "p.11 §3.2, Table 1"
+    quote: "Attention-Layer Composition 61 MLA 69 KDA + 24 MLA"
+  attn.head_dim:
+    value: 192
+    source: config
+    at: "/text_config/qk_nope_head_dim + /text_config/qk_rope_head_dim"
+    note: "MLA layers. KDA layers use head_dim 128 (/text_config/linear_attn_config/head_dim)."
+  attn.heads: {value: 96, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: "KDA, MLA"
+    source: report
+    at: "p.4 §2.1"
+    quote: "Kimi K3 uses a layerwise hybrid of linear and global attention, combining KDA [64] with Gated MLA."
+  attn.kv_lora_rank: {value: 512, source: config, at: "/text_config/kv_lora_rank"}
+  attn.layout:
+    value: "(3 KDA : 1 MLA) × 23 + 1 MLA"
+    source: report
+    at: "p.4 §2.1"
+    quote: "Each block contains 3 KDA layers followed by 1 Gated MLA layer, giving a 3:1 mixing ratio. This pattern is repeated throughout the backbone. The two attention mechanisms are described separately below. An additional Gated MLA layer is placed at the end of the backbone"
+    note: "linear_attn_config full_attn_layers (1-indexed) = 4, 8, …, 92, 93; kda_layers lists the other 69."
+  attn.qk_norm:
+    value: false
+    source: modeling_kimi_linear
+    at: "modeling_kimi_linear.py; KimiMLAAttention.forward"
+    quote: "query_states = torch.cat((q_pass, q_rot), dim=-1)"
+    note: "MLA layers: RMSNorm only on the Q and KV latents. KDA layers L2-normalize q and k (attn.linear_kind)."
+  attn.linear_head_dim: {value: 128, source: config, at: "/text_config/linear_attn_config/head_dim"}
+  attn.linear_heads: {value: 96, source: config, at: "/text_config/linear_attn_config/num_heads"}
+  attn.linear_kind:
+    value: "KDA: 96 heads × 128, short conv 4 + Swish on q/k/v, L2-normed q/k, channel-wise decay with log-decay bounded below at −5 (gmin·sigmoid), head-wise RMSNorm + full-rank sigmoid output gate"
+    source: report
+    at: "p.5 §2.1.1, Eq. 5"
+    quote: "where Ah is a learnable per-head log-scale and gmin = −5 is fixed."
+    note: "Heads, head dim and kernel from /text_config/linear_attn_config; gate_lower_bound = -5; Ah initialized to 0."
+  attn.linear_layers:
+    value: 69
+    source: report
+    at: "p.11 §3.2, Table 1"
+    quote: "Attention-Layer Composition 61 MLA 69 KDA + 24 MLA"
+  attn.position:
+    value: "NoPE (all MLA layers)"
+    source: report
+    at: "p.5 §2.1.2"
+    quote: "Kimi K3 follows the hybrid design of Kimi Linear [64] and applies No Position Encoding (NoPE) to all MLA layers."
+  attn.q_lora_rank: {value: 1536, source: config, at: "/text_config/q_lora_rank"}
+  attn.rope_dim:
+    value: 64
+    source: config
+    at: "/text_config/qk_rope_head_dim"
+    note: "Head-shared key slice cached next to the latent but never rotated: mla_use_nope=true and the code asserts use_nope with rotary_emb=None."
+  attn.v_head_dim: {value: 128, source: config, at: "/text_config/v_head_dim"}
+
+  ffn.activation:
+    value: "SiTU-GLU (β1=4 gate, β2=25 up)"
+    source: report
+    at: "p.11 §3.2, Table 1; β values p.8 §2.3.2"
+    quote: "Activation Function SwiGLU SiTU-GLU"
+    note: "β1 = 4 and β2 = 25 per §2.3.2 and config activation_situ_beta / activation_situ_linear_beta."
+  ffn.bias:
+    value: false
+    source: modeling_kimi_linear
+    at: "modeling_kimi_linear.py; KimiMLP.__init__"
+    quote: "self.intermediate_size, self.hidden_size, bias=False)"
+  ffn.clamp:
+    value: "SiTU-GLU soft caps: gate 4·tanh(x/4)·σ(x), up 25·tanh(x/25), |f| ≤ 100; all dense, shared and routed FFNs"
+    source: report
+    at: "p.7 §2.3.2, Figure 4"
+    quote: "SiTU-GLU, shown in red with β1 = 4 and β2 = 25, closely follows SwiGLU near the origin and approaches the bound |f (x)| ≤ β1 β2 = 100 for large positive inputs"
+    note: "Smooth tanh caps, not hard clamps; config hidden_act = situ applies to every MLP in modeling_kimi_linear.py."
+  ffn.dim: {value: 33792, source: config, at: "/text_config/intermediate_size"}
+
+  moe.balancing:
+    value: "Quantile Balancing: aux-loss-free selection bias; each expert's bias recomputed every step from the (1−k/n)-quantile of its routing margins (global-batch histogram estimate), applied from the next step"
+    source: report
+    at: "p.8–9 §2.3.3; p.11 §3.3"
+    quote: "the (1 − k/n)-quantile of the margins across tokens, giving the QB update"
+    note: "config topk_method = noaux_tc (e_score_correction_bias added to scores for selection)."
+  moe.dense_layers:
+    value: 1
+    source: config
+    at: "/text_config/first_k_dense_replace"
+    note: "moe_layer_freq = 1."
+  moe.groups:
+    value: "none"
+    source: config
+    at: "config.json text_config.num_expert_group, topk_group"
+    quote: "\"num_expert_group\": 1,"
+    note: "num_expert_group = topk_group = 1, so use_grouped_topk has no effect."
+  moe.expert_dim:
+    value: 3072
+    source: config
+    at: "/text_config/moe_intermediate_size"
+    note: "Routed experts run in a 3584-wide latent (LatentMoE, /text_config/routed_expert_hidden_size)."
+  moe.experts: {value: 896, source: config, at: "/text_config/num_experts"}
+  moe.router: {value: sigmoid, source: config, at: "/text_config/moe_router_activation_func"}
+  moe.shared: {value: 2, source: config, at: "/text_config/num_shared_experts"}
+  moe.shared_dim:
+    value: 6144
+    source: modeling_kimi_linear
+    at: "modeling_kimi_linear.py; KimiSparseMoeBlock.__init__"
+    quote: "intermediate_size = config.moe_intermediate_size * config.num_shared_experts"
+    basis: inferred
+    note: "3072 × 2 shared experts, fused into one full-width MLP."
+  moe.latent_dim:
+    value: 3584
+    source: config
+    at: "/text_config/routed_expert_hidden_size"
+    note: "0.5 × d_model (Table 1); RMSNorm on the aggregated routed output before the up-projection (Eq. 11; config latent_moe_use_norm)."
+  moe.norm_topk: {value: true, source: config, at: "/text_config/moe_renormalize"}
+  moe.routed_scale: {value: 1.0, source: config, at: "/text_config/routed_scaling_factor"}
+  moe.top_k: {value: 16, source: config, at: "/text_config/num_experts_per_token"}
+
+  mtp.depth:
+    value: 1
+    source: report
+    at: "p.14 §4.1.4"
+    quote: "Kimi K3 is pre-trained with a multi-token-prediction (MTP) layer that mirrors the structure of a backbone block."
+  mtp.modules:
+    value: 1
+    source: report
+    at: "p.11 §3.2, Table 1"
+    quote: "Number of MTP Layers 1 layer 1 layer"
+  mtp.block:
+    value: "one layer with the structure of a backbone block"
+    source: report
+    at: "p.14 §4.1.4"
+    quote: "multi-token-prediction (MTP) layer that mirrors the structure of a backbone block"
+    note: "Mixer type (KDA or MLA), FFN type and how hidden state and embedding are combined are not stated."
+  mtp.released:
+    value: false
+    source: weight-index
+    at: "/weight_map | has eh_proj"
+    note: "Backbone layers 0–92 only; config /text_config/num_nextn_predict_layers 0. The pretrained MTP layer was fine-tuned into an EAGLE-3 drafter (report p.14), not shipped here."
+
+  norm.eps: {value: 1.0e-5, source: config, at: "/text_config/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: modeling_kimi_linear
+    at: "modeling_kimi_linear.py; KimiDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+    note: "Residual path is Block Attention Residuals (see norm.residual)."
+  norm.residual:
+    value: "Block Attention Residuals: layer outputs summed within 12-layer blocks (8 blocks + embedding = 9 sources); each attention and FFN sublayer input is a softmax-weighted mix of block sums and the current partial sum (learned query, RMSNorm'd keys)"
+    source: report
+    at: "p.6 §2.2"
+    quote: "for Kimi K3, we partition its layers into 8 blocks with 12-layer size, giving a partial final block and 9 total blocks when counting the embedding layer."
+    note: "/text_config/attn_res_block_size = 12; separate res queries for attention and FFN in KimiDecoderLayer._forward_attn_residual; the final output also aggregates all blocks."
+  norm.type:
+    value: RMSNorm
+    source: modeling_kimi_linear
+    at: "modeling_kimi_linear.py; KimiDecoderLayer.__init__"
+    quote: "self.input_layernorm = KimiRMSNorm("
+
+  ctx.extension:
+    value: "8K → 64K (pre-training) → 256K → 1M (cooldown); no positional-encoding change (NoPE)"
+    source: report
+    at: "p.12 §3.4"
+    quote: "following a four-stage curriculum. The window grows from 8K to 64K tokens during pre-training, and from 256K to 1M tokens during the cooldown phase."
+  ctx.final:
+    value: 1_048_576
+    source: report
+    at: "p.12 §3.4"
+    quote: "The window grows from 8K to 64K tokens during pre-training, and from 256K to 1M tokens during the cooldown phase."
+  ctx.max:
+    value: 1_048_576
+    source: card
+    at: "README.md; Model Summary"
+    quote: "Context Length 1048576"
+    note: "config max_position_embeddings = 1048576."
+  ctx.pretrain:
+    value: 8192
+    source: report
+    at: "p.12 §3.3"
+    quote: "Our pre-training begins with a context length of 8k tokens, which is later extended to 64k tokens"
+
+  train.data:
+    value: "Web Text, Code, Mathematics, Knowledge plus vision (captions, interleaved image–text, OCR, perception, video, visual coding); K2-style rephrasing of knowledge and math; long documents and videos upsampled and synthetic long-context data in cooldown"
+    source: report
+    at: "p.10 §3.1"
+    quote: "Following the rephrasing recipe of Kimi K2 [59], we rephrase knowledge and mathematics corpora with style and perspective-diverse prompting, chunk-wise autoregressive generation, and fidelity verification against the source documents."
+    note: "Domain list p.10 §3.1; long-context data p.12 §3.4. No token counts or shares disclosed."
+  train.objective:
+    value: "native multimodal: text and vision tokens interleaved in one next-token objective from the start; vision encoder trained from scratch"
+    source: report
+    at: "p.11 §3.3"
+    quote: "Under this paradigm, visual and textual tokens are interleaved within a single next-token prediction objective"
+    note: "MoonViT-V2 trained from scratch with next-token prediction rather than SigLIP-initialized (p.9 §2.4)."
+  train.optimizer:
+    value: "Muon (per-head Newton–Schulz on Q/K/V projections; K2 QK-Clip weight clipping)"
+    source: report
+    at: "p.11 §3.3"
+    quote: "We optimize the model using the Per-Head Muon optimizer (§ 2.5) together with the weight-clipping mechanism introduced in Kimi K2"
+  train.schedule:
+    value: "cosine with 1% linear warmup"
+    source: report
+    at: "p.11 §3.3"
+    quote: "We use a cosine learning rate schedule with a 1% linear warmup."
+  train.stability:
+    value: "K2 QK-Clip weight clipping; SiTU-GLU and RMSNorm before the latent up-projection against routed-branch activation explosion"
+    source: report
+    at: "p.11 §3.3"
+    quote: "together with the weight-clipping mechanism introduced in Kimi K2"
+    note: "Clipping threshold not stated. SiTU-GLU and RMSNorm: p.7 §2.3."
+  train.stages:
+    value:
+      - name: pretrain-8k
+        seq_len: 8192
+        quote: "Our pre-training begins with a context length of 8k tokens"
+      - name: pretrain-64k
+        seq_len: 65536
+        quote: "which is later extended to 64k tokens in a subsequent training phase."
+      - name: cooldown-256k
+        seq_len: 262_144
+        quote: "and from 256K to 1M tokens during the cooldown phase."
+      - name: cooldown-1m
+        seq_len: 1_048_576
+        quote: "and from 256K to 1M tokens during the cooldown phase."
+    source: report
+    at: "p.12 §3.3–3.4"
+    note: "Native multimodal (text + vision) from the first step. Token counts per stage not disclosed."
+  train.warmup:
+    value: "1% of training, linear"
+    source: report
+    at: "p.11 §3.3"
+    quote: "with a 1% linear warmup"
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.11 §3.3"
+    quote: "Weight decay is set to 0.1 throughout."
+  scaling.hp_rule:
+    value: "batch size, LR, TPP and model shape retuned by scaling-law studies; separate search per schedule, cosine chosen over WSD"
+    source: report
+    at: "p.10 §3.2"
+    quote: "we conduct dedicated scaling-law studies to retune key hyperparameters, including the batch size, learning rate, tokens-per-parameter ratio (TPP) and the model shape"

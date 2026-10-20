@@ -1,0 +1,186 @@
+name: Laguna-XS-2.1
+org: Poolside
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  blog: {url: https://web.archive.org/web/20260920153810/https://poolside.ai/blog/introducing-laguna-xs-2-1, kind: blog}
+  card: {url: https://huggingface.co/poolside/Laguna-XS-2.1/resolve/c5f36269bbdbd3f27fddc9a9f9dbae0cf2cf57db/README.md, kind: model-card}
+  config: {url: https://huggingface.co/poolside/Laguna-XS-2.1/resolve/c5f36269bbdbd3f27fddc9a9f9dbae0cf2cf57db/config.json, kind: config}
+  configuration_laguna: {url: https://huggingface.co/poolside/Laguna-XS-2.1/resolve/c5f36269bbdbd3f27fddc9a9f9dbae0cf2cf57db/configuration_laguna.py, kind: code}
+  modeling_laguna: {url: https://huggingface.co/poolside/Laguna-XS-2.1/resolve/c5f36269bbdbd3f27fddc9a9f9dbae0cf2cf57db/modeling_laguna.py, kind: code}
+
+not_disclosed: [params.active_non_embedding, moe.balancing, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  gating_types: "not read by modeling_laguna.py; gating is set by /gating"
+  mlp_layer_types: "not read by modeling_laguna.py; MoE placement comes from mlp_only_layers and decoder_sparse_step"
+
+facts:
+  meta.released:
+    value: "2026-07-02"
+    source: blog
+    at: "Introducing Laguna XS 2.1; post date"
+    quote: 'category:"announcements",date:"2026-07-02"'
+  meta.license:
+    value: openmdw-1.1
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: openmdw-1.1"
+
+  params.active:
+    value: 3_000_000_000
+    source: blog
+    at: "Introducing Laguna XS 2.1; intro"
+    quote: "Laguna XS 2.1 is a 33B total parameter Mixture-of-Experts model with 3B activated parameters per token"
+  params.total:
+    value: 33_000_000_000
+    source: card
+    at: "README.md; Model overview"
+    quote: "Number of parameters: 33B total with 3B activated per token"
+
+  shape.d_model: {value: 2048, source: config, at: "/hidden_size"}
+  shape.layers: {value: 40, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 100_352, source: config, at: "/vocab_size"}
+
+  attn.gate:
+    value: "softplus, per head, on attention output before o_proj"
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaAttention.forward"
+    quote: "gate = F.softplus(self.g_proj(hidden_states).float()).to(attn_output.dtype)"
+    note: "Per head: config /gating = \"per-head\". The card says \"sigmoid gating\"; the code uses softplus."
+  attn.global_layers: {value: 10, source: config, at: "/layer_types | count full_attention"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads:
+    value: 48
+    source: config
+    at: "/num_attention_heads"
+    note: "Global layers; SWA layers use 64 (attn.local_heads)."
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/num_attention_heads_per_layer/1"
+    note: "Layer 1 is sliding_attention; every sliding_attention entry is 64, every full_attention entry 48. modeling_laguna.py LagunaDecoderLayer.__init__ passes the per-layer count to LagunaAttention."
+  attn.kind:
+    value: "GQA, SWA"
+    source: card
+    at: "README.md; Highlights"
+    quote: "enabling mixed SWA (Sliding Window Attention) and global attention layers in a 3:1 ratio"
+    note: "GQA: 8 KV heads for 48/64 Q-heads (config)."
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "3 SWA : 1 global"
+    source: card
+    at: "README.md; Highlights"
+    quote: "enabling mixed SWA (Sliding Window Attention) and global attention layers in a 3:1 ratio (across 40 total layers)"
+    note: "Config /layer_types starts each group of four with the global layer."
+  attn.local_kv_heads:
+    value: 8
+    source: config
+    at: "/num_key_value_heads"
+    note: "LagunaAttention builds k_proj/v_proj from config.num_key_value_heads and config.head_dim for both layer types."
+  attn.local_head_dim:
+    value: 128
+    source: config
+    at: "/head_dim"
+    note: "LagunaAttention uses config.head_dim for both layer types."
+  attn.local_rope_theta:
+    value: 10000
+    source: config
+    at: "/rope_parameters/sliding_attention/rope_theta"
+    note: "configuration_laguna.py derives swa_rope_parameters from rope_parameters[\"sliding_attention\"]; LagunaModel builds swa_rotary_emb from it."
+  attn.local_layers: {value: 30, source: config, at: "/layer_types | count sliding_attention"}
+  attn.position:
+    value: "partial RoPE (global, 50%), RoPE (SWA)"
+    source: config
+    at: "config.json; rope_parameters.full_attention"
+    quote: "\"partial_rotary_factor\": 0.5"
+    note: "rope_parameters.sliding_attention has partial_rotary_factor 1.0."
+  attn.qk_norm:
+    value: true
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaAttention.__init__"
+    quote: "self.q_norm = LagunaRMSNorm(config.head_dim, eps=config.rms_norm_eps)"
+  attn.rope_fraction:
+    value: 0.5
+    source: config
+    at: "/rope_parameters/full_attention/partial_rotary_factor"
+    note: "Global layers; SWA layers rotate all dims (/rope_parameters/sliding_attention/partial_rotary_factor = 1.0)."
+  attn.rope_theta:
+    value: 500_000
+    source: config
+    at: "/rope_parameters/full_attention/rope_theta"
+    note: "Global layers; SWA layers use 10,000."
+  attn.v_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.bias:
+    value: false
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaAttention.__init__"
+    quote: "self.q_proj = nn.Linear(config.hidden_size, self.num_heads * config.head_dim, bias=False)"
+  attn.window: {value: 512, source: config, at: "/sliding_window"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: configuration_laguna
+    at: "configuration_laguna.py; LagunaConfig.__init__"
+    quote: "hidden_act: str = \"silu\""
+    note: "config.json sets no hidden_act; LagunaMLP computes down_proj(act_fn(gate_proj(x)) * up_proj(x))."
+  ffn.bias:
+    value: false
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 8192, source: config, at: "/intermediate_size"}
+
+  moe.dense_layers:
+    value: 1
+    source: config
+    at: "/mlp_only_layers | len"
+    note: "Layer 0; decoder_sparse_step 1 makes every other layer MoE (LagunaDecoderLayer.__init__)."
+
+  moe.expert_dim: {value: 512, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/num_experts"}
+  moe.router:
+    value: sigmoid
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaTopKRouter"
+    quote: "Laguna MoE router using sigmoid scoring (not softmax)."
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/moe_routed_scaling_factor"}
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model overview"
+    quote: "Experts: 256 experts with 1 shared expert"
+  moe.shared_dim: {value: 512, source: config, at: "/shared_expert_intermediate_size"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  norm.placement:
+    value: pre
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaDecoderLayer.forward"
+    quote: "residual = hidden_states hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling_laguna
+    at: "modeling_laguna.py; LagunaDecoderLayer.__init__"
+    quote: "self.input_layernorm = LagunaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.extension:
+    value: "YaRN factor 32 over original 8,192 on global layers (release config)"
+    source: config
+    at: "config.json; rope_parameters.full_attention"
+    quote: "\"rope_type\": \"yarn\", \"factor\": 32.0, \"original_max_position_embeddings\": 8192,"
+    note: "Training-time extension stages are not disclosed. Same dict: beta_fast 64, beta_slow 1, attention_factor 1.347; max_position_embeddings 262,144."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Model overview"
+    quote: "Context window: 262,144 tokens"
+  train.optimizer:
+    value: Muon
+    source: card
+    at: "README.md; Model overview"
+    quote: "Optimizer: Muon"

@@ -1,0 +1,332 @@
+name: Trinity-Large-Base
+org: Arcee AI
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/arcee-ai/Trinity-Large-Base/resolve/b2a665b40e5d67b05fb164205cf63155f7958e2a/README.md, kind: model-card}
+  config: {url: https://huggingface.co/arcee-ai/Trinity-Large-Base/resolve/b2a665b40e5d67b05fb164205cf63155f7958e2a/config.json, kind: config}
+  modeling_afmoe: {url: https://raw.githubusercontent.com/huggingface/transformers/c633787a7acb9bd11e57cd8d599be2b767bbdbaa/src/transformers/models/afmoe/modeling_afmoe.py, kind: code}
+  report: {url: https://raw.githubusercontent.com/arcee-ai/trinity-large-tech-report/51bc374cbf4aa5f3ece618edd3e3488455664f77/Arcee%20Trinity%20Large.pdf, kind: paper}
+  blog: {url: https://web.archive.org/web/20261001124052/https://www.arcee.ai/blog/trinity-large, kind: blog}
+
+not_disclosed: [mtp.depth, train.weight_decay, train.betas, train.grad_clip, params.active_non_embedding]
+
+config_unused:
+  n_group: 1 (no group-limited routing); not read by modeling_afmoe.py
+  num_expert_groups: 1 (no group-limited routing); not read by modeling_afmoe.py
+  num_limited_groups: 1 (no group-limited routing); not read by modeling_afmoe.py
+  topk_group: 1 (no group-limited routing); not read by modeling_afmoe.py
+
+facts:
+  meta.released:
+    value: "2026-01-27"
+    source: blog
+    at: "Trinity Large blog; header"
+    quote: "Jan 27, 2026"
+  meta.license:
+    value: "other (OpenMDW-1.1)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: openmdw-1.1"
+  params.total:
+    value: 398_000_000_000
+    source: card
+    at: "README.md; Architecture table"
+    quote: "Total parameters | ~398B"
+    note: "Report rounds to 400B total."
+  params.active:
+    value: 13_000_000_000
+    source: report
+    at: "p.1 Abstract"
+    quote: "with 400B total parameters and 13B activated per token."
+  params.note:
+    value: "Card gives ~398B total, report 400B; embedding scope not stated."
+    source: card
+    at: "README.md; Introduction"
+    quote: "It is a 398B-parameter sparse Mixture-of-Experts (MoE) model with approximately 13B active parameters per token."
+
+  shape.d_model: {value: 3072, source: config, at: "/hidden_size"}
+  shape.layers: {value: 60, source: config, at: "/num_hidden_layers"}
+  shape.vocab: {value: 200_192, source: config, at: "/vocab_size"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "byte-level BPE, 200K vocab trained on ~10B tokens; DeepSeek-V3-style pretokenizer with right-aligned 3-digit number chunks and extended script isolation"
+    source: report
+    at: "p.2 §2.1; p.3 §2.1.1"
+    quote: "We train a custom 200,000-token BPE [Shibata et al., 1999] vocabulary using the tokenizers library"
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "p.4 §2.2"
+    quote: "We combine grouped-query attention (GQA) [Ainslie et al., 2023], QK-normalization (QK-norm) [Henry et al., 2020], gated attention"
+  attn.layout:
+    value: "3 SWA : 1 global"
+    source: report
+    at: "p.5 §2.2 Local/global attention pattern"
+    quote: "they have three local (SWA) attention layers with RoPE, followed by one global layer without positional embeddings (NoPE)"
+    note: "Config global_attn_every_n_layers 4."
+  attn.global_layers: {value: 15, source: config, at: "/layer_types | count full_attention"}
+  attn.local_layers: {value: 45, source: config, at: "/layer_types | count sliding_attention"}
+  attn.heads: {value: 48, source: config, at: "/num_attention_heads"}
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.window: {value: 4096, source: config, at: "/sliding_window"}
+  attn.local_heads:
+    value: 48
+    source: config
+    at: "/num_attention_heads"
+    note: "AfmoeAttention uses the same projections for both layer types; only RoPE and the window differ."
+  attn.local_kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.local_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.local_rope_theta:
+    value: 10000
+    source: config
+    at: "/rope_theta"
+    note: "Only sliding_attention layers apply RoPE; rope_scaling null."
+  attn.position:
+    value: "RoPE (SWA), NoPE (global)"
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeAttention.forward"
+    quote: "if self.is_local_attention:"
+    note: "RoPE applied only in sliding_attention layers (config rope_theta 10,000)."
+  attn.qk_norm:
+    value: true
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeAttention.__init__"
+    quote: "self.q_norm = AfmoeRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+    note: "Per-head RMSNorm on Q and K, all layers."
+  attn.gate:
+    value: "elementwise sigmoid gate σ(W_G x) on the SDPA output before o_proj, all layers"
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeAttention.forward"
+    quote: "output = output * torch.sigmoid(gate_states)"
+    note: "W_G is d × d (one gate per head channel), computed from the attention input (report eq. 11–14)."
+  attn.bias:
+    value: false
+    source: report
+    at: "p.2 §2"
+    quote: "with no biases on the linear layers."
+
+  ffn.activation:
+    value: SwiGLU
+    source: report
+    at: "p.6 §2.3"
+    quote: "We use the SwiGLU [Shazeer, 2020] activation function as the nonlinearity."
+    note: "Config hidden_act silu."
+  ffn.dim:
+    value: 12288
+    source: config
+    at: "/intermediate_size"
+    note: "Dense FFN in the first 6 layers."
+  ffn.bias:
+    value: false
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.experts: {value: 256, source: config, at: "/num_experts"}
+  moe.top_k: {value: 4, source: config, at: "/num_experts_per_tok"}
+  moe.shared: {value: 1, source: config, at: "/num_shared_experts"}
+  moe.expert_dim: {value: 3072, source: config, at: "/moe_intermediate_size"}
+  moe.shared_dim:
+    value: 3072
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeSparseMoeBlock.__init__"
+    quote: "self.shared_experts = AfmoeMLP(config, config.moe_intermediate_size * config.num_shared_experts)"
+    basis: inferred
+    note: "moe_intermediate_size 3072 × num_shared_experts 1."
+  moe.dense_layers:
+    value: 6
+    source: config
+    at: "/num_dense_layers"
+    note: "Raised from 3 to 6 after early unstable runs (report §6)."
+  moe.router:
+    value: normalized sigmoid
+    source: report
+    at: "p.6 §2.3 Routing"
+    quote: "We use normalized sigmoid routing scores instead of softmax-based routing"
+    note: "Config score_func sigmoid. Top-k chosen on score + expert bias; gates use unbiased scores."
+  moe.norm_topk:
+    value: true
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeTokenChoiceRouter.forward"
+    quote: "top_scores = top_scores / denominator"
+    note: "Config route_norm true."
+  moe.routed_scale:
+    value: 2.448
+    source: report
+    at: "p.12 Table 2"
+    quote: "Route scale 2.826 2.826 2.448"
+    note: "Config route_scale 2.448; applied after top-k renormalization (AfmoeTokenChoiceRouter.forward)."
+  moe.balancing:
+    value: "SMEBU expert bias (tanh soft-clamped, momentum; λ=5e-4, β=0.5, κ=2) + sequence-wise aux loss 1e-4"
+    source: report
+    at: "p.7 §2.3; p.15 §6"
+    quote: "For our Trinity Large run, we use SMEBU with λ = 5 × 10−4 , β = 0.5, and κ = 2."
+    note: "Sequence-wise loss weight from §6: 1 × 10^-4; config load_balance_coeff 5e-5 is not cited by the report."
+
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "p.8 §2.4"
+    quote: "For layer normalization, we use a simplified depth-scaled sandwich norm"
+  norm.placement:
+    value: sandwich
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeDecoderLayer.forward"
+    quote: "hidden_states = self.post_attention_layernorm(hidden_states)"
+    note: "RMSNorm on sublayer input and output, both inside the residual branch; final RMSNorm before the LM head."
+  norm.eps: {value: 1e-5, source: config, at: "/rms_norm_eps"}
+  norm.residual:
+    value: "depth-scaled sandwich norm: output-RMSNorm gains initialized to 1/√L"
+    source: report
+    at: "p.8 §2.4"
+    quote: "We depth-scale the RMSNorm gain parameters for the second RMSNorm in each layer."
+  norm.embedding:
+    value: "× sqrt(d_model)"
+    source: modeling_afmoe
+    at: "modeling_afmoe.py; AfmoeModel.forward"
+    quote: "hidden_states = hidden_states * (self.config.hidden_size**0.5)"
+    note: "Gated by config mup_enabled (true); report eq. 39."
+
+  ctx.pretrain:
+    value: 8192
+    source: report
+    at: "p.12 §3.4.1"
+    quote: "We use local/global attention with sliding-window size for the local layers set to 4096 and pre-training sequence length 8192."
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.13 §3.5"
+    quote: "We trained Trinity Large at a sequence length of 256K, targeting a final context window size of 256K"
+    note: "Card states Base includes context extension but also lists no tuning beyond 8K; config max_position_embeddings is 262,144."
+  ctx.max:
+    value: 524_288
+    source: report
+    at: "p.13 §3.4.2"
+    quote: "We train to 256k context for inference at 512k."
+  ctx.extension:
+    value: "single stage at 256K from the final pretrained checkpoint; only global (NoPE) layers extended, SWA window 4096 and RoPE unchanged; ~117B-token long-context mix; LR cosine continued 1/10 → 1/20 of peak; CP 4"
+    source: report
+    at: "p.13 §3.5"
+    quote: "Adjusting only the global layers resulted in a much quicker loss recovery"
+
+  train.tokens:
+    value: 17_000_000_000_000
+    source: report
+    at: "p.1 Abstract"
+    quote: "Trinity Large was pre-trained on 17 trillion tokens."
+    note: "Excludes context extension (blog: 33-day pretraining figure excludes it)."
+  train.optimizer:
+    value: "Muon + AdamW (Muon for hidden layers, AdamW for embedding and output; Muon LR × max(1, √(fan_out/fan_in)))"
+    source: report
+    at: "p.12 §3.4.2"
+    quote: "we use the Muon optimizer [Jordan et al., 2024a] for hidden layers and the AdamW optimizer [Loshchilov and Hutter, 2019] for the embedding and output layers."
+    note: "Distributed Muon from the Dion repository; expert gradients orthogonalized batched per expert (§3.3)."
+  train.lr_peak:
+    value: 8.0e-4
+    source: report
+    at: "p.13 §3.4.2"
+    quote: "The peak learning rates are 8.0 × 10−4 for Muon and 2.0 × 10−4 for AdamW."
+    note: "Muon; AdamW peak 2.0e-4."
+  train.lr_min:
+    value: 4.0e-5
+    source: report
+    at: "p.13 §3.4.2"
+    quote: "we continue cosine decay from 10 1 1 to 20 of the peak learning rate"
+    note: "Muon, end of context extension (1/20 of peak); end of pretraining 8.0e-5. AdamW: 2.0e-5, then 1.0e-5."
+  train.schedule:
+    value: "WSD: 2000-step linear warmup, constant, cosine decay to 1/10 of peak; context extension continues cosine 1/10 → 1/20"
+    source: report
+    at: "p.13 §3.4.2"
+    quote: "During the decay phase, we use a cosine decay to 10 1 of the peak learning rate"
+    note: "The 10T TrueBase checkpoint has no LR anneal (blog), so decay starts after 10T."
+  train.warmup:
+    value: "2000 steps"
+    source: report
+    at: "p.13 §3.4.2"
+    quote: "Trinity Large. We use a linear warmup of 2000 steps."
+  train.batch:
+    value: "12,288 × 8,192 (101M tokens), raised to 16,384 × 8,192 (134M tokens) after 4.9T tokens"
+    source: report
+    at: "p.13 §3.4.2; p.1 Figure 1"
+    quote: "We train with global batch size 12288 at sequence length 8192, and increase the global batch size to 16384 after crossing 4.9T tokens"
+  train.batch_tokens:
+    value: 134_217_728
+    source: report
+    at: "p.13 §3.4.2"
+    quote: "We train with global batch size 12288 at sequence length 8192, and increase the global batch size to 16384 after crossing 4.9T tokens"
+    basis: inferred
+    note: "16,384 sequences × 8192 tokens, after the step-up at 4.9T (12,288 × 8192 = 100,663,296 before)."
+  train.precision:
+    value: "BF16 (MXFP8 linear and grouped-GEMM kernels disabled after early unstable runs)"
+    source: report
+    at: "p.15 §6"
+    quote: "We disabled our MXFP8 kernels for linear layers and grouped GEMMs, falling back to BF16."
+  train.init:
+    value: "truncated normal σ=0.009 on [−3σ, 3σ] for all trainable parameters (σ = 0.5/√d); output-norm gains 1/√L"
+    source: report
+    at: "p.12 §3.4.1; p.8 §2.5"
+    quote: "We initialize all trainable parameters from a truncated normal distribution with standard deviation 0.009."
+  train.stability:
+    value: "QK-norm; sigmoid attention-output gate; depth-scaled sandwich norm; z-loss 1e-6 (introduced mid-training); sequence-wise aux loss 1e-4; SMEBU; 6 dense layers; intra-document masking; BF16; random sequential document buffer from phase 3"
+    source: report
+    at: "pp.15–16 §6; p.9 §3.2"
+    quote: "and had to reduce the weight to 1 × 10−6 , as larger values destabilized the network."
+    note: "A bug left z-loss at 0 until it was introduced mid-run; the six §6 fixes were applied together after collapsed-expert restarts."
+  train.masking:
+    value: "intra-document masking"
+    source: report
+    at: "p.9 §3.2"
+    quote: "but Trinity Large was pre-trained using intra-doc attention masking."
+  train.data:
+    value: "DatologyAI 20T-token mix in 3 phases (13T/4T/3T), shifting from web toward code, math, STEM; >8T synthetic (~6.5T rephrased web, ~1T multilingual, ~800B code); 14 non-English languages"
+    source: report
+    at: "p.9 §3.1"
+    quote: "DatologyAI generated over 8 trillion tokens of synthetic web, code, and STEM data."
+    note: "13T/4T/3T is the 20T mix; the report says the 17T were sampled 13:4:3 from it, the blog gives trained phases of 10T, 4T and 3T."
+  train.hardware:
+    value: "2048 B300; HSDP (FSDP group 128) + EP 8; pretraining 33 days"
+    source: blog
+    at: "Trinity Large blog; Training at scale"
+    quote: "The full pretraining run finished in 33 days."
+    note: "Report §3.3: 2048 B300, FSDP group 128, EP 8, CP 4 for context extension."
+  train.stages:
+    value:
+      - name: phase 1
+        seq_len: 8192
+        lr: 8.0e-4
+        batch_sequences: 12288
+        note: "Report: 13T of the 20T mix, from which the 17T were sampled 13:4:3; blog: 10T. Warmup then constant LR; batch 16,384 after 4.9T."
+        quote: "The 17 trillion tokens that Trinity Large was trained on were sampled proportionally from the 20T mix (i.e. a 13:4:3 ratio across the three phases)."
+      - name: phase 2
+        seq_len: 8192
+        batch_sequences: 16384
+        note: "Report: 4T of the 20T mix; blog: 4T. Shifted toward code, math and STEM."
+        quote: "The 20 trillion mix was distributed across 13T tokens in phase 1, 4T tokens in phase 2, and 3T tokens in phase 3."
+      - name: phase 3
+        seq_len: 8192
+        batch_sequences: 16384
+        note: "Report: 3T of the 20T mix; blog: 3T. Random sequential document buffer enabled; LR ends at 1/10 of peak."
+        quote: "we introduce a document buffer mid-way through the Trinity Large training run, right before beginning phase 3."
+      - name: context extension
+        seq_len: 262_144
+        lr: 8.0e-5
+        note: "~117B-token long-context dataset; cosine continued to 4.0e-5 (Muon)."
+        quote: "Our long-context extension dataset comprises approximately 117 billion tokens across 35.6 million documents."
+    source: report
+    at: "p.9 §3.1–3.2; p.13 §3.4.2–3.5"
+
+  scaling.parametrization:
+    value: "Muon LR × max(1, √(fan_out/fan_in)) for width transfer; embedding ×√d; init σ = 0.5/√d"
+    source: report
+    at: "p.12 §3.4.2 eq. 41; p.8 §2.5 eqs. 38–39"
+    quote: "Empirically, we observe that this adjustment enables optimal learning rate transfer when scaling model width, for Muon."
+    note: "The report does not name a parametrization; config mup_enabled gates the √d embedding scale."
+
+  scaling.ladder:
+    value: "Trinity Nano (6B-A1B, 56 layers, d 1024) and Trinity Mini (26B-A3B, 32 layers, d 2048), 10T tokens each"
+    source: report
+    at: "p.2 §1; p.12 Table 2"
+    quote: "serve as steps in our scaling ladder that validate the data pipeline, architecture, training recipe, and infrastructure required for Trinity Large."

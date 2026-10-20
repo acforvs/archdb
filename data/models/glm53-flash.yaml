@@ -1,0 +1,264 @@
+name: GLM-5.3-Flash
+org: Z.ai
+kind: reasoning
+note: "No base checkpoint is public; the card says the model starts from a newly trained base, not the GLM-5.2/5.3 base. Architecture from config and the pinned transformers implementation."
+
+sources:
+  card: {url: https://huggingface.co/zai-org/GLM-5.3-Flash/resolve/46a050bec13002ad29ee795c16e61cf4fa3c4a9c/README.md, kind: model-card}
+  config: {url: https://huggingface.co/zai-org/GLM-5.3-Flash/resolve/46a050bec13002ad29ee795c16e61cf4fa3c4a9c/config.json, kind: config}
+  hf-index: {url: https://huggingface.co/zai-org/GLM-5.3-Flash/resolve/46a050bec13002ad29ee795c16e61cf4fa3c4a9c/model.safetensors.index.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/e0eb2810ac1b2caf6d082f247d8d37162ecf67a0/src/transformers/models/glm5_next/modeling_glm5_next.py, kind: code}
+  hf-configuration: {url: https://raw.githubusercontent.com/huggingface/transformers/e0eb2810ac1b2caf6d082f247d8d37162ecf67a0/src/transformers/models/glm5_next/configuration_glm5_next.py, kind: code}
+  blog: {url: https://web.archive.org/web/20261019095936id_/https://z.ai/blog/assets/glm-5.3-flash-nnmBGEIY.js, kind: blog}
+
+# Searched: card, blog (2026-08-26), GitHub README, transformers code. No Flash report exists;
+# the GLM-5 report (arXiv 2602.15763) describes a different base model.
+not_disclosed:
+  - params.active_non_embedding
+  - mtp.depth
+  - ctx.pretrain
+  - ctx.final
+  - train.tokens
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+config_unused:
+  num_key_value_heads: "MLA; validate_architecture requires it to equal num_attention_heads"
+  qk_head_dim: "overwritten in Glm5NextTextConfig.__post_init__ as qk_rope_head_dim + qk_nope_head_dim"
+  index_kpool_compress: "not read by modeling_glm5_next.py; pooling is always applied"
+  index_share_for_mtp_iteration: "not read by modeling_glm5_next.py (no MTP implementation there)"
+  indexer_rope_interleave: "not read; qk_rope_head_dim is 0"
+  mhc: "not read; every layer builds hyper-connections from hc_mult"
+  topk_method: "not read; the router always adds e_score_correction_bias (see moe.balancing)"
+
+facts:
+  meta.released:
+    value: "2026-08-26"
+    source: blog
+    at: "GLM-5.3-Flash blog; post date"
+    quote: "2026-08-26"
+    note: "The post states the weights are publicly available."
+  meta.license:
+    value: mit
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: mit"
+
+  params.total:
+    value: 320_000_000_000
+    source: card
+    at: "README.md; Introduction"
+    quote: "With 320B total parameters and just 18B active parameters"
+  params.active:
+    value: 18_000_000_000
+    source: card
+    at: "README.md; Introduction"
+    quote: "With 320B total parameters and just 18B active parameters"
+
+  shape.d_model: {value: 4096, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 45, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab: {value: 154_880, source: config, at: "/text_config/vocab_size"}
+
+  attn.kind:
+    value: "KDA, MLA, DSA"
+    source: card
+    at: "README.md; Introduction"
+    quote: "we introduce a hybrid architecture combining sparse and linear attention"
+    note: "Linear layers are Kimi Delta Attention (Glm5NextTextLinearAttention); sparse layers are MLA with a DSA indexer (Glm5NextTextAttention)."
+  attn.layout:
+    value: "(3 KDA : 1 MLA+DSA) × 11 + 1 KDA"
+    source: config
+    at: "config.json text_config.linear_attn_config.full_attn_layers"
+    quote: "\"full_attn_layers\": [ 3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43 ]"
+    basis: inferred
+    note: "0-indexed MLA+DSA layers of 45; the rest (kda_layers), including the last (44), are KDA."
+  attn.global_layers: {value: 11, source: config, at: "/text_config/layer_types | count deepseek_sparse_attention"}
+  attn.linear_layers: {value: 34, source: config, at: "/text_config/layer_types | count linear_attention"}
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}
+  attn.head_dim:
+    value: 256
+    source: config
+    at: "/text_config/qk_nope_head_dim + /text_config/qk_rope_head_dim"
+    note: "256 nope + 0 rope. The config's /text_config/head_dim=0 is the RoPE sub-dim."
+  attn.kv_lora_rank: {value: 512, source: config, at: "/text_config/kv_lora_rank"}
+  attn.rope_dim: {value: 0, source: config, at: "/text_config/qk_rope_head_dim"}
+  attn.v_head_dim: {value: 256, source: config, at: "/text_config/v_head_dim"}
+  attn.qk_norm:
+    value: false
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextAttention.forward"
+    quote: "q_resid = self.q_a_layernorm(self.q_a_proj(hidden_states))"
+    note: "MLA layers normalize only the Q and KV latents; KDA layers L2-normalize q/k inside the recurrence."
+  attn.indexer_dim:
+    value: 128
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextIndexer.__init__"
+    quote: "self.wk = nn.Linear(self.hidden_size, self.head_dim, bias=False)"
+    note: "One key head; IndexPool pools 4 consecutive keys into one (see attn.kv_groups)."
+  attn.kv_groups:
+    value:
+      - name: MLA latent
+        layers: 11
+        elements: 512
+        tokens_per_entry: 1
+        note: "kv_lora_rank 512, no RoPE key."
+        quote: "k_pass = self.kv_a_layernorm(kv_pass).view(batch_size, 1, seq_length, self.kv_lora_rank)"
+      - name: IndexPool indexer key
+        layers: 11
+        elements: 128
+        tokens_per_entry: 4
+        note: "Blog: IndexPool compresses four indexer key vectors into one; transformers caches unpooled keys and pools at scoring time."
+        quote: "# Key difference: Score across pools, not on a per token basis"
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextAttention, Glm5NextTextIndexer.forward"
+  attn.q_lora_rank: {value: 1536, source: config, at: "/text_config/q_lora_rank"}
+  attn.position:
+    value: NoPE
+    source: hf-configuration
+    at: "configuration_glm5_next.py; Glm5NextTextConfig.__post_init__"
+    quote: "Expecting NoPE for the DSA attention layers"
+    note: "qk_rope_head_dim 0 (config mla_use_nope true); KDA layers carry no positional encoding."
+  attn.sparse:
+    value: "DSA indexer (32 heads × 128), top-2048 tokens, indexer keys pooled 4:1"
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextIndexer docstring"
+    quote: "DeepSeek Sparse Attention (DSA) indexer with k-pool compression for GLM-5.3-Flash."
+    note: "Blog calls the 4:1 key pooling IndexPool. /text_config/index_topk 2048, /text_config/index_kpool 4, /text_config/index_n_heads 32, /text_config/index_head_dim 128; every MLA layer runs its own indexer (/text_config/indexer_types all \"full\"); index_kpool_always_select_tail adds the trailing incomplete pool's tokens."
+  attn.linear_kind:
+    value: "KDA: 64 heads × 128, short conv 4 on q/k/v, forget-gate lower bound −5, q/k L2-normalized, gated RMSNorm output"
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextLinearAttention"
+    quote: "Kimi-style KDA (Kimi Linear Attention) for GLM-5.3-Flash."
+    note: "/text_config/linear_attn_config: num_heads 64, head_dim 128, short_conv_kernel_size 4, gate_lower_bound -5.0."
+  attn.linear_heads: {value: 64, source: config, at: "/text_config/linear_attn_config/num_heads"}
+  attn.linear_head_dim: {value: 128, source: config, at: "/text_config/linear_attn_config/head_dim"}
+  attn.conv: {value: 4, source: config, at: "/text_config/linear_attn_config/short_conv_kernel_size"}
+  attn.gate:
+    value: "KDA layers: gated RMSNorm with low-rank gate (g_a_proj → g_b_proj) before o_proj; none on MLA layers"
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextLinearAttention.forward"
+    quote: "output = self.o_norm(core_attn_out, gate).reshape(batch_size, seq_len, -1)"
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextMLP.forward"
+    quote: "return self.down_proj(self.act_fn(gate) * up)"
+    note: "act_fn is /text_config/hidden_act silu; clamps in ffn.clamp."
+  ffn.dim: {value: 12288, source: config, at: "/text_config/intermediate_size"}
+  ffn.clamp:
+    value: "gate ≤ 10, up ±10; dense, shared and routed experts"
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextMLP.forward, Glm5NextTextExperts._apply_gate"
+    quote: "up = up.clamp(min=-self.swiglu_limit, max=self.swiglu_limit)"
+    note: "/text_config/swiglu_limit 10.0; gate is clamped above only."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.dense_layers:
+    value: 3
+    source: config
+    at: "/text_config/mlp_layer_types | count dense"
+    note: "Layers 0–2; matches first_k_dense_replace."
+  moe.experts: {value: 288, source: config, at: "/text_config/n_routed_experts"}
+  moe.top_k: {value: 8, source: config, at: "/text_config/num_experts_per_tok"}
+  moe.shared: {value: 1, source: config, at: "/text_config/n_shared_experts"}
+  moe.expert_dim: {value: 2048, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.shared_dim:
+    value: 2048
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextMoE.__init__"
+    quote: "intermediate_size=config.moe_intermediate_size * config.n_shared_experts"
+    basis: inferred
+    note: "2048 × 1 shared expert."
+  moe.router:
+    value: sigmoid
+    source: config
+    at: "/text_config/scoring_func"
+    note: "Router logits computed in FP32 (moe_router_dtype float32)."
+  moe.balancing:
+    value: "expert-score correction bias on top-k selection"
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextTopkRouter.forward"
+    quote: "scores_for_choice = scores + self.e_score_correction_bias"
+    note: "Bias affects selection only; its update rule and any auxiliary loss are not disclosed."
+  moe.groups:
+    value: "none"
+    source: config
+    at: "config.json n_group, topk_group"
+    quote: "\"n_group\": 1,"
+    note: "n_group = topk_group = 1."
+  moe.norm_topk: {value: true, source: config, at: "/text_config/norm_topk_prob"}
+  moe.routed_scale:
+    value: 2.5
+    source: config
+    at: "/text_config/routed_scaling_factor"
+    note: "Applied after top-k renormalization (Glm5NextTextTopkRouter.forward)."
+
+  mtp.released:
+    value: true
+    source: hf-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.language_model.layers.45.eh_proj.weight"'
+    note: "Its use in pretraining is not disclosed."
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/text_config/num_nextn_predict_layers"
+  mtp.block:
+    value: "enorm + hnorm, eh_proj, one MLA+DSA layer with its own IndexPool indexer, MoE FFN, shared_head.norm; no hyper-connection weights"
+    source: hf-index
+    at: "model.safetensors.index.json; model.language_model.layers.45.* weight names"
+    quote: '"model.language_model.layers.45.self_attn.indexer.index_kpool_compress_gate"'
+    note: "No embedding or output-head weights under layer 45."
+  mtp.ffn:
+    value: MoE
+    source: hf-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.language_model.layers.45.mlp.gate.e_score_correction_bias"'
+
+  norm.type:
+    value: RMSNorm
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextDecoderLayer.__init__"
+    quote: "self.input_layernorm = Glm5NextTextRMSNorm(config.hidden_size, config.rms_norm_eps)"
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextTextDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+    note: "Applied to the mHC-collapsed block input."
+  norm.eps: {value: 1.0e-5, source: config, at: "/text_config/rms_norm_eps"}
+  norm.residual:
+    value: "mHC: 4 residual streams, Sinkhorn-Knopp (20 iterations) doubly-stochastic stream mixing; streams averaged before the final norm"
+    source: card
+    at: "README.md; Introduction"
+    quote: "The model also adopts Manifold-Constrained Hyper-Connections (mHC) to further improve scaling efficiency."
+    note: "/text_config/hc_mult 4, /text_config/hc_sinkhorn_iters 20, hc_eps 1e-6; Glm5NextTextHyperHead takes an unweighted mean of the streams."
+
+  ctx.max:
+    value: 1_048_576
+    source: blog
+    at: "Serving section"
+    quote: "especially when supporting context lengths of up to one million tokens"
+    note: "Config /text_config/max_position_embeddings is 1048576."
+
+  train.data:
+    value: "30T-token multimodal corpus"
+    source: card
+    at: "README.md; Introduction"
+    quote: "Together with our latest 30T-token multimodal pre-training corpus"
+    note: "Corpus size; tokens seen in pretraining are not stated."

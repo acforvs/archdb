@@ -1,0 +1,200 @@
+name: Hy4-preview
+org: Tencent
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/tencent/Hy4-preview/resolve/705d81ee51566a186d645b74c974d642ef2828fe/README.md, kind: model-card}
+  config: {url: https://huggingface.co/tencent/Hy4-preview/resolve/705d81ee51566a186d645b74c974d642ef2828fe/config.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/hy_v4/modeling_hy_v4.py, kind: code}
+  blog: {url: https://web.archive.org/web/20260926093529/https://www.tencent.com/tencent-releases-and-open-sources-tencent-hy4-preview/, kind: blog}
+
+not_disclosed: [params.active_non_embedding, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  enable_lm_head_fp32: not read by modeling_hy_v4.py
+  n_group: 1 group with topk_group 1, so group-limited routing is a no-op
+  topk_group: 1 of 1 group, no-op
+  num_key_value_heads: "MLA: expand_kv projects the latent to all 64 heads; only sets num_key_value_groups for repeat_kv"
+
+facts:
+  meta.released:
+    value: "2026-08-28"
+    source: blog
+    at: "tencent.com; article header"
+    quote: "Tencent Releases and Open-Sources Tencent Hy4 preview August 28, 2026"
+  meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+
+  params.total:
+    value: 770_000_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "The model comprises 770B total parameters, of which 49B are activated per token."
+  params.active:
+    value: 49_000_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "The model comprises 770B total parameters, of which 49B are activated per token."
+  params.note:
+    value: "Backbone only, excluding the MTP layer (10B total, 0.7B active)."
+    source: card
+    at: "README.md; Model Specifications"
+    quote: "The table below lists backbone parameters only, excluding the MTP layer."
+
+  shape.d_model: {value: 6144, source: config, at: "/hidden_size"}
+  shape.layers: {value: 78, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 120_832, source: config, at: "/vocab_size"}
+
+  attn.global_layers: {value: 78, source: config, at: "/layer_types | count deepseek_sparse_attention"}
+  attn.head_dim:
+    value: 256
+    source: config
+    at: "/qk_head_dim"
+    note: "qk_nope_head_dim 192 + qk_rope_head_dim 64. /head_dim=64 only sizes the rotary embedding."
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "MLA, DSA"
+    source: config
+    at: "config.json; use_dsa, use_mla"
+    quote: '"use_dsa": true, "use_mla": true'
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.layout:
+    value: "78 DSA"
+    source: config
+    at: "config.json; layer_types"
+    quote: '"layer_types": [ "deepseek_sparse_attention", "deepseek_sparse_attention",'
+    basis: inferred
+    note: "Uniform: /layer_types | count deepseek_sparse_attention = 78 = /num_hidden_layers."
+  attn.qk_norm:
+    value: false
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4Attention.forward"
+    quote: "k_pass = self.kv_a_layernorm(kv_pass).view(batch_size, 1, seq_length, self.kv_lora_rank)"
+    note: "RMSNorm only on the Q and KV latents; no per-head Q/K norm. The DSA indexer LayerNorms its key."
+  attn.indexer_dim:
+    value: 128
+    source: config
+    at: "/index_head_dim"
+    note: "One indexer key head (HYV4Indexer.wk outputs index_head_dim); only the 21 'full' indexer layers cache it (see attn.kv_groups)."
+  attn.kv_groups:
+    value:
+      - name: MLA latent + RoPE key
+        layers: 78
+        elements: 576
+        tokens_per_entry: 1
+        note: "kv_lora_rank 512 + qk_rope_head_dim 64."
+        quote: "k_pass, k_rot = past_key_values.update(k_pass, k_rot, self.layer_idx)"
+      - name: DSA indexer key
+        layers: 21
+        elements: 128
+        tokens_per_entry: 1
+        note: "Only layers with indexer_types 'full' own an indexer; 'shared' layers reuse the previous top-k."
+        quote: "self.indexer = None if self.skip_topk else HYV4Indexer(config, layer_idx)"
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4Attention.__init__, HYV4Attention.forward"
+  attn.q_lora_rank: {value: 2048, source: config, at: "/q_lora_rank"}
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta: {value: 10_000_000, source: config, at: "/rope_parameters/rope_theta"}
+  attn.position:
+    value: "partial RoPE (MLA decoupled, 64 of 256 QK dims)"
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4Attention.forward"
+    quote: "q_pass, q_rot = torch.split(q_states, [self.qk_nope_head_dim, self.qk_rope_head_dim], dim=-1)"
+  attn.gate:
+    value: "elementwise sigmoid gate computed from the block input, before o_proj"
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4Attention.forward"
+    quote: "attn_output = attn_output * torch.sigmoid(gate_states)"
+    note: "Config /gated_mla true, /gating_type elementwise."
+  attn.sparse:
+    value: "DSA indexer (32 heads × 128, top-2048); IndexCache: 21 layers run the indexer, 57 reuse the previous indexer layer's top-k"
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "(Gated DSA) with [IndexCache](https://arxiv.org/abs/2603.12201) for cross-layer sparse index reuse"
+    note: "Indexer dims from the card table (config /index_n_heads, /index_head_dim, /index_topk); layer split from config /indexer_types (21 full, 57 shared)."
+  attn.v_head_dim: {value: 256, source: config, at: "/v_head_dim"}
+  attn.sinks:
+    value: "learned per-head sink logit, all 78 layers"
+    source: config
+    at: "config.json; learnable_sink"
+    quote: '"learnable_sink": true, "learnable_sink_init": 0.0'
+    note: "modeling_hy_v4.py HYV4Attention holds one sink per head and concatenates it to the attention logits before softmax."
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4MLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is config /hidden_act silu; routed experts compute F.silu(gate) * up."
+  ffn.dim: {value: 18432, source: config, at: "/intermediate_size"}
+  ffn.clamp:
+    value: "SwiGLU limit 10 (gate ≤ 10, up in [-10, 10]), routed experts only"
+    source: config
+    at: "config.json; swiglu_limit"
+    quote: '"swiglu_limit": 10.0'
+    note: "Clamp applied in modeling_hy_v4.py HYV4Experts._apply_gate; HYV4MLP has none."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Routed experts (HYV4Experts) hold only gate_up_proj and down_proj weights."
+
+  moe.dense_layers: {value: 1, source: config, at: "/mlp_layer_types | count dense"}
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/n_routed_experts"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim:
+    value: 2048
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4MoE.__init__"
+    quote: "intermediate_size=config.moe_intermediate_size * config.n_shared_experts"
+    basis: inferred
+    note: "moe_intermediate_size 2048 × n_shared_experts 1 (config)."
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+  moe.balancing:
+    value: "expert bias added to selection scores (e_score_correction_bias); update rule and any aux loss not disclosed"
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4TopkRouter.forward"
+    quote: "scores_for_choice = scores + self.e_score_correction_bias"
+  moe.routed_scale: {value: 2.827, source: config, at: "/routed_scaling_factor"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.router:
+    value: sigmoid
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4TopkRouter.forward"
+    quote: "scores = router_logits.sigmoid()"
+
+  mtp.released:
+    value: true
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "1 native MTP layer (10B total parameters, 0.7B activated) is built in for speculative decoding."
+    note: "Config /num_nextn_predict_layers 1; config mtp_loss_factor 0.1 is not read by modeling_hy_v4.py, and the training stage of the MTP layer is not stated."
+
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+    note: "Pre-norm on the hyper-connection-mixed input (see norm.residual)."
+  norm.residual:
+    value: "iHC (identity Hyper-Connections), 4 streams: per sublayer, input-dependent sigmoid read weights and 2·sigmoid write weights, identity stream mixing (no Sinkhorn); streams merged by a sigmoid-weighted sum before the final norm"
+    source: card
+    at: "README.md; Model Specifications"
+    quote: "Residual Streams | 4"
+    note: "Card: 'The residual pathway uses iHC (identity Hyper-Connections)'. Details from modeling_hy_v4.py HYV4HyperConnection / HYV4HyperHead and config /enable_ihc, /hc_mult 4, /hc_magnitude 2.0, /hc_eps 1e-6 (added to the sigmoid weights)."
+  norm.eps: {value: 1.0e-5, source: config, at: "/rms_norm_eps"}
+  norm.type:
+    value: RMSNorm
+    source: hf-transformers
+    at: "modeling_hy_v4.py; HYV4DecoderLayer.__init__"
+    quote: "self.input_layernorm = HYV4RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+
+  ctx.max:
+    value: 1_048_576
+    source: config
+    at: "/max_position_embeddings"
+    note: "Card table: Context Length 1M."

@@ -1,0 +1,331 @@
+name: MiniMax-M1
+org: MiniMax
+kind: reasoning
+note: "No base checkpoint is public; facts describe MiniMax-M1-80k (MiniMax-M1-40k is an intermediate checkpoint of the same run)."
+
+sources:
+  card: {url: https://huggingface.co/MiniMaxAI/MiniMax-M1-80k/resolve/8d1494b1a260e22040d5b9b2eb332eb44500b34d/README.md, kind: model-card}
+  config: {url: https://huggingface.co/MiniMaxAI/MiniMax-M1-80k/resolve/8d1494b1a260e22040d5b9b2eb332eb44500b34d/config.json, kind: config}
+  modeling_minimax_m1: {url: https://huggingface.co/MiniMaxAI/MiniMax-M1-80k/resolve/8d1494b1a260e22040d5b9b2eb332eb44500b34d/modeling_minimax_m1.py, kind: code}
+  m1-report: {url: https://arxiv.org/pdf/2506.13585v1, kind: paper}
+  text01-report: {url: https://arxiv.org/pdf/2501.08313v1, kind: paper}
+
+not_disclosed:
+  - mtp.depth
+  - train.tokens
+  - train.grad_clip
+  - train.precision
+  - params.active_non_embedding
+
+config_unused:
+  max_position_embeddings: "length of the RoPE cos/sin cache built by MiniMaxM1RotaryEmbedding, not a trained or supported length"
+  shared_moe_mode: "not read by modeling_minimax_m1.py; the shared-MLP path is disabled by shared_intermediate_size 0"
+
+facts:
+  meta.released:
+    value: "2025-06-16"
+    source: m1-report
+    at: "p.1 arXiv stamp"
+    quote: "arXiv:2506.13585v1 [cs.CL] 16 Jun 2025"
+    note: "arXiv v1 date; MiniMax's M1 news page (minimax.io/news/minimaxm1) is dated the same day."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; front matter"
+    quote: "license: apache-2.0"
+
+  params.total:
+    value: 456_000_000_000
+    source: card
+    at: "README.md; 1. Model Overview"
+    quote: "which contains a total of 456 billion parameters with 45.9 billion parameters activated"
+  params.active:
+    value: 45_900_000_000
+    source: card
+    at: "README.md; 1. Model Overview"
+    quote: "which contains a total of 456 billion parameters with 45.9 billion parameters activated"
+  params.note:
+    value: "Counts are those of MiniMax-Text-01, on which M1 is built; embedding scope not stated."
+    source: card
+    at: "README.md; 1. Model Overview"
+    quote: "The model is developed based on our previous"
+
+  shape.layers: {value: 80, source: config, at: "/num_hidden_layers"}
+  shape.d_model: {value: 6144, source: config, at: "/hidden_size"}
+  shape.vocab: {value: 200_064, source: config, at: "/vocab_size"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "byte-level BPE, 200K vocab (MiniMax-Text-01 tokenizer)"
+    source: text01-report
+    at: "p.22 §4.1.2"
+    quote: "The resulting vocabulary size is set to 200K"
+
+  attn.kind:
+    value: "Lightning, GQA"
+    source: m1-report
+    at: "p.2 §1"
+    quote: "a transformer block with softmax attention follows every seven transnormer blocks"
+    note: "Transnormer blocks use Lightning attention (linear); the softmax blocks use GQA."
+  attn.layout:
+    value: "7 Lightning : 1 GQA"
+    source: config
+    at: "config.json attn_type_list"
+    quote: "\"attn_type_list\": [ 0, 0, 0, 0, 0, 0, 0, 1, 0,"
+    note: "Repeats 10 times; layer 79 is the last softmax layer."
+  attn.global_layers:
+    value: 10
+    source: config
+    at: "/attn_type_list | count 1"
+    note: "1 = softmax attention (MiniMaxM1FlashAttention2), 0 = Lightning attention (MiniMaxM1Model.__init__)."
+  attn.linear_layers: {value: 70, source: config, at: "/attn_type_list | count 0"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.position:
+    value: "partial RoPE (softmax layers); Lightning layers use a fixed per-head decay, no RoPE"
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1Attention.__init__"
+    quote: "self.rotary_dim = getattr(config, 'rotary_dim', self.head_dim)"
+    note: "/rotary_dim 64 of /head_dim 128."
+  attn.rope_fraction:
+    value: 0.5
+    source: text01-report
+    at: "p.4 §2"
+    quote: "is applied to half of the attention"
+    note: "Softmax layers only."
+  attn.rope_theta:
+    value: 10_000_000
+    source: config
+    at: "/rope_theta"
+    note: "Base 10,000 in pretraining (p.4 §2), 5M at the 128K stage and 10M from the 512K stage (Table 6)."
+  attn.qk_norm:
+    value: false
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1Attention.forward"
+    quote: "attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)"
+  attn.bias:
+    value: false
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1Attention.__init__"
+    quote: "self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias=False)"
+    note: "Lightning qkv_proj, output_gate and out_proj are also bias-free."
+  attn.gate:
+    value: "sigmoid gate on the Lightning-layer output, after the output RMSNorm, before out_proj; none in softmax layers"
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1LightningAttention.inference"
+    quote: "output = F.sigmoid(self.output_gate(x)) * output"
+  attn.linear_kind:
+    value: "Lightning attention: SiLU on Q, K, V; per-head exponential decay (ALiBi-style slopes, scaled down linearly with depth); RMSNorm on output; 128×128 state per head"
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1LightningAttention.inference"
+    quote: "qkv = self.act(self.qkv_proj(x))"
+    note: "act is /hidden_act silu; slopes from MiniMaxM1Model._build_slope_tensor times (1 - idx/(L-1) + 1e-5) in MiniMaxM1Model.forward."
+  attn.linear_heads:
+    value: 64
+    source: config
+    at: "/num_attention_heads"
+    note: "MiniMaxM1LightningAttention reads num_attention_heads and head_dim, as the softmax layers do."
+  attn.linear_head_dim: {value: 128, source: config, at: "/head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1BlockSparseTop2MLP.forward"
+    quote: "current_hidden_states = self.act_fn(self.w1(hidden_states)) * self.w3(hidden_states)"
+    note: "act_fn is SiLU (/hidden_act)."
+  ffn.bias:
+    value: false
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1BlockSparseTop2MLP.__init__"
+    quote: "self.w1 = nn.Linear(self.hidden_dim, self.ffn_dim, bias=False)"
+
+  moe.experts: {value: 32, source: config, at: "/num_local_experts"}
+  moe.top_k: {value: 2, source: config, at: "/num_experts_per_tok"}
+  moe.shared:
+    value: 0
+    source: config
+    at: "/shared_intermediate_size"
+    note: "shared_intermediate_size 0 disables the shared MLP in MiniMaxM1DecoderLayer."
+  moe.expert_dim: {value: 9216, source: config, at: "/intermediate_size"}
+  moe.dense_layers:
+    value: 0
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1DecoderLayer.__init__"
+    quote: "self.block_sparse_moe = MiniMaxM1SparseMoeBlock(config)"
+    note: "Every decoder layer is MoE."
+  moe.router:
+    value: softmax
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1SparseMoeBlock.forward"
+    quote: "routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)"
+  moe.norm_topk:
+    value: true
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1SparseMoeBlock.forward"
+    quote: "routing_weights /= routing_weights.sum(dim=-1, keepdim=True)"
+  moe.balancing:
+    value: "GShard auxiliary loss (coefficient 0.01 for Text-01, lowered in M1 continued pretraining) + global router synchronizing token counts across EP groups"
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "loss coefficient is set to 0.01."
+    note: "Global router: p.5 §2.1; M1 decrease: M1 report p.3 §2.1, value not given."
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1DecoderLayer.__init__"
+    quote: "self.input_layernorm = MiniMaxM1RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.placement:
+    value: post
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1DecoderLayer.forward"
+    quote: "if self.postnorm: residual = hidden_states"
+    note: "/postnorm true: the normed input also replaces the residual, so each block computes α·Norm(x) + F(Norm(x)) (DeepNorm)."
+  norm.residual:
+    value: "DeepNorm: residual × α = (2N)^0.25 = 3.5566 (N = 80), branch × β = 1"
+    source: modeling_minimax_m1
+    at: "modeling_minimax_m1.py; MiniMaxM1DecoderLayer.forward"
+    quote: "hidden_states = residual * self.layernorm_attention_alpha"
+    note: "/layernorm_full_attention_alpha, /layernorm_linear_attention_alpha, /layernorm_mlp_alpha 3.5565588200778455; /layernorm_full_attention_beta, /layernorm_linear_attention_beta, /layernorm_mlp_beta 1.0."
+  norm.eps:
+    value: 1e-5
+    source: config
+    at: "/rms_norm_eps"
+    note: "The Lightning output RMSNorm uses the class default 1e-6."
+
+  ctx.pretrain:
+    value: 8192
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "The training sequence length is 8192"
+  ctx.final:
+    value: 1_000_000
+    source: m1-report
+    at: "p.3 §2.1"
+    quote: "ultimately extending the training context to 1M tokens"
+  ctx.max:
+    value: 1_000_000
+    source: card
+    at: "README.md; 1. Model Overview"
+    quote: "the M1 model natively supports a context length of 1 million tokens"
+  ctx.extension:
+    value: "Text-01: 8K → 128K (RoPE base 5M, 300B tokens) → 512K (10M, 32B) → 1M (10M, 26B); M1 continued pretraining: four stages from 32K to 1M"
+    source: m1-report
+    at: "p.3 §2.1"
+    quote: "adapting a smoother extension of context length across four stages"
+    note: "Text-01 stages: report p.25 Table 6."
+
+  train.optimizer:
+    value: AdamW
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "We employ the AdamW optimizer"
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "β1 = 0.9, β2 = 0.95, and the weight decay is set to 0.1"
+  train.weight_decay:
+    value: 0.1
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "β1 = 0.9, β2 = 0.95, and the weight decay is set to 0.1"
+  train.lr_peak:
+    value: 2e-4
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "value of 2 × 10−4 , followed by training with a"
+    note: "Text-01 initial pretraining; M1 continued pretraining used a constant 8e-5."
+  train.lr_min:
+    value: 3e-5
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "rate to 3 × 10−5"
+    note: "End of the Text-01 initial-pretraining fast-decay phase (the stage of train.lr_peak); M1 continued pretraining then ran 8e-5 decaying to 8e-6."
+  train.warmup:
+    value: "500 iterations"
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "linear warm-up over 500 iterations to a peak"
+  train.schedule:
+    value: "Text-01: 500-iter warmup, constant 2e-4 for 7.2T tokens, 1.3e-4 for the remaining 3.2T, exponential decay to 3e-5 over 1T; M1: constant 8e-5 for 2.5T, decay to 8e-6 over 5T"
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "constant learning rate for 7.2T tokens"
+    note: "The report does not say whether the 3.2T at 1.3e-4 is part of the 7.2T. M1 part: M1 report p.3 §2.1."
+  train.batch:
+    value: "16M → 32M (at 69B tokens) → 64M (790B) → 128M tokens (4.7T), then constant"
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "the batch size is progressively scaled from an initial size of 16M to 32M at 69B tokens, to 64M at 790B tokens, and finally to 128M at 4.7T tokens"
+    note: "Doubled when the loss reaches a fitted critical-batch-size threshold (Figure 13)."
+  train.batch_tokens:
+    value: 128_000_000
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "and finally to 128M at 4.7T tokens, where it remains until the end of training"
+    note: "Text-01 initial pretraining after the 16M → 128M ramp; M1 continued-pretraining batch not stated."
+  train.init:
+    value: "Xavier; DeepNorm α = (2N)^0.25, β = (8N)^-0.25"
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "We initialize all model parameters using the Xavier initialization method"
+  train.stability:
+    value: "LR cut from 2e-4 to 1.3e-4 after anomalous gradient norms; M1 context extension spread over four stages after gradient explosions with aggressive extension"
+    source: text01-report
+    at: "p.24 §4.2"
+    quote: "lr to 1.3 × 10−4 for the remaining 3.2T"
+    note: "Context-extension instability: M1 report p.3 §2.1."
+  train.hardware:
+    value: "1500–2500 H800 GPUs (cluster size varied)"
+    source: text01-report
+    at: "p.14 §3"
+    quote: "the number of H800 GPUs ranges from 1500 to 2500"
+  train.data:
+    value: "Text-01: academic literature, books, web, code, scored by a 5B-active/60B MoE; high-quality data up to 4 epochs. M1: STEM, code, book and reasoning data raised to 70%, no synthetic data"
+    source: m1-report
+    at: "p.3 §2.1"
+    quote: "and reasoning-related data to 70%"
+    note: "Text-01 corpus: report p.21–24 §4.1."
+  train.stages:
+    value:
+      - name: Text-01 main
+        seq_len: 8192
+        lr: 2e-4
+        batch_tokens: 128_000_000
+        note: "Constant 2e-4 for 7.2T tokens, then 1.3e-4 for 3.2T; batch ramped 16M → 128M by 4.7T tokens."
+        quote: "constant learning rate for 7.2T tokens"
+      - name: Text-01 fast decay
+        tokens: 1_000_000_000_000
+        seq_len: 8192
+        batch_tokens: 128_000_000
+        note: "Exponential decay to 3e-5."
+        quote: "During the fast decay phase, we train 1T"
+      - name: Text-01 long-context 128K
+        tokens: 300_000_000_000
+        seq_len: 131_072
+        note: "RoPE base 5M; 30% short, 70% medium data."
+        quote: "128K 5M 300B"
+      - name: Text-01 long-context 512K
+        tokens: 32_000_000_000
+        seq_len: 524_288
+        note: "RoPE base 10M; 35% short, 35% medium, 30% long."
+        quote: "512K 10M 32B"
+      - name: Text-01 long-context 1M
+        tokens: 26_000_000_000
+        seq_len: 1_000_000
+        note: "RoPE base 10M; 30% short, 30% medium, 40% long."
+        quote: "1M 10M 26B"
+      - name: M1 continued pretraining
+        tokens: 7_500_000_000_000
+        lr: 8e-5
+        note: "Constant 8e-5 for 2.5T, then decay to 8e-6 over 5T; context 32K → 1M in four stages; reasoning-heavy mix (70% STEM, code, book, reasoning)."
+        quote: "we continue training the MiniMax-Text-01 model with additional 7.5T tokens"
+        source: m1-report
+    source: text01-report
+    at: "Text-01 report p.24–25 §4.2, Table 6; M1 report p.3 §2.1"
+  scaling.ladder:
+    value: "Text-01: softmax / lightning / hybrid scaling study at 70M–7B dense (≤300B tokens, 8K); size law fit on 44M–1.2B active MoE (16/32/64 experts, 500B tokens); MoE ablations at 28B-A5B (1T tokens) and 60B-A9.3B, 48 layers (500B tokens)"
+    source: text01-report
+    at: "Text-01 report p.8 §2.2.2.1, p.12–14 §2.3–2.4"
+    quote: "We train models with activation parameters ranging from 44 million to 1.2 billion across 500 billion tokens, utilizing 16, 32, and 64 experts."

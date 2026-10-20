@@ -1,0 +1,39 @@
+# Config keys that `archdb check-sources` does not require a record to account for.
+#
+# Every other key in a cited config.json with a non-empty value (not null, false, 0, "" or [])
+# must be either cited by a fact (pointer or `at`), named in a fact's note, or listed under the
+# record's `config_unused` with a reason. That catches values that were present in the config but
+# never recorded. Keys are matched on their name at any nesting depth; patterns are regular
+# expressions matched against the whole name.
+
+not_architecture:
+  reason: tokenizer ids, runtime and serving flags, dtypes, library metadata
+  keys: [
+    architectures, auto_map, model_type, transformers_version, torch_dtype, dtype, use_cache,
+    tokenizer_class, pad_token_id, bos_token_id, eos_token_id, ignore_index, num_logits_to_keep,
+    output_router_logits, pretraining_tp, use_grouped_mm, use_mamba_kernels, moe_impl, ep_size,
+    attention_dropout, hidden_dropout, embedding_dropout, output_dropout, quantization_config,
+    _debug_force_load_balance, bitwise_backward_align, attention_method, att_impl_type,
+    attention_cls, mamba_ssm_cache_dtype, mamba_ssm_dtype, scale_fmt, expert_dtype, language_model_only,
+    mtp_num_speculative_steps, initial_context_length, layer_group_size, moe_shared_expert_overlap,
+    expert_parallel, expert_model_parallel,
+    name_or_path, _name_or_path, return_dict, tie_encoder_decoder, is_encoder_decoder,
+    length_penalty, max_length, num_beam_groups, num_beams, num_return_sequences, repetition_penalty,
+    temperature, top_k, top_p, typical_p, id2label, label2id,
+  ]
+  patterns: ['.*_token_id', '.*_token_index', '.*_token', 'use_flash_.*', 'LABEL_\d+']
+
+multimodal:
+  reason: vision, audio and projector settings; archdb records the language backbone
+  patterns: [
+    'vision_.*', 'audio_.*', 'image_.*', 'video_.*', 'projector_.*', 'multimodal_.*', 'im_.*',
+'alignment_.*', 'adapter_.*', 'enable_adapter_.*', 'patch_.*', 'spatial_merge_size',
+    'max_splits_per_img', 'process_image_mode', 'understand_projector_stride', 'use_im_start_end',
+    'use_unified_vision_chunk', 'downsample_factor', 'media_placeholder.*', 'boi_.*', 'eoi_.*',
+    'boa_.*', 'eoa_.*', 'fps', 'max_frames', 'merge_size', 'temporal_.*', 'use_video_.*', 'image_grid_pinpoints', 'vision_feature_.*', 'mm_.*',
+  ]
+
+not_evidence:
+  reason: training coefficients and initializers in a config are loader defaults unless a paper states them
+  keys: [initializer_range, router_aux_loss_coef, aux_loss_alpha, seq_aux, load_balance_coeff,
+         num_reward_heads, num_noise_heads]

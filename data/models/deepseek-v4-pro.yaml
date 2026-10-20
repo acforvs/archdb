@@ -1,0 +1,364 @@
+name: DeepSeek-V4-Pro
+org: DeepSeek
+kind: reasoning
+
+sources:
+  config: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/config.json, kind: config}
+  inference-model: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/inference/model.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2606.19348v1, kind: paper}
+  weight-index: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/model.safetensors.index.json, kind: config}
+  card: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/README.md, kind: model-card}
+  announcement: {url: https://web.archive.org/web/20261017101832/https://api-docs.deepseek.com/news/news260424/, kind: blog}
+
+not_disclosed: [params.active_non_embedding, train.warmup, train.grad_clip, train.precision]
+
+facts:
+  meta.released:
+    value: "2026-04-24"
+    source: announcement
+    at: "DeepSeek API Docs news, DeepSeek-V4 Preview Release"
+    quote: "DeepSeek-V4 Preview Release 2026/04/24"
+    note: "Same post announces open weights; arXiv v1 is dated 26 Apr 2026."
+  meta.license:
+    value: mit
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: mit"
+  params.active:
+    value: 49_000_000_000
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "DeepSeek-V4-Pro comprises 1.6T total parameters, of which 49B are activated for each token."
+  params.total:
+    value: 1_600_000_000_000
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "DeepSeek-V4-Pro comprises 1.6T total parameters, of which 49B are activated for each token."
+
+  shape.d_model: {value: 7168, source: config, at: "/hidden_size"}
+  shape.layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  shape.tokenizer:
+    value: "DeepSeek-V3 byte-level BPE plus special tokens for context construction; 128K vocab"
+    source: report
+    at: "p.24 §4.1"
+    quote: "on top of the DeepSeek-V3 tokenizer, we introduce a few special tokens for context construction"
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 129_280, source: config, at: "/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.global_layers:
+    value: 61
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "For the first two layers, we use HCA. For the subsequent layers, CSA and HCA are used in an interleaved manner."
+    note: "All 61 layers are CSA or HCA; /compress_ratios has 30 × 4 and 31 × 128, plus a trailing 0 for the MTP block."
+  attn.head_dim: {value: 512, source: config, at: "/head_dim"}
+  attn.heads: {value: 128, source: config, at: "/num_attention_heads", note: "Grouped low-rank output projection: /o_groups 16 groups, /o_lora_rank 1024 each."}
+  attn.kind:
+    value: "CSA, HCA (each with a 128-token SWA branch)"
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "For the first two layers, we use HCA. For the subsequent layers, CSA and HCA are used in an interleaved manner."
+    note: "SWA branch inside CSA and HCA: p.13 §2.3.3."
+  attn.local_layers:
+    value: 0
+    source: config
+    at: "/compress_ratios/0:61 | count 0"
+    note: "No pure-SWA backbone layer; every CSA/HCA layer also attends to its own 128-token window (attn.kv_groups)."
+  attn.kv_groups:
+    value:
+      - name: CSA main KV
+        layers: 30
+        elements: 512
+        tokens_per_entry: 4
+        note: "Layers with /compress_ratios 4; one shared K=V entry of head_dim per 4 tokens."
+        quote: "kv_cache_size = args.window_size + (args.max_seq_len // self.compress_ratio if self.compress_ratio else 0)"
+      - name: CSA indexer K
+        layers: 30
+        elements: 128
+        tokens_per_entry: 4
+        note: "One index_head_dim key per compressed entry (Indexer.kv_cache)."
+        quote: 'self.register_buffer("kv_cache", torch.zeros(args.max_batch_size, args.max_seq_len // compress_ratio, self.head_dim), persistent=False)'
+      - name: HCA main KV
+        layers: 31
+        elements: 512
+        tokens_per_entry: 128
+        note: "Layers with /compress_ratios 128; no indexer."
+        quote: 'self.register_buffer("kv_cache", torch.zeros(args.max_batch_size, kv_cache_size, self.head_dim), persistent=False)'
+      - name: SWA window
+        layers: 61
+        elements: 512
+        window: 128
+        note: "Uncompressed ring buffer in every backbone layer; MTP block (pure SWA) excluded."
+        quote: "self.kv_cache[:bsz, start_pos % win] = kv.squeeze(1)"
+    source: inference-model
+    at: "inference/model.py; Attention.__init__, Attention.forward, Indexer.__init__"
+  attn.kv_heads:
+    value: 1
+    source: config
+    at: "/num_key_value_heads"
+    note: "Shared-KV MQA: one KV head serves as both key and value (p.11 §2.3.1)."
+  attn.layout:
+    value: "2 HCA, then 1 CSA : 1 HCA (30 CSA + 31 HCA)"
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "For the first two layers, we use HCA. For the subsequent layers, CSA and HCA are used in an interleaved manner."
+    note: "Counts from /compress_ratios (4 = CSA, 128 = HCA)."
+  attn.position:
+    value: "partial RoPE (last 64 dims of Q and KV entries; inverse rotation on attention output)"
+    source: report
+    at: "p.13 §2.3.3"
+    quote: "we partially employ the Rotary Positional Embedding (RoPE)"
+  attn.q_lora_rank: {value: 1536, source: config, at: "/q_lora_rank"}
+  attn.qk_norm:
+    value: true
+    source: report
+    at: "p.12 §2.3.3"
+    quote: "we perform an additional RMSNorm operation on each head of the queries and the only head of the compressed KV entries, just before the core attention operation."
+  attn.rope_fraction:
+    value: 0.125
+    basis: inferred
+    source: report
+    at: "p.13 §2.3.3"
+    quote: "we apply RoPE to its last 64 dimensions"
+    note: "64 (/qk_rope_head_dim) of 512 head dims (/head_dim)."
+  attn.rope_theta:
+    value: 160_000
+    source: config
+    at: "/compress_rope_theta"
+    note: "Compressed (CSA/HCA) layers use compress_rope_theta with YaRN (factor 16, original 65536); rope_theta=10000 without YaRN applies only to compress_ratio 0 layers, i.e. only the MTP block here (inference/model.py lines 475–479)."
+  attn.sinks:
+    value: "learnable per-head sink logit in the softmax denominator, all CSA and HCA layers"
+    source: report
+    at: "p.13 §2.3.3"
+    quote: "we set a series of learnable sink logits"
+  attn.sparse:
+    value: "CSA: lightning indexer (64 heads × 128) selects top-1024 of 4×-compressed KV entries; HCA (128×) attends densely"
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "the number of KV entries selected for sparse attention (i.e., attention top-k) to 1024"
+    note: "HCA does not employ sparse attention (p.11 §2.3.2); config /index_n_heads 64, /index_head_dim 128, /index_topk 1024."
+  attn.window: {value: 128, source: config, at: "/sliding_window"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: inference-model
+    at: "inference/model.py line 603; Expert.forward"
+    quote: "x = F.silu(gate) * up"
+    note: "config /hidden_act silu."
+  ffn.bias:
+    value: false
+    source: inference-model
+    at: "inference/model.py lines 589–594; Expert.__init__"
+    quote: "self.w1 = Linear(dim, inter_dim, dtype=dtype)"
+    note: "Linear defaults to bias=False; shared and routed experts both use Expert."
+  ffn.clamp:
+    value: "up (linear) clamped to [−10, 10], gate capped at 10; routed and shared experts in every layer"
+    source: report
+    at: "p.26 §4.2.3"
+    quote: "we clamped the linear component of SwiGLU to the range of [−10, 10], while capping the upper bound of the gate component at 10."
+    note: "Applied throughout the training of both V4 models; inference code applies the same clamp (Expert.forward, /swiglu_limit 10)."
+
+  moe.balancing:
+    value: "aux-loss-free bias (update speed 0.001) + sequence-wise loss 1e-4; no node-limited routing"
+    source: report
+    at: "p.26 §4.2.2"
+    quote: "For auxiliary-loss-free load balancing, we set the bias update speed to 0.001. For the balance loss, we set its loss weight to 0.0001 to avoid extreme imbalance within single sequences."
+    note: "Node limit removed: p.7 §2.1. Bias enters top-k selection only (/topk_method noaux_tc)."
+  moe.dense_layers:
+    value: 0
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "We employ MoE layers in all Transformer blocks, but use the Hash routing strategy for the first 3 MoE layers."
+  moe.expert_dim: {value: 3072, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 384, source: config, at: "/n_routed_experts"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/routed_scaling_factor"}
+  moe.router:
+    value: "sqrt(softplus); hash on token ID (first 3 MoE layers)"
+    source: report
+    at: "p.7 §2.1"
+    quote: "we change the activation function that computes the affinity scores from Sigmoid(·) into Sqrt(Softplus(·))."
+    note: "Hash routing for the first 3 MoE layers: p.25 §4.2.1 (/num_hash_layers 3); /scoring_func sqrtsoftplus."
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim:
+    value: 3072
+    source: config
+    at: "/moe_intermediate_size"
+    note: "1 shared expert (/n_shared_experts) of the routed-expert width."
+  moe.top_k: {value: 6, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 1
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "The multi-token prediction depth is set to 1."
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/num_nextn_predict_layers"
+  mtp.block:
+    value: "e_proj(RMSNorm(Emb(t_{i+1}))) + h_proj(RMSNorm(h)), then one block with 128-token pure-SWA attention and MoE FFN inside mHC, own mHC head and final norm"
+    source: inference-model
+    at: "inference/model.py; MTPBlock.forward"
+    quote: "x = self.e_proj(e).unsqueeze(2) + self.h_proj(x)"
+    note: "Attention is SWA-only because the MTP entry of /compress_ratios is 0; the report states the MTP configuration is identical to DeepSeek-V3 (p.7 §2)."
+  mtp.ffn:
+    value: MoE
+    source: inference-model
+    at: "inference/model.py; MTPBlock, Block.__init__"
+    quote: "class MTPBlock(Block):"
+    note: "Block builds self.ffn = MoE(layer_id, args); weight index has mtp.0.ffn.experts.*."
+  mtp.shares_embedding:
+    value: true
+    source: inference-model
+    at: "inference/model.py; Transformer.__init__"
+    quote: "self.mtp[-1].embed = self.embed"
+    note: "Output head shared as well (self.mtp[-1].head = self.head)."
+  mtp.loss_weight:
+    value: "0.3, reduced to 0.1 at the start of LR decay"
+    source: report
+    at: "p.26 §4.2.2"
+    quote: "The MTP loss weight is set to 0.3 for most of the training, and to 0.1 upon the start of learning rate decay."
+  mtp.released:
+    value: true
+    source: weight-index
+    at: "model.safetensors.index.json; weight_map mtp.0.*"
+    quote: "\"mtp.0.hc_head_base\""
+
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: inference-model
+    at: "inference/model.py lines 688–700; Block.forward"
+    quote: "x = self.attn_norm(x)"
+    note: "Sublayers sit inside manifold-constrained hyper-connections (hc_pre/hc_post), expansion 4."
+  norm.type:
+    value: RMSNorm
+    source: inference-model
+    at: "inference/model.py lines 658–659; Block.__init__"
+    quote: "self.attn_norm = RMSNorm(args.dim, self.norm_eps)"
+  norm.residual:
+    value: "mHC: 4 residual streams, residual mixing projected to doubly stochastic by Sinkhorn-Knopp (20 iterations), sigmoid-bounded input/output maps"
+    source: report
+    at: "p.25 §4.2.1"
+    quote: "As for mHC, the expansion factor 𝑛hc is set to 4, and the number of Sinkhorn-Knopp iterations 𝑡max is set to 20."
+    note: "mHC design: p.7–8 §2.2. config /hc_mult 4, /hc_sinkhorn_iters 20, /hc_eps 1e-6."
+
+  ctx.extension:
+    value: "4K → 16K → 64K → 1M during pretraining; compressed layers use YaRN (factor 16, original 65536)"
+    source: report
+    at: "p.25–26 §4.2.2"
+    quote: "extended to 16K, 64K, and 1M."
+    note: "config /rope_scaling: type yarn, factor 16, beta_fast 32, beta_slow 1, original_max_position_embeddings 65536."
+  ctx.final:
+    value: 1_048_576
+    source: report
+    at: "p.26 §4.2.2"
+    quote: "extended to 16K, 64K, and 1M."
+  ctx.max: {value: 1_048_576, source: config, at: "/max_position_embeddings"}
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "The training also starts with a sequence length of 4K"
+    note: "First stage; token split across the 4K/16K/64K/1M stages is not disclosed."
+
+  train.batch:
+    value: "ramped to a maximum of 94.4M tokens"
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "with the maximum batch size being 94.4M tokens"
+  train.batch_tokens:
+    value: 94_400_000
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "with the maximum batch size being 94.4M tokens"
+    note: "Maximum after the batch-size ramp; ramp length not disclosed."
+  train.betas:
+    value: "(0.9, 0.95)"
+    basis: inferred
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "The hyper-parameters of AdamW and Muon are the same as those of DeepSeek-V4-Flash."
+    note: "Flash AdamW: β1 = 0.9, β2 = 0.95, ε = 1e-20 (same page)."
+  train.lr_min:
+    value: 2e-5
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "the end learning rate is set to 2.0 × 10−5"
+  train.lr_peak:
+    value: 2e-4
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "the peak learning rate is set to 2.0 × 10−4"
+  train.optimizer:
+    value: "Muon + AdamW (AdamW for embedding, prediction head and RMSNorm weights)"
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "We employ the Muon optimizer for the majority of parameters, but use the AdamW optimizer for the embedding module, the prediction head module, and the weights of all RMSNorm modules."
+    note: "Muon hyper-parameters as Flash: momentum 0.95, weight decay 0.1, update RMS rescaled to 0.18."
+  train.schedule:
+    value: "largely as Flash: linear warmup, constant 2.0e-4 for most of training, cosine decay to 2.0e-5 near the end"
+    basis: inferred
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "The learning rate scheduling strategy is largely the same as that of DeepSeek-V4-Flash"
+    note: "Shape from the Flash paragraph (same page), which the Pro paragraph says is largely shared; Pro's peak and end LR are stated in the Pro paragraph."
+  train.stages:
+    value:
+      - name: context-4096
+        seq_len: 4096
+        note: "Starts with dense attention, a longer dense stage than Flash's 1T tokens."
+        quote: "The training also starts with a sequence length of 4K"
+      - name: context-16384
+        seq_len: 16384
+        quote: "extended to 16K, 64K, and 1M."
+      - name: context-65536
+        seq_len: 65536
+        quote: "extended to 16K, 64K, and 1M."
+      - name: context-1048576
+        seq_len: 1_048_576
+        quote: "extended to 16K, 64K, and 1M."
+    source: report
+    at: "p.25–26 §4.2.2"
+  train.tokens:
+    value: 33_000_000_000_000
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "We train DeepSeek-V4-Pro on 33T tokens"
+  train.weight_decay:
+    value: 0.1
+    basis: inferred
+    source: report
+    at: "p.25 §4.2.2"
+    quote: "The hyper-parameters of AdamW and Muon are the same as those of DeepSeek-V4-Flash."
+    note: "Flash: AdamW and Muon weight decay 0.1 (same page)."
+  train.data:
+    value: ">32T tokens: math, code, web, long documents (scientific papers, technical reports), larger multilingual corpus; agentic data added in mid-training"
+    source: report
+    at: "p.24 §4.1"
+    quote: "our pre-training corpus comprises more than 32T tokens, containing mathematical contents, codes, web pages, long documents, and other high-quality categories."
+  train.masking:
+    value: "sample-level attention masking within packed sequences"
+    source: report
+    at: "p.24 §4.1"
+    quote: "Different from DeepSeek-V3, we employ sample-level attention masking during pre-training."
+  train.objective:
+    value: "FIM, strategy inherited from DeepSeek-V3"
+    source: report
+    at: "p.24 §4.1"
+    quote: "We also inherit the token-splitting (DeepSeek-AI, 2024) and Fill-in-Middle (FIM) (DeepSeek-AI, 2024) strategies from DeepSeek-V3."
+    note: "The FIM rate is not restated for V4."
+  train.stability:
+    value: "Anticipatory Routing (routing indices computed with parameters from Δt steps earlier), auto-triggered with a short rollback on loss spikes; SwiGLU clamping"
+    source: report
+    at: "p.26 §4.2.3"
+    quote: "we introduced an automatic detection mechanism that triggers a short rollback and activates Anticipatory Routing exclusively when a loss spike occurs"
+    note: "SwiGLU clamp values under ffn.clamp."
+  scaling.hp_rule:
+    value: "AdamW hyper-parameters reused for Muon by rescaling the update RMS"
+    source: report
+    at: "p.14 §2.4"
+    quote: "rescale the Root Mean Square (RMS) of the update matrix for reutilization of our AdamW hyper-parameters"
+    note: "Update RMS 0.18 (p.25 §4.2.2)."

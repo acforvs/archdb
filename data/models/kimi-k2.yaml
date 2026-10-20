@@ -1,0 +1,286 @@
+name: Kimi-K2-Base
+org: Moonshot AI
+kind: base
+
+sources:
+  config: {url: https://huggingface.co/moonshotai/Kimi-K2-Base/resolve/ce72df012259dcc55d945e890f815fe7ef69159c/config.json, kind: config}
+  modeling_deepseek: {url: https://huggingface.co/moonshotai/Kimi-K2-Base/resolve/ce72df012259dcc55d945e890f815fe7ef69159c/modeling_deepseek.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2507.20534v1, kind: paper}
+  k3_report: {url: https://raw.githubusercontent.com/MoonshotAI/Kimi-K3/3cb39dfd32e51c3328e2e4b4af21341247d06c43/k3_tech_report.pdf, kind: paper}
+  blog: {url: https://web.archive.org/web/20260817080036/https://www.kimi.com/blog/, kind: blog}
+  card: {url: https://huggingface.co/moonshotai/Kimi-K2-Base/resolve/ce72df012259dcc55d945e890f815fe7ef69159c/README.md, kind: model-card}
+  weight-index: {url: https://huggingface.co/moonshotai/Kimi-K2-Base/resolve/ce72df012259dcc55d945e890f815fe7ef69159c/model.safetensors.index.json, kind: config}
+
+not_disclosed: [params.active_non_embedding, mtp.block, mtp.ffn, mtp.shares_embedding, mtp.loss_weight, train.betas, train.grad_clip]
+
+config_unused:
+  num_key_value_heads: "not read by DeepseekV3Attention (MLA)"
+
+facts:
+  meta.released:
+    value: "2025-07-11"
+    source: blog
+    at: "kimi.com blog index (Wayback 2026-08-17); Kimi K2 entry"
+    quote: "Kimi K2 2025-07-11"
+  meta.license:
+    value: "other (modified-mit)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: modified-mit"
+
+  params.active:
+    value: 32_600_000_000
+    source: report
+    at: "p.6 §2.3, Table 2"
+    quote: "Activated Parameters 37B 32.6B"
+    note: "Abstract and card round to 32B."
+  params.note:
+    value: "Table 2 figures; abstract rounds to 1T total / 32B active."
+    source: report
+    at: "p.1 Abstract"
+    quote: "32 billion activated parameters and 1 trillion total parameters"
+  params.total:
+    value: 1_040_000_000_000
+    source: report
+    at: "p.6 §2.3, Table 2"
+    quote: "Kimi K2 is a 1.04 trillion-parameter Mixture-of-Experts (MoE) transformer model"
+    note: "Abstract and card round to 1T."
+
+  shape.d_model: {value: 7168, source: config, at: "/hidden_size"}
+  shape.layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 163_840, source: config, at: "/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.global_layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  attn.head_dim: {value: 192, source: config, at: "/qk_nope_head_dim + /qk_rope_head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: MLA
+    source: report
+    at: "p.6 §2.3"
+    quote: "employing Multi-head Latent Attention (MLA) [44] as the attention mechanism"
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.layout:
+    value: "61 MLA"
+    source: report
+    at: "p.6 §2.3, Table 2"
+    quote: "#Layers 61 61"
+  attn.position:
+    value: "partial RoPE (MLA decoupled, 64 of 192 QK dims)"
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3Attention.forward"
+    quote: "q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)"
+  attn.q_lora_rank: {value: 1536, source: config, at: "/q_lora_rank"}
+  attn.qk_norm:
+    value: false
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3Attention.forward"
+    quote: "torch.matmul(query_states, key_states.transpose(2, 3)) * self.softmax_scale"
+    note: "RMSNorm only on the Q and KV latents before up-projection; no per-head Q/K norm. Training bounded logits with QK-Clip weight clipping instead (see train.optimizer)."
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta: {value: 50000, source: config, at: "/rope_theta"}
+  attn.v_head_dim: {value: 128, source: config, at: "/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3MLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU (config hidden_act)."
+  ffn.bias:
+    value: false
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 18432, source: config, at: "/intermediate_size"}
+
+  moe.dense_layers:
+    value: 1
+    source: report
+    at: "p.6 §2.3, Table 2"
+    quote: "Number of Dense Layers 3 1"
+    note: "config first_k_dense_replace = 1, moe_layer_freq = 1."
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 384, source: config, at: "/n_routed_experts"}
+  moe.balancing:
+    value: "aux-loss-free selection bias (e_score_correction_bias added to sigmoid scores for top-k only)"
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; MoEGate.forward"
+    quote: "scores_for_choice = scores.view(bsz * seq_len, -1) + self.e_score_correction_bias.unsqueeze(0)"
+    note: "config topk_method = noaux_tc; the K2 report does not describe the bias update rule or any auxiliary loss."
+  moe.groups:
+    value: "none"
+    source: report
+    at: "p.6 §2.3, Table 2"
+    quote: "Expert Grouping Yes No"
+    note: "DeepSeek-V3 column says Yes, Kimi K2 says No; config n_group = topk_group = 1."
+  moe.norm_topk:
+    value: true
+    source: config
+    at: "/norm_topk_prob"
+    note: "Applied in MoEGate.forward before the routed scaling factor."
+  moe.routed_scale:
+    value: 2.827
+    source: config
+    at: "/routed_scaling_factor"
+    note: "MoEGate.forward multiplies the renormalized top-k weights by it."
+  moe.router: {value: sigmoid, source: config, at: "/scoring_func"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim:
+    value: 2048
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3MoE.__init__"
+    quote: "intermediate_size = config.moe_intermediate_size * config.n_shared_experts"
+    basis: inferred
+    note: "2048 × 1 shared expert."
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 1
+    source: k3_report
+    at: "K3 report p.11 §3.2, Table 1 (Kimi K2 column)"
+    quote: "Number of MTP Layers 1 layer 1 layer"
+    note: "The K2 report does not mention MTP."
+  mtp.modules:
+    value: 1
+    source: k3_report
+    at: "K3 report p.11 §3.2, Table 1 (Kimi K2 column)"
+    quote: "Number of MTP Layers 1 layer 1 layer"
+
+  mtp.released:
+    value: false
+    source: weight-index
+    at: "/weight_map | has eh_proj"
+    note: "Backbone layers 0–60 only; config /num_nextn_predict_layers 0."
+
+  norm.eps: {value: 1.0e-6, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling_deepseek
+    at: "modeling_deepseek.py; DeepseekV3DecoderLayer.__init__"
+    quote: "self.input_layernorm = DeepseekV3RMSNorm("
+
+  ctx.extension:
+    value: "4K → 32K (60B tokens), then YaRN to 128K"
+    source: report
+    at: "p.9 §2.5"
+    quote: "followed by an additional 60 billion tokens with a 32k sequence length. To extend the context window to 128k, we employed the YaRN method [55]."
+    note: "Release rope_scaling: type yarn, factor 32 over original_max_position_embeddings 4096, beta_fast = beta_slow = 1, mscale = mscale_all_dim = 1 (softmax scale × (0.1·ln 32 + 1)² in DeepseekV3Attention)."
+  ctx.final:
+    value: 32768
+    source: report
+    at: "p.9 §2.5"
+    quote: "followed by an additional 60 billion tokens with a 32k sequence length"
+    note: "Longest length the K2 report states was trained; 128K is reached by YaRN. The K3 report (Table 1) lists K2 training context as 128K."
+  ctx.max:
+    value: 131_072
+    source: report
+    at: "p.9 §2.5"
+    quote: "To extend the context window to 128k, we employed the YaRN method"
+    note: "config max_position_embeddings = 131072."
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.9 §2.5"
+    quote: "We pre-trained the model with a 4,096-token context window"
+
+  train.batch:
+    value: "67M tokens, constant"
+    source: report
+    at: "p.9 §2.5"
+    quote: "the global batch size was held at 67M tokens."
+  train.batch_tokens:
+    value: 67_000_000
+    source: report
+    at: "p.9 §2.5"
+    quote: "the global batch size was held at 67M tokens."
+  train.data:
+    value: "15.5T tokens of Web Text, Code, Mathematics, Knowledge; knowledge corpora rephrased by LLM (each at most twice), math rewritten as learning notes and translated to English"
+    source: report
+    at: "p.5–6 §2.2"
+    quote: "We extended this method to other large-scale knowledge corpora and observed similarly encouraging results, and each corpora is rephrased at most twice."
+    note: "Domains: p.6 §2.2 \"Pre-training Data Overall\"; math rewriting follows SwallowMath."
+  train.hardware:
+    value: "NVIDIA H800, 8 GPUs per node, 8×400 Gbps RoCE between nodes"
+    source: report
+    at: "p.7 §2.4.1"
+    quote: "Kimi K2 was trained on a cluster equipped with NVIDIA H800 GPUs."
+  train.lr_min:
+    value: 7e-6
+    source: report
+    at: "p.9 §2.5"
+    quote: "the learning rate was decayed from 2e-5 to 7e-6."
+  train.lr_peak:
+    value: 2e-4
+    source: report
+    at: "p.9 §2.5"
+    quote: "The first 10T tokens were trained with a constant learning rate of 2e-4 after a 500-step warm-up, followed by 5.5T tokens with a cosine decay from 2e-4 to 2e-5."
+  train.optimizer:
+    value: "MuonClip (Muon + weight decay + RMS matching + QK-Clip, τ=100)"
+    source: report
+    at: "p.4 §2.1"
+    quote: "we train Kimi K2, a large-scale MoE model, using MuonClip with τ = 100"
+  train.precision:
+    value: "No FP8 compute; MoE up-projection and SwiGLU inputs stored as FP8-E4M3 (1×128 tiles, FP32 scales)"
+    source: report
+    at: "p.8 §2.4.3"
+    quote: "Inputs of MoE up-projections and SwiGLU are compressed to FP8-E4M3 in 1× 128 tiles with FP32 scales. Small-scale experiments show no measurable loss increase. Due to potential risks of performance degradation that we observed during preliminary study, we do not apply FP8 in computation."
+  train.schedule:
+    value: "WSD: 500-step warmup, constant 2e-4 for 10T, cosine to 2e-5 over 5.5T, then 2e-5 → 7e-6 over the 400B (4K) + 60B (32K) annealing/long-context phase"
+    source: report
+    at: "p.9 §2.5"
+    quote: "the WSD learning rate schedule [25], processing a total of 15.5T tokens."
+  train.stability:
+    value: "QK-Clip (MuonClip), τ=100, per head; MLA: head-specific q/k content weights × √γ, q rope weights × γ, shared k rope untouched; 12.7% of heads triggered at least once in the first 70k steps, inactive afterwards"
+    source: report
+    at: "p.30 App. D"
+    quote: "Initial 70000 steps: 12.7% of attention heads triggered QK-Clip for at least once, clamping Smax to 100."
+    note: "Per-head weight rescaling is Algorithm 1 (p.4 §2.1); no loss spikes over the run (Figure 3)."
+  train.stages:
+    value:
+      - name: main
+        tokens: 15_500_000_000_000
+        seq_len: 4096
+        lr: 2.0e-4
+        note: "Constant 2e-4 for 10T tokens, then cosine to 2e-5 over 5.5T."
+        quote: "The first 10T tokens were trained with a constant learning rate of 2e-4 after a 500-step warm-up, followed by 5.5T tokens with a cosine decay from 2e-4 to 2e-5."
+      - name: anneal
+        tokens: 400_000_000_000
+        seq_len: 4096
+        lr: 2.0e-5
+        note: "LR decays from 2e-5 to 7e-6 across the anneal and long-context stages."
+        quote: "the model was trained on 400 billion tokens with a 4k sequence length"
+      - name: long-context
+        tokens: 60_000_000_000
+        seq_len: 32768
+        quote: "followed by an additional 60 billion tokens with a 32k sequence length"
+    source: report
+    at: "p.9 §2.5"
+  train.tokens:
+    value: 15_500_000_000_000
+    source: report
+    at: "p.9 §2.5"
+    quote: "We pre-trained the model with a 4,096-token context window using the MuonClip optimizer (Algorithm 1) and the WSD learning rate schedule [25], processing a total of 15.5T tokens."
+    note: "15.5T = 10T constant + 5.5T cosine; the 400B anneal and 60B long-context tokens are reported separately."
+  train.warmup:
+    value: "500 steps"
+    source: report
+    at: "p.9 §2.5"
+    quote: "after a 500-step warm-up"
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.9 §2.5"
+    quote: "Weight decay was set to 0.1 throughout"
+  scaling.ladder:
+    value: "small-scale Muon MoE runs: sparsity 8–64 at 8 active + 1 shared expert; heads = layers vs 2× layers at 1.2e20–9.0e20 FLOPs"
+    source: report
+    at: "p.6–7 §2.3, Figures 5–6"
+    quote: "Through carefully controlled small-scale experiments, we observe that — under a fixed number of activated parameters (i.e., constant FLOPs) — increasing the total number of experts (i.e., increasing sparsity) consistently lowers both the training and validation loss"
+    note: "Sparsity levels and FLOPs budgets from the Figure 5–6 legends; model sizes are not given."

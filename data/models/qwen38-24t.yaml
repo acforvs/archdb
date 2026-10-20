@@ -1,0 +1,183 @@
+name: Qwen3.8-2.4T-A95B
+org: Qwen
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/resolve/207bd685a7e3696cfaff12ded7c6a7ea0f88c996/README.md, kind: model-card}
+  config: {url: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/resolve/207bd685a7e3696cfaff12ded7c6a7ea0f88c996/config.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/qwen3_5_moe/modeling_qwen3_5_moe.py, kind: code}
+  weights-index: {url: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/resolve/207bd685a7e3696cfaff12ded7c6a7ea0f88c996/model.safetensors.index.json, kind: config}
+  github: {url: https://raw.githubusercontent.com/QwenLM/Qwen3.8/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md, kind: model-card}
+
+not_disclosed: [mtp.depth, mtp.loss_weight, moe.balancing, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision, params.active_non_embedding]
+
+config_unused:
+  mamba_ssm_dtype: GDN recurrent-state dtype for serving; not read by the modeling code
+
+facts:
+  meta.released:
+    value: "2026-08-12"
+    source: github
+    at: "QwenLM GitHub README; News"
+    quote: "2026-08-12: Qwen3.8-2.4T-A95B is now available on"
+    note: "Hugging Face repository created 2026-08-08, before public release."
+  meta.license: {value: "other (qwen3.8-max)", source: card, at: "README.md; YAML front matter", quote: "license_name: qwen3.8-max"}
+
+  params.active:
+    value: 95_000_000_000
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "2.4T in total and 95B activated"
+  params.note:
+    value: "Rounded card figure for a text-only model. Whether the MTP module is counted is not stated."
+    source: card
+    at: "README.md; Quickstart; API Usage"
+    quote: "Qwen3.8-2.4T-A95B is a text-only model"
+  params.total:
+    value: 2_400_000_000_000
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "2.4T in total and 95B activated"
+
+  shape.d_model: {value: 8192, source: config, at: "/hidden_size"}
+  shape.layers: {value: 92, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 248_320, source: config, at: "/vocab_size"}
+
+  attn.gate:
+    value: "sigmoid, elementwise on the attention output before o_proj; gate projected jointly with Q"
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeAttention.forward"
+    quote: "attn_output = attn_output * torch.sigmoid(gate)"
+    note: "Config attn_output_gate true; the code applies the gate unconditionally."
+  attn.global_layers: {value: 23, source: config, at: "/layer_types | count full_attention"}
+  attn.head_dim: {value: 256, source: config, at: "/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "Gated DeltaNet, GQA"
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "23 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))"
+    note: "Gated Attention is GQA with 64 Q / 4 KV heads."
+  attn.kv_heads: {value: 4, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "3 Gated DeltaNet : 1 GQA"
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "23 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))"
+    note: "Config full_attention_interval 4; layer_types lists the same pattern."
+  attn.linear_layers: {value: 69, source: config, at: "/layer_types | count linear_attention"}
+  attn.position:
+    value: "partial RoPE"
+    source: card
+    at: "README.md; Model Overview; Gated Attention"
+    quote: "Rotary Position Embedding Dimension: 64"
+    note: "64 of 256 head dims rotated."
+  attn.qk_norm:
+    value: true
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeAttention.__init__"
+    quote: "self.q_norm = Qwen3_5MoeRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+    note: "Per-head RMSNorm on Q and K in the full-attention layers."
+  attn.rope_fraction: {value: 0.25, source: config, at: "/partial_rotary_factor"}
+  attn.rope_theta: {value: 10_000_000, source: config, at: "/rope_parameters/rope_theta"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.conv: {value: 4, source: config, at: "/linear_conv_kernel_dim"}
+  attn.linear_head_dim: {value: 128, source: config, at: "/linear_value_head_dim"}
+  attn.linear_heads: {value: 128, source: config, at: "/linear_num_value_heads"}
+  attn.linear_kind:
+    value: "Gated DeltaNet: 16 QK heads, 128 V heads, head dim 128, short conv 4, SiLU-gated RMSNorm on output"
+    source: card
+    at: "README.md; Model Overview; Gated DeltaNet"
+    quote: "Number of Linear Attention Heads: 128 for V and 16 for QK"
+    note: "QK heads/dim from config linear_num_key_heads and linear_key_head_dim; conv kernel from config linear_conv_kernel_dim; SiLU output gate from Qwen3_5MoeRMSNormGated in modeling_qwen3_5_moe.py; config output_gate_type swish (not read by the code)."
+
+  ffn.activation:
+    value: "SwiGLU"
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeExperts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn is SiLU (config hidden_act silu)."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Shared-expert MLP; routed experts are bias-free weight tensors."
+
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 512, source: config, at: "/num_experts"}
+  moe.router:
+    value: softmax
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeTopKRouter.forward"
+    quote: "router_probs = torch.nn.functional.softmax(router_logits, dtype=torch.float, dim=-1)"
+    note: "Top-k taken after softmax; shared expert has its own sigmoid gate."
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model Overview; Mixture of Experts"
+    quote: "10 Routed + 1 Shared"
+  moe.shared_dim: {value: 2048, source: config, at: "/shared_expert_intermediate_size"}
+  moe.top_k: {value: 10, source: config, at: "/num_experts_per_tok"}
+  moe.dense_layers:
+    value: 0
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "23 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))"
+    note: "Every layer is MoE; Qwen3_5Moe code has no dense-layer option."
+  moe.norm_topk:
+    value: true
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeTopKRouter.forward"
+    quote: "router_top_value /= router_top_value.sum(dim=-1, keepdim=True)"
+    note: "Unconditional in this code path."
+
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/mtp_num_hidden_layers"
+    note: "One MTP decoder layer (mtp.layers.0 only in the weight index); card: MTP trained with multiple steps."
+  mtp.block:
+    value: "one decoder layer (gated attention + MoE); RMSNormed hidden state and RMSNormed next-token embedding fused by linear fc; final RMSNorm"
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.* entries"
+    quote: "mtp.pre_fc_norm_embedding.weight"
+    note: "From weight names: pre_fc_norm_hidden, pre_fc_norm_embedding, fc, layers.0 (self_attn with q_norm/k_norm, mlp), norm."
+  mtp.ffn:
+    value: "MoE"
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.layers.0.mlp"
+    quote: "mtp.layers.0.mlp.shared_expert_gate.weight"
+  mtp.shares_embedding:
+    value: true
+    source: config
+    at: "config.json; mtp_use_dedicated_embeddings"
+    quote: '"mtp_use_dedicated_embeddings": false'
+    note: "The weight index has no MTP embedding or output head."
+  mtp.released:
+    value: true
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.* entries"
+    quote: "mtp.fc.weight"
+
+  norm.placement:
+    value: pre
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: hf-transformers
+    at: "modeling_qwen3_5_moe.py; Qwen3_5MoeRMSNorm.forward"
+    quote: "output = output * (1.0 + self.weight.float())"
+    note: "Gain initialized at 0 and applied as 1 + weight."
+  norm.eps: {value: 1.0e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.max:
+    value: 1_010_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "262,144 natively and extensible up to 1,010,000 tokens"
+    note: "262,144 native (config max_position_embeddings); extension method not stated."

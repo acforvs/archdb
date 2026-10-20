@@ -1,0 +1,387 @@
+name: MiMo-V2-Flash-Base
+org: Xiaomi
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/XiaomiMiMo/MiMo-V2-Flash-Base/resolve/e4187012dd10281638071e417a56164dd7805fbd/README.md, kind: model-card}
+  config: {url: https://huggingface.co/XiaomiMiMo/MiMo-V2-Flash-Base/resolve/e4187012dd10281638071e417a56164dd7805fbd/config.json, kind: config}
+  index: {url: https://huggingface.co/XiaomiMiMo/MiMo-V2-Flash-Base/resolve/e4187012dd10281638071e417a56164dd7805fbd/model.safetensors.index.json, kind: config}
+  modeling_mimo_v2_flash: {url: https://huggingface.co/XiaomiMiMo/MiMo-V2-Flash-Base/resolve/e4187012dd10281638071e417a56164dd7805fbd/modeling_mimo_v2_flash.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2601.02780v2, kind: paper}
+  blog: {url: https://web.archive.org/web/20261019100652/https://mimo.xiaomi.com/mimo-v2-flash, kind: blog}
+
+not_disclosed: [params.active_non_embedding]
+
+config_unused:
+  sliding_window_size: "duplicate of /sliding_window; not read by modeling_mimo_v2_flash.py"
+  attention_chunk_size: "not read by modeling_mimo_v2_flash.py"
+  n_group: "1: no group-limited routing"
+  topk_group: "1: no group-limited routing"
+
+facts:
+  meta.released:
+    value: "2025-12-16"
+    source: blog
+    at: "Introducing MiMo-V2-Flash; header"
+    quote: "December 16, 2025 Today, we are releasing and open-sourcing MiMo-V2-Flash."
+  meta.license:
+    value: mit
+    source: card
+    at: "README.md; front matter"
+    quote: "license: mit"
+
+  params.total:
+    value: 309_000_000_000
+    source: report
+    at: "p.10 §3.2"
+    quote: "Overall, MiMo-V2-Flash has 309B total parameters, of which 15B are active."
+  params.active:
+    value: 15_000_000_000
+    source: report
+    at: "p.10 §3.2"
+    quote: "Overall, MiMo-V2-Flash has 309B total parameters, of which 15B are active."
+  params.note:
+    value: "MTP inclusion not stated; each MTP block is 0.33B."
+    source: report
+    at: "p.5 §2.1"
+    quote: "The number of parameters for each MTP block is only 0.33B."
+
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.layers: {value: 48, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 152_576, source: config, at: "/vocab_size"}
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "p.5 §2.1"
+    quote: "The model consists of 39 SWA layers and 9 GA layers. Both SWA and GA utilize Grouped-Query Attention (GQA)"
+  attn.layout:
+    value: "5 SWA : 1 global"
+    source: report
+    at: "p.1 Abstract"
+    quote: "with a 128-token sliding window under a 5:1 hybrid ratio"
+    note: "Config hybrid_layer_pattern puts global layers at 0, 5, 11, 17, 23, 29, 35, 41, 47: 4 SWA layers before the first hybrid GA, 5 before each later one."
+  attn.global_layers:
+    value: 9
+    source: report
+    at: "p.5 §2.1"
+    quote: "The model consists of 39 SWA layers and 9 GA layers."
+  attn.local_layers:
+    value: 39
+    source: report
+    at: "p.5 §2.1"
+    quote: "The model consists of 39 SWA layers and 9 GA layers."
+  attn.heads:
+    value: 64
+    source: report
+    at: "p.6 §2.1"
+    quote: "SWA has 64 query heads and 8 key-value heads, while GA has 64 query heads and 4 key-value heads."
+    note: "Config num_attention_heads 64."
+  attn.kv_heads:
+    value: 4
+    source: report
+    at: "p.6 §2.1"
+    quote: "SWA has 64 query heads and 8 key-value heads, while GA has 64 query heads and 4 key-value heads."
+    note: "Config num_key_value_heads 4."
+  attn.local_kv_heads:
+    value: 8
+    source: report
+    at: "p.6 §2.1"
+    quote: "SWA has 64 query heads and 8 key-value heads, while GA has 64 query heads and 4 key-value heads."
+    note: "Config swa_num_key_value_heads 8."
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/swa_num_attention_heads"
+    note: "MiMoV2Attention.__init__ reads swa_* head counts and dims for SWA layers and the unprefixed keys for GA layers."
+  attn.local_head_dim:
+    value: 192
+    source: config
+    at: "/swa_head_dim"
+    note: "QK dim; V dim is swa_v_head_dim 128."
+  attn.local_rope_theta:
+    value: 10000
+    source: config
+    at: "/swa_rope_theta"
+    note: "MiMoV2FlashRotaryEmbedding(is_swa=True) replaces rope_theta with swa_rope_theta."
+  attn.qk_norm:
+    value: false
+    source: modeling_mimo_v2_flash
+    at: "modeling_mimo_v2_flash.py; MiMoV2Attention.forward"
+    quote: "query_states = self.q_proj(hidden_states).view(qk_hidden_shape).transpose(1, 2)"
+    note: "No norm between projection and RoPE in either layer type."
+  attn.head_dim:
+    value: 192
+    source: report
+    at: "p.6 §2.1"
+    quote: "(192 for queries and keys, and 128 for values)"
+    note: "Config head_dim 192."
+  attn.v_head_dim:
+    value: 128
+    source: report
+    at: "p.6 §2.1"
+    quote: "(192 for queries and keys, and 128 for values)"
+    note: "Config v_head_dim 128."
+  attn.window:
+    value: 128
+    source: report
+    at: "p.5 §2.1"
+    quote: "The sliding window size 𝑊 used in MiMo-V2-Flash is 128."
+    note: "Config sliding_window 128 (read by the SWA mask)."
+  attn.position:
+    value: "partial RoPE (first 64 of 192 QK dims)"
+    source: report
+    at: "p.6 §2.1"
+    quote: "is partially applied to the first 64 dimensions query and key."
+  attn.rope_fraction:
+    value: 0.334
+    source: config
+    at: "/partial_rotary_factor"
+    note: "Config value; MiMoV2Attention rotates int(192 × 0.334) = 64 dims, i.e. 1/3."
+  attn.rope_theta:
+    value: 5_000_000
+    source: config
+    at: "/rope_theta"
+    note: "640,000 during the 32K stages; raised to 5,000,000 for the 256K extension (§3.2). SWA layers use 10,000."
+  attn.sinks:
+    value: "learnable per-head sink bias in the softmax denominator (gpt-oss style), SWA layers only"
+    source: report
+    at: "p.6 §2.2"
+    quote: "our implementation follows the design used in gpt-oss"
+    note: "Config: add_swa_attention_sink_bias true, add_full_attention_sink_bias false."
+  attn.scale:
+    value: "values × 0.707"
+    source: modeling_mimo_v2_flash
+    at: "modeling_mimo_v2_flash.py; MiMoV2Attention.forward"
+    quote: "value_states = value_states * self.v_scale"
+    note: "v_scale is config attention_value_scale (0.707), applied in all attention layers; not mentioned in the report. QK scaling is the standard head_dim**-0.5."
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_mimo_v2_flash
+    at: "modeling_mimo_v2_flash.py; MiMoV2MLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(hidden_states)) * self.up_proj(hidden_states))"
+    note: "act_fn is config hidden_act silu; routed experts use the same MiMoV2MLP."
+  ffn.dim:
+    value: 16384
+    source: report
+    at: "p.10 §3.2"
+    quote: "The intermediate hidden dimension of the FFN of dense layers is set to 16384."
+    note: "Dense FFN in layer 0 only; config intermediate_size 16384."
+
+  moe.dense_layers:
+    value: 1
+    source: report
+    at: "p.10 §3.2"
+    quote: "All layers except the first are equipped with sparse MoE."
+    note: "Config moe_layer_freq is 0 for layer 0 only."
+  moe.experts:
+    value: 256
+    source: report
+    at: "p.10 §3.2"
+    quote: "Each MoE layer contains 256 routed experts, with 8 experts activated per token, and an intermediate hidden dimension of 2048 for each expert."
+    note: "Config n_routed_experts 256."
+  moe.top_k:
+    value: 8
+    source: report
+    at: "p.10 §3.2"
+    quote: "Each MoE layer contains 256 routed experts, with 8 experts activated per token, and an intermediate hidden dimension of 2048 for each expert."
+    note: "Config num_experts_per_tok 8."
+  moe.expert_dim:
+    value: 2048
+    source: report
+    at: "p.10 §3.2"
+    quote: "Each MoE layer contains 256 routed experts, with 8 experts activated per token, and an intermediate hidden dimension of 2048 for each expert."
+    note: "Config moe_intermediate_size 2048."
+  moe.shared:
+    value: 0
+    source: report
+    at: "p.5 §2.1"
+    quote: "with 8 activated per token, and contains no shared experts."
+  moe.router: {value: sigmoid, source: config, at: "/scoring_func"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.balancing:
+    value: "aux-loss-free expert bias (update 0.001 in stages 1–2, 1e-5 in stage 3) + sequence aux loss 1e-5"
+    source: report
+    at: "p.10 §3.2"
+    quote: "the MoE sequence auxiliary loss coefficient is set to 1.0 × 10−5 for all stages."
+    note: "Config topk_method noaux_tc: the expert bias is added to scores for selection only."
+
+  mtp.depth:
+    value: 1
+    source: report
+    at: "p.10 §3.2"
+    quote: "The model uses a single MTP layer during pre-training."
+  mtp.modules:
+    value: 1
+    source: report
+    at: "p.9 §2.3.2"
+    quote: "During pre-training, only a single MTP head is attached to the model to avoid extra training overhead."
+    note: "Released checkpoint holds three modules: the head replicated and trained jointly in post-training."
+  mtp.block:
+    value: "SWA (64 Q / 8 KV heads, sink bias) + dense SwiGLU FFN; RMSNorm'd hidden state and next-token embedding concatenated and linearly projected"
+    source: report
+    at: "p.5 Figure 2 caption; §2.1"
+    quote: "The MTP blocks employ SWA and a dense FFN."
+    note: "Input combination from Figure 2 (two RMSNorms, Linear) and index weights enorm, hnorm, eh_proj; SWA heads from Table 1."
+  mtp.ffn:
+    value: "dense"
+    source: report
+    at: "p.9 §2.3.2"
+    quote: "We use a small dense FFN rather than MoE to limit parameter count"
+    note: "Width not stated."
+  mtp.shares_embedding:
+    value: true
+    source: report
+    at: "p.5 Figure 2"
+    quote: "LM Head (tied)"
+    note: "Figure 2 labels the MTP block's embedding and LM head as tied to the main model's; the weight index has no MTP embedding or head weights."
+  mtp.loss_weight:
+    value: "0.3 in stage 1; 0.1 in stages 2 and 3"
+    source: report
+    at: "p.10 §3.2"
+    quote: "The MTP loss weight is set to 0.3 for Stage 1 and 0.1 for Stage 2 and 3."
+  mtp.released:
+    value: true
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.mtp.layers.2.eh_proj.weight"'
+    note: "Three SWA + dense-FFN MTP blocks; the single pretraining head is replicated and trained jointly in post-training (§2.3.2)."
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_mimo_v2_flash
+    at: "modeling_mimo_v2_flash.py; MiMoV2DecoderLayer.__init__"
+    quote: "self.input_layernorm = MiMoV2RMSNorm(config.hidden_size, eps=config.layernorm_epsilon)"
+  norm.placement:
+    value: pre
+    source: modeling_mimo_v2_flash
+    at: "modeling_mimo_v2_flash.py; MiMoV2DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.eps: {value: 1.0e-5, source: config, at: "/layernorm_epsilon"}
+
+  ctx.pretrain:
+    value: 32768
+    source: report
+    at: "p.10 §3.2"
+    quote: "we set the pre-training sequence length to 32,768"
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.10 §3.2"
+    quote: "the sequence length is extended to 262,144"
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; §1 Introduction"
+    quote: "The context window supports up to 256k length."
+    note: "Config max_position_embeddings 262144."
+  ctx.extension:
+    value: "Stage 3 (26T–27T tokens): 32K → 256K, GA RoPE base 640K → 5M"
+    source: report
+    at: "p.10 §3.2"
+    quote: "In Stage 3, the sequence length is extended to 262,144, and the RoPE base frequency of GA is adjusted to 5,000,000."
+
+  train.tokens:
+    value: 27_000_000_000_000
+    source: report
+    at: "p.1 Abstract"
+    quote: "The model is pre-trained on 27 trillion tokens with Multi-Token Prediction (MTP)"
+    note: "Includes mid-training (stage 2) and context extension (stage 3)."
+  train.optimizer:
+    value: AdamW
+    source: report
+    at: "p.10 §3.2"
+    quote: "We employ the AdamW optimizer with 𝛽1 = 0.9, 𝛽2 = 0.95, and a weight decay of 0.1."
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: report
+    at: "p.10 §3.2"
+    quote: "We employ the AdamW optimizer with 𝛽1 = 0.9, 𝛽2 = 0.95, and a weight decay of 0.1."
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.10 §3.2"
+    quote: "We employ the AdamW optimizer with 𝛽1 = 0.9, 𝛽2 = 0.95, and a weight decay of 0.1."
+  train.grad_clip:
+    value: 1.0
+    source: report
+    at: "p.10 §3.2"
+    quote: "Gradient clipping is applied with a maximum norm of 1.0."
+  train.lr_peak:
+    value: 3.2e-4
+    source: report
+    at: "p.10 §3.2"
+    quote: "the learning rate starts with a linear warm-up from 0 to 3.2 × 10−4 over the first 50B tokens"
+  train.lr_min:
+    value: 1.0e-5
+    source: report
+    at: "p.10 §3.2"
+    quote: "The learning rate in Stage 3 decays from 3.0 × 10−5 to 1.0 × 10−5 following a cosine schedule"
+  train.warmup:
+    value: "50B tokens"
+    source: report
+    at: "p.10 §3.2"
+    quote: "the learning rate starts with a linear warm-up from 0 to 3.2 × 10−4 over the first 50B tokens"
+  train.schedule:
+    value: "Stage 1: 50B warmup, constant 3.2e-4 for 12T, cosine to 1e-4 over 10T; stage 2: cosine 1e-4 → 3e-5 over 4T; stage 3: cosine 3e-5 → 1e-5"
+    source: report
+    at: "p.10 §3.2"
+    quote: "followed by a constant phase at 3.2 × 10−4 for 12T tokens, and concludes with a cosine decay to 1.0 × 10−4 over 10T tokens."
+  train.batch:
+    value: "2,048 × 32,768 (67.1M tokens) after a linear warmup over the first 500B tokens; 256 × 262,144 (67.1M tokens) in stage 3"
+    source: report
+    at: "p.10 §3.2"
+    quote: "The batch size warms up linearly to 2,048 over the initial 500B tokens and remains constant for the remainder of both stages."
+    note: "The report does not give the unit; read as sequences because both stages then give the same tokens per step."
+  train.batch_tokens:
+    value: 67_108_864
+    source: report
+    at: "p.10 §3.2"
+    quote: "The batch size warms up linearly to 2,048 over the initial 500B tokens"
+    basis: inferred
+    note: "Unit not stated; read as sequences: 2,048 × 32,768. Stage 3's 256 × 262,144 gives the same total."
+  train.precision:
+    value: "FP8 mixed precision (DeepSeek-V3-style); BF16 attention output projections, embedding and output head; FP32 router"
+    source: report
+    at: "p.6 §2.1"
+    quote: "we retain BF16 precision for the attention output projections, as well as for the embedding and output head parameters, while maintaining FP32 precision for the MoE router parameters."
+  train.init:
+    value: "std 0.006 for all parameters"
+    source: report
+    at: "p.10 §3.2"
+    quote: "All learnable parameters are randomly initialized with a standard deviation of 0.006."
+  train.data:
+    value: "web, books, papers, code, math, STEM; upweighted long-form web documents and repository-level code, PRs, issues and commits; ~5% synthetic reasoning data from stage 2"
+    source: report
+    at: "pp.9–10 §3, §3.1"
+    quote: "we emphasize long-form web documents and carefully curated code corpora"
+  train.stages:
+    value:
+      - name: pre-training
+        tokens: 22_000_000_000_000
+        seq_len: 32768
+        lr: 3.2e-4
+        batch_sequences: 2048
+        note: "General corpus; warmup, constant, then cosine to 1e-4."
+        quote: "Stage 1 (Pre-training, 0 – 22T)."
+      - name: mid-training
+        tokens: 4_000_000_000_000
+        note: "Code upsampled, ~5% synthetic reasoning data; LR cosine 1e-4 → 3e-5."
+        quote: "Stage 2 (Mid-training, 22 – 26T)."
+      - name: context-extension
+        tokens: 1_000_000_000_000
+        seq_len: 262_144
+        batch_sequences: 256
+        note: "Stage 2 mix with long-range-dependency data upsampled; LR cosine 3e-5 → 1e-5."
+        quote: "Stage 3 (Context Extension, 26 – 27T)."
+    source: report
+    at: "p.10 §3.1, §3.2"
+  scaling.ladder:
+    value: "attention ablations on a 32B dense model: 250B tokens at 8K, then 40B at 32K"
+    source: report
+    at: "p.6–7 §2.2.1"
+    quote: "we conduct exploratory and empirical studies on a 32B dense model"
+    note: "Token budget from §2.2.1 Baselines and Benchmarks."

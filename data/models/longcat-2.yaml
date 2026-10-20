@@ -1,0 +1,217 @@
+name: LongCat-2.0
+org: Meituan
+kind: reasoning
+note: "Post-trained checkpoint (thinking and non-thinking modes); no base checkpoint released."
+
+sources:
+  card: {url: https://huggingface.co/meituan-longcat/LongCat-2.0/resolve/834bf5ffe3047aa9f6cc7a64a9bc068b146b8274/README.md, kind: model-card}
+  config: {url: https://huggingface.co/meituan-longcat/LongCat-2.0/resolve/834bf5ffe3047aa9f6cc7a64a9bc068b146b8274/config.json, kind: config}
+  weights-index: {url: https://huggingface.co/meituan-longcat/LongCat-2.0/resolve/834bf5ffe3047aa9f6cc7a64a9bc068b146b8274/model.safetensors.index.json, kind: config}
+  blog: {url: https://web.archive.org/web/20260825022823id_/https://s3.meituan.net/static-prod01/com.sankuai.friday.longcat.next2/assets/index-B2a7Qfrx.js, kind: blog}
+  lsa: {url: https://arxiv.org/pdf/2608.01662v2, kind: paper}
+
+not_disclosed:
+  - attn.qk_norm
+  - ffn.activation
+  - moe.router
+  - moe.balancing
+  - moe.norm_topk
+  - mtp.depth
+  - norm.type
+  - norm.placement
+  - ctx.pretrain
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+  - params.active_non_embedding
+
+config_unused:
+  use_mla: "duplicate of /attention_method MLA"
+  moe_switch_token_num: "undocumented; no modeling code published"
+
+facts:
+  meta.released:
+    value: "2026-06-30"
+    source: blog
+    at: "blog bundle; hero date of 'Introducing LongCat-2.0'"
+    quote: "date:`2026-06-30`"
+    note: "Publisher-dated announcement; the weight files were uploaded to Hugging Face on 2026-07-05 (repository commit history)."
+  meta.license:
+    value: mit
+    source: card
+    at: "README.md; front matter"
+    quote: "license: mit"
+
+  params.active:
+    value: 48_000_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "a large-scale MoE language model with 1.6 trillion total parameters and ~48 billion activated per token"
+  params.note:
+    value: "The 1.6T total includes 135B N-gram Embedding parameters"
+    source: card
+    at: "README.md; N-gram Embedding"
+    quote: "135B N-gram Embedding parameters are included in the model"
+  params.total:
+    value: 1_600_000_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "a large-scale MoE language model with 1.6 trillion total parameters and ~48 billion activated per token"
+
+  shape.d_model: {value: 8192, source: config, at: "/hidden_size"}
+  shape.layers:
+    value: 38
+    source: config
+    at: "/num_layers"
+    note: "Counts LongCat-Flash-style shortcut-connected blocks: each holds two attention + dense-FFN sublayers (self_attn.0/.1, mlps.0/.1 in the weight map) and one MoE, so the backbone has 76 MLA and 76 dense-FFN sublayers."
+  shape.memory:
+    value: "N-gram Embedding, n-gram size 5, 135B params; embedding space expanded ~100× over the token vocabulary"
+    source: blog
+    at: "blog bundle; N-gram Embedding"
+    quote: "the n-gram size is configured to 5, and 135B N-gram Embedding parameters are included in the model"
+    note: "Weight map has 16 N-gram tables (model.oe_embed_tokens0-15) with projections (oe_embed_proj0-15), and a separate set in the MTP module; config /oe_vocab_size_ratio 100.567, /oe_neighbor_num 5, /oe_split_num 4."
+  shape.vocab: {value: 163_840, source: config, at: "/vocab_size"}
+  shape.tied_embeddings:
+    value: false
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"lm_head.weight"'
+    basis: inferred
+    note: "Weight map stores lm_head.weight separately from model.embed_tokens.weight."
+
+  attn.global_layers:
+    value: 76
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: "model.layers.37.self_attn.1.kv_a_proj_with_mqa.weight"
+    basis: inferred
+    note: "38 blocks (/num_layers) × 2 MLA sublayers, each with its own kv_a_proj_with_mqa and therefore its own latent KV cache; counts attention sublayers, unlike shape.layers."
+  attn.head_dim: {value: 192, source: config, at: "/qk_nope_head_dim + /qk_rope_head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "MLA, LSA"
+    source: card
+    at: "README.md; LongCat Sparse Attention"
+    quote: "we introduce LongCat Sparse Attention (LSA)"
+    note: "Config /attention_method is MLA; LSA is the DSA-derived sparse selection inside those layers."
+  attn.kv_lora_rank:
+    value: 512
+    source: config
+    at: "/kv_lora_rank"
+    note: "Config also sets mla_scale_q_lora and mla_scale_kv_lora true; no modeling code is published to define them."
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.position:
+    value: "RoPE (MLA decoupled, 64 dims)"
+    source: config
+    at: "config.json"
+    quote: '"qk_rope_head_dim": 64'
+  attn.indexer_dim:
+    value: 128
+    source: config
+    at: "/index_head_dim"
+    note: "Indexer wk weight is [128, 8192], one key head; present only in self_attn.0 of each block, so 38 indexer caches for 76 MLA sublayers."
+  attn.q_lora_rank: {value: 1536, source: config, at: "/q_lora_rank"}
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta: {value: 1_000_000, source: config, at: "/rope_theta"}
+  attn.sparse:
+    value: "LSA: 2048-token budget per query = 16 sink tokens + 1024-token sliding window + indexer-selected tokens; one indexer pass shared by every 2 attention sublayers"
+    source: lsa
+    at: "p.8 §3.1"
+    quote: "We set sink size Ksink = 16 and sliding window size Kswa = 1024"
+    note: "Released config matches: /index_topk 2048, /index_init_tokens 16, /index_local_tokens 1024, /cli_factor 2; index_n_heads 32 query heads of index_head_dim 128, index_k_norm_type rms; dsa_mtp_cli true shares one index across the 3 MTP steps. Card: 'the target model shares an index every 2 layers'; indexer weights exist only in self_attn.0 of each block. Hierarchical Indexing is training-free and enabled only for selected ultra-long-context tasks (blog)."
+  attn.v_head_dim: {value: 128, source: config, at: "/v_head_dim"}
+
+  ffn.dim:
+    value: 12288
+    source: config
+    at: "/ffn_hidden_size"
+    note: "Two dense FFN sublayers per block (mlps.0/.1 in the weight map) alongside one MoE."
+
+  moe.expert_dim: {value: 2048, source: config, at: "/expert_ffn_hidden_size"}
+  moe.experts:
+    value: 768
+    source: config
+    at: "/n_routed_experts"
+    note: "Config also declares 128 identity zero-experts (/zero_expert_num, /zero_expert_type); the router classifier is [896, 8192], scoring 768 + 128 experts, with an e_score_correction_bias. No modeling code is published."
+  moe.shared:
+    value: 0
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.layers.0.mlp.experts.0.gate_proj.weight"'
+    basis: inferred
+    note: "Weight map has routed experts and the two dense branches (mlps.0/.1) but no shared-expert weights."
+  moe.dense_layers:
+    value: 0
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.layers.0.mlp.router.classifier.weight"'
+    basis: inferred
+    note: "Every block from layer 0 carries an MoE branch next to its dense branches."
+  moe.routed_scale: {value: 9, source: config, at: "/routed_scaling_factor"}
+  moe.top_k: {value: 12, source: config, at: "/moe_topk"}
+
+  mtp.released:
+    value: true
+    source: weights-index
+    at: "/weight_map | has mtp."
+    note: "One MTP layer is stored (model.mtp.layers.0: MLA with indexer, dense FFN, enorm/hnorm + eh_proj, own embedding and N-gram tables); config /mtp_num_layers 3 with /mtp_replicate_modules true reuses it for 3 draft steps; mtp_disable_over_tokenizer true is undocumented. Pretraining MTP depth is not disclosed."
+
+  norm.eps:
+    value: 1e-5
+    source: config
+    at: "/rms_norm_eps"
+    note: "No modeling code is published; the norm type is not stated."
+
+  ctx.extension:
+    value: "YaRN (factor 120, beta_fast 32, beta_slow 1, mscale 1) over an 8,192-token original context"
+    source: config
+    at: "config.json; rope_scaling"
+    quote: "\"original_max_position_embeddings\": 8192, \"rope_type\": \"deepseek_yarn\", \"factor\": 120"
+    note: "Config rope_scaling keys factor, beta_fast, beta_slow, mscale, mscale_all_dim; the stages that used it are not disclosed."
+  ctx.final:
+    value: 1_000_000
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "train LongCat-2.0 on hundreds of billions of tokens of 1M-context data"
+    note: "Stated as 1M; the blog says CP scales past 512 'enabling native 1M-length training'. Released config /max_position_embeddings is 262,144."
+  ctx.max:
+    value: 1_000_000
+    source: blog
+    at: "blog bundle; Inference"
+    quote: "Serving a 1.6T-parameter model over a 1M-token context presents a significant challenge"
+    note: "Stated as 1M; released config /max_position_embeddings is 262,144."
+
+  train.hardware:
+    value: "over 50K AI ASICs in superpods of up to 48 machines; millions of accelerator-days"
+    source: blog
+    at: "blog bundle; Training"
+    quote: "LongCat-2.0 is pre-trained on over 50K AI ASICs"
+    note: "6D parallelism (TP/CP/EP/DP/PP plus EMBP for the N-gram Embeddings), ZeRO-1, selective recomputation and allocator-level OOM-aware offloading; CP scaled past 512 for 1M-length training."
+  train.optimizer:
+    value: Muon
+    source: blog
+    at: "blog bundle; Training at Scale"
+    quote: "We deploy the Muon optimizer at large scale on our accelerators"
+  train.stages:
+    value:
+      - name: "pre-training"
+        tokens: ">35T"
+        quote: "Pretraining spans millions of accelerator-days across more than 35 trillion tokens"
+      - name: "1M long-context"
+        seq_len: 1_000_000
+        note: "Hundreds of billions of tokens."
+        quote: "train LongCat-2.0 on hundreds of billions of tokens of 1M-context data"
+    source: card
+    at: "README.md; Model Introduction"
+    note: "Sparse attention is reached through a dense warmup computed forward-only alongside the KL loss (blog, Long Context Training)."
+  train.tokens:
+    value: ">35T"
+    source: card
+    at: "README.md; Model Introduction"
+    quote: "Pretraining spans millions of accelerator-days across more than 35 trillion tokens"

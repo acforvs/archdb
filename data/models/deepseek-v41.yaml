@@ -1,0 +1,373 @@
+name: DeepSeek-V4.1-Flash
+org: DeepSeek
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint. Recipe facts are from the technical report."
+
+sources:
+  config: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/314113f8a7dadb388215396ba5fbee2c610a04d6/config.json, kind: config}
+  inference-model: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/314113f8a7dadb388215396ba5fbee2c610a04d6/inference/model.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2609.19969v1, kind: paper}
+  card: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/314113f8a7dadb388215396ba5fbee2c610a04d6/README.md, kind: model-card}
+  announcement: {url: https://web.archive.org/web/20261019003838/https://api-docs.deepseek.com/news/news260910/, kind: blog}
+
+not_disclosed: [params.active_non_embedding, train.grad_clip, train.precision]
+
+config_unused:
+  num_nextn_predict_layers: "counts the 3 DSpark draft layers (separately trained drafter, not MTP)"
+  dspark_block_size: "DSpark drafter"
+  dspark_target_layer_ids: "DSpark drafter"
+  dspark_markov_rank: "DSpark drafter"
+  dspark_n_routed_experts: "DSpark drafter"
+  dspark_num_experts_per_tok: "DSpark drafter"
+
+facts:
+  meta.released:
+    value: "2026-09-10"
+    source: announcement
+    at: "DeepSeek API Docs news, DeepSeek-V4.1-Flash Release"
+    quote: "DeepSeek-V4.1-Flash Release 2026/09/10"
+    note: "Post links the Hugging Face weights and report; arXiv v1 is dated 17 Sep 2026."
+  meta.license:
+    value: mit
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: mit"
+  params.active_prefill:
+    value: 8_000_000_000
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "DeepSeek-V4.1-Flash comprises 552B backbone parameters, with 8B activated per token during prefill and 16B during decode."
+    note: "Serving-system figure: prompt tokens run the 20-layer encoder plus decoder SWA replay of the last 128 tokens; the reference inference/model.py runs all 40 layers."
+  params.active:
+    value: 16_000_000_000
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "DeepSeek-V4.1-Flash comprises 552B backbone parameters, with 8B activated per token during prefill and 16B during decode."
+    note: "Per decoded token; prefill figure under params.active_prefill."
+  params.note:
+    value: "Backbone only; the 196B Engram (conditional-memory) parameters are reported separately."
+    source: report
+    at: "p.7 §2.1"
+    quote: "has 552B backbone parameters and 196B Engram parameters"
+  params.total:
+    value: 552_000_000_000
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "DeepSeek-V4.1-Flash comprises 552B backbone parameters, with 8B activated per token during prefill and 16B during decode."
+
+  shape.d_model: {value: 5120, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 40, source: config, at: "/text_config/num_hidden_layers"}
+  shape.memory:
+    value: "Engram, 196B params in 2 modules at layers 1 and 14 (0-indexed); N-gram orders {2, 3, 4}, 8 hash heads, 2048 dims per order, ~16M-entry prime-sized tables, FP8, no short conv"
+    source: report
+    at: "p.13 §2.4.2"
+    quote: "We allocate 196B Engram parameters evenly across two modules."
+    note: "Orders, heads, table sizes, FP8 and layer placement in the same paragraph. config /text_config/engram_layer_ids [1, 14], engram_num_embeddings, engram_max_ngram_size 4, engram_vocab_size 16000000, engram_n_heads 8, engram_head_dim 256, engram_compressed_vocab_size 99092."
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab: {value: 129_280, source: config, at: "/text_config/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+  attn.global_layers:
+    value: 38
+    basis: inferred
+    source: report
+    at: "p.7 §2.1"
+    quote: "Each layer incorporates both global attention and sliding window attention (SWA), except for the first two layers, which use SWA only."
+    note: "40 layers minus 2 SWA-only layers. Global KV is shared across layers: only layers 2, 8, 14 and 20 compute it (/text_config/kv_source_layer_ids)."
+  attn.head_dim: {value: 512, source: config, at: "/text_config/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads", note: "Grouped low-rank output projection: /text_config/o_groups 8 groups, /text_config/o_lora_rank 1024 each."}
+  attn.local_heads:
+    value: 64
+    source: config
+    at: "/text_config/num_attention_heads"
+    note: "SWA-only layers (compress ratio 0) use the same Attention class with n_heads, head_dim and one shared KV head."
+  attn.local_kv_heads: {value: 1, source: config, at: "/text_config/num_key_value_heads"}
+  attn.local_head_dim: {value: 512, source: config, at: "/text_config/head_dim"}
+  attn.local_rope_theta:
+    value: 10000
+    source: config
+    at: "/text_config/rope_theta"
+    note: "Compress-ratio-0 layers use rope_theta without YaRN (Attention.__init__)."
+  attn.qk_norm:
+    value: false
+    source: inference-model
+    at: "inference/model.py; Attention.forward"
+    quote: "q = self.wq_b(qr).unflatten(-1, (self.n_local_heads, self.head_dim))"
+    note: "Only the single shared KV head is RMSNormed (kv_norm, compressor norm); queries get no per-head norm, unlike V4."
+  attn.kv_sharing:
+    value: "Main KV and indexer K owned by layers 2, 8, 14 (encoder, m=2, each serving its 6-layer group) and 20 (decoder, m=1, serving layers 20–39, computed from the last encoder layer's output); other CSA2 layers read them. Each layer keeps its own 128-token SWA KV."
+    source: report
+    at: "p.22 §4.2.1; p.10–11 §2.3.1"
+    quote: "In each group, the first layer operates in Full Mode, and the remaining five layers operate in Reuse Mode."
+    note: "Owners in /text_config/kv_source_layer_ids; /text_config/index_source_layer_ids adds Reindex layers 24, 28, 32, 36 that rescore the shared cache with their own indexer Q."
+  attn.kv_groups:
+    value:
+      - name: encoder main KV (m=2)
+        layers: 3
+        elements: 512
+        tokens_per_entry: 2
+        note: "Layers 2, 8, 14; one shared K=V entry per 2 tokens."
+        quote: "compress_ratio > 0 does not mean the layer compresses its own KV: only kv_source_layers do, the rest read that same cache."
+      - name: encoder indexer K (m=2)
+        layers: 3
+        elements: 128
+        tokens_per_entry: 2
+        note: "Indexer.k_cache of the same owner layers."
+        quote: "torch.zeros(args.max_batch_size, args.max_seq_len // self.compress_ratio, args.index_head_dim)"
+      - name: decoder main KV (m=1)
+        layers: 1
+        elements: 512
+        tokens_per_entry: 1
+        note: "Layer 20; ratio-1 compressor is a plain projection."
+        quote: "if ratio == 1:  # one token per group: nothing to pool, so no gate and no fp32"
+      - name: decoder indexer K (m=1)
+        layers: 1
+        elements: 128
+        tokens_per_entry: 1
+        note: "Layer 20."
+        quote: "self.owns_k = layer_id in args.kv_source_layers"
+      - name: SWA window
+        layers: 40
+        elements: 512
+        window: 128
+        note: "window_kv_cache in every backbone layer; DSpark layers excluded."
+        quote: "torch.zeros(args.max_batch_size, args.window_size, self.head_dim)"
+    source: inference-model
+    at: "inference/model.py; Attention.__init__, Compressor.forward, Indexer.__init__"
+  attn.kind:
+    value: "SWA, CSA2"
+    source: report
+    at: "p.7 Figure 3"
+    quote: "The first two encoder layers use sliding window attention (SWA); the rest use Compressed Sparse Attention 2 (CSA2)"
+  attn.kv_heads: {value: 1, source: config, at: "/text_config/num_key_value_heads"}
+  attn.layout:
+    value: "2 SWA + 18 CSA2 m=2 (encoder: 3 × [1 Full, 5 Reuse]) + 20 CSA2 m=1 (decoder: [1 Full, 3 Reuse], then 4 × [1 Reindex, 3 Reuse])"
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "The remaining 18 encoder layers use CSA2 with a compression rate of 𝑚 = 2."
+    note: "Decoder: \"The 20 decoder layers use CSA2 with a compression rate of 𝑚 = 1\" (same paragraph). Every CSA2 layer also attends to its own 128-token SWA KV. Per-layer ratios in /text_config/compress_ratios (last 3 entries are DSpark layers)."
+  attn.local_layers:
+    value: 2
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "For the first two layers, we use pure sliding window attention."
+    note: "Counts SWA-only layers; the 38 CSA2 layers also have a 128-token SWA branch."
+  attn.position:
+    value: "partial RoPE (last 64 dims of Q and KV; inverse rotation on attention output)"
+    source: inference-model
+    at: "inference/model.py lines 632–633 (Attention.__init__) and 766–782 (Attention.forward)"
+    quote: "apply_rotary_emb(o[..., -rd:], freqs_cis, True)"
+    note: "forward rotates q[..., -rd:] and the KV tail (rope_head_dim 64), and applies the inverse rotation to o[..., -rd:]."
+  attn.q_lora_rank: {value: 1280, source: config, at: "/text_config/q_lora_rank"}
+  attn.rope_fraction:
+    value: 0.125
+    basis: inferred
+    source: inference-model
+    at: "inference/model.py lines 632–633; Attention.__init__"
+    quote: "self.nope_head_dim = args.head_dim - args.rope_head_dim"
+    note: "/text_config/qk_rope_head_dim 64 of /text_config/head_dim 512."
+  attn.rope_theta:
+    value: 160_000
+    source: config
+    at: "/text_config/compress_rope_theta"
+    note: "CSA2 layers use compress_rope_theta with YaRN (factor 16, original 65536); the 2 SWA-only layers use rope_theta=10000 without YaRN (inference/model.py lines 681–688)."
+  attn.sinks:
+    value: "learnable per-head sink logit in the softmax denominator, every layer"
+    source: inference-model
+    at: "inference/model.py line 640; Attention.__init__"
+    quote: "self.attn_sink = nn.Parameter(torch.empty(self.n_local_heads, dtype=torch.float32))"
+  attn.sparse:
+    value: "CSA2 indexer (32 heads × 128), top-512 KV entries; decoder hierarchical indexer limited to a 2048-block × 8-position candidate pool"
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "For all CSA2 layers, we set the number of indexer query heads to 32, the indexer head dimension to 128, and the number of KV entries selected for sparse attention (i.e., attention top-k) to 512."
+    note: "The hierarchical candidate pool is introduced in post-training (p.12 §2.3.2); config /text_config/candidate_source_layer_id 20, candidate_topk_blocks 2048, candidate_block_size 8; index_n_heads 32, index_head_dim 128, index_topk 512."
+  attn.window: {value: 128, source: config, at: "/text_config/sliding_window"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "using SwiGLU activation function with clamping (OpenAI, 2025) at a threshold of 10"
+    note: "config /text_config/hidden_act silu."
+  ffn.bias:
+    value: false
+    source: inference-model
+    at: "inference/model.py lines 836–841; Expert.__init__"
+    quote: "self.w1 = Linear(dim, inter_dim, dtype=dtype)"
+    note: "Linear defaults to bias=False; shared and routed experts both use Expert."
+  ffn.clamp:
+    value: "up (linear) clamped to [−10, 10], gate capped at 10; routed and shared experts in every layer"
+    source: inference-model
+    at: "inference/model.py lines 846–849; Expert.forward"
+    quote: "up = torch.clamp(up, min=-self.swiglu_limit, max=self.swiglu_limit)"
+    note: "Gate is clamped with max only; limit 10 from /text_config/swiglu_limit and p.22 §4.2.1."
+
+  moe.balancing:
+    value: "aux-loss-free bias with separate text and image biases (update speed 0.001) + sequence-level loss 1e-4"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "we set the bias update speed to 0.001 for both image and text tokens, while retaining a small sequence-level balance loss with a loss weight of 0.0001"
+    note: "Modality-specific biases: p.8 §2.1.1. Bias enters top-k selection only (/text_config/topk_method noaux_tc)."
+  moe.dense_layers:
+    value: 0
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "We employ MoE layers in all Transformer blocks"
+  moe.expert_dim: {value: 2304, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.experts: {value: 384, source: config, at: "/text_config/n_routed_experts"}
+  moe.norm_topk: {value: true, source: config, at: "/text_config/norm_topk_prob"}
+  moe.routed_scale: {value: 1.5, source: config, at: "/text_config/routed_scaling_factor"}
+  moe.router:
+    value: "sqrt(softplus)"
+    source: inference-model
+    at: "inference/model.py line 819; Gate.forward"
+    quote: "scores = F.softplus(scores).sqrt()"
+    note: "/text_config/scoring_func is sqrtsoftplus."
+  moe.shared: {value: 1, source: config, at: "/text_config/n_shared_experts"}
+  moe.shared_dim:
+    value: 2304
+    source: config
+    at: "/text_config/moe_intermediate_size"
+    note: "1 shared expert (/text_config/n_shared_experts) of the routed-expert width."
+  moe.top_k: {value: 6, source: config, at: "/text_config/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 0
+    source: report
+    at: "p.8 §2.1"
+    quote: "We omit the MTP module during backbone pre-training and use DSpark (Cheng et al., 2026a) for speculative decoding."
+    note: "The DSpark drafter is trained after pre-training with the backbone frozen."
+
+  norm.eps:
+    value: 1e-20
+    source: config
+    at: "/text_config/rms_norm_eps"
+    note: "Used by attn_norm, ffn_norm, q/kv norms and the final norm in inference/model.py (norm_eps); the mHC Sinkhorn eps is separate (hc_eps 1e-6)."
+  norm.placement:
+    value: pre
+    source: inference-model
+    at: "inference/model.py lines 983–995; Block.forward"
+    quote: "x = self.attn_norm(x)"
+    note: "Sublayers sit inside Single-Pass mHC (hc_pre/hc_post), expansion 4."
+  norm.type:
+    value: RMSNorm
+    source: inference-model
+    at: "inference/model.py lines 935–936; Block.__init__"
+    quote: "self.attn_norm = RMSNorm(args.dim, self.norm_eps)"
+  norm.residual:
+    value: "Single-Pass mHC: 4 residual streams, Sinkhorn-Knopp (20 iterations); each sublayer's input mixing uses the coefficients predicted at the previous sublayer"
+    source: report
+    at: "p.22 §4.2.1"
+    quote: "As for mHC, the expansion factor is set to 4, and the number of Sinkhorn-Knopp iterations is set to 20."
+    note: "Single-Pass shift: p.13 §2.4.1 (pre-training keeps the multi-kernel implementation); Block.forward in inference/model.py. config /text_config/hc_mult 4, hc_sinkhorn_iters 20."
+
+  ctx.extension:
+    value: "64K → 1M at 34T tokens; CSA2 layers use YaRN (factor 16, original 65536)"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "We train the model from scratch with sparse attention at a sequence length of 64K and extend the sequence length to 1M at 34T tokens."
+    note: "config /text_config/rope_scaling: rope_type yarn, factor 16, beta_fast 32, beta_slow 1, original_max_position_embeddings 65536."
+  ctx.final:
+    value: 1_048_576
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "extend the sequence length to 1M at 34T tokens."
+  ctx.max: {value: 1_048_576, source: config, at: "/text_config/max_position_embeddings"}
+  ctx.pretrain:
+    value: 65536
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "We train the model from scratch with sparse attention at a sequence length of 64K"
+
+  train.batch:
+    value: "100.6M tokens, fixed"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "We keep the batch size fixed at 100.6 million tokens throughout training."
+  train.batch_tokens:
+    value: 100_600_000
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "We keep the batch size fixed at 100.6 million tokens throughout training."
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "For AdamW, we set its hyper-parameters to 𝛽1 = 0.9, 𝛽2 = 0.95, 𝜀 = 10 −20 , and weight_decay = 0.1."
+  train.lr_min:
+    value: 2.6e-5
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "Between 28T and 40T tokens, we decay the learning rate to 2.6 × 10−5 following a cosine schedule."
+  train.lr_peak:
+    value: 2.6e-4
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "The learning rate is linearly warmed up over the first 2000 steps and then maintained at 2.6 × 10−4 until 28T tokens."
+  train.optimizer:
+    value: "Muon + AdamW (Muon for linear weights, head-wise for Q/K; AdamW for RMSNorm and other non-matrix params; Sinkhorn-balanced momentum update for embeddings, Engram tables and prediction head)"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "We employ the Muon optimizer (Jordan et al., 2024; Liu et al., 2025) for the parameters of linear transformations, use AdamW optimizer (Loshchilov and Hutter, 2019) for the weights of all RMSNorm modules and other non-matrix parameters, and use Sinkhorn-balanced update for all embeddings and prediction head."
+    note: "Muon: Nesterov momentum 0.95, weight decay 0.1, update RMS 0.18. Sinkhorn: K = 11, τ = 1e-3, ε = 1e-20, no weight decay. Engram LR scaled 5×. Head-wise Q/K Muon: p.15 §2.5."
+  train.schedule:
+    value: "2000-step linear warmup, constant 2.6e-4 to 28T, cosine to 2.6e-5 at 40T, constant to 45T"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "Between 28T and 40T tokens, we decay the learning rate to 2.6 × 10−5 following a cosine schedule. We keep the learning rate at this value from 40T to 45T tokens."
+  train.stages:
+    value:
+      - name: main
+        tokens: 34_000_000_000_000
+        seq_len: 65536
+        note: "Sparse attention from scratch."
+        quote: "We train the model from scratch with sparse attention at a sequence length of 64K"
+      - name: long
+        tokens: 11_000_000_000_000
+        seq_len: 1_048_576
+        note: "34T to 45T."
+        quote: "extend the sequence length to 1M at 34T tokens."
+    source: report
+    at: "p.22 §4.2.2"
+  train.tokens:
+    value: 45_000_000_000_000
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "We train DeepSeek-V4.1-Flash on 45T tokens of multimodal data with no instability."
+  train.warmup:
+    value: "2000 steps"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "The learning rate is linearly warmed up over the first 2000 steps"
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "For AdamW, we set its hyper-parameters to 𝛽1 = 0.9, 𝛽2 = 0.95, 𝜀 = 10 −20 , and weight_decay = 0.1."
+  train.data:
+    value: "text-only : multimodal = 7:1 tokens; multimodal = image-text pairs, interleaved image-text, domain-specific (grounding, OCR, image-code, computer-use)"
+    source: report
+    at: "p.21 §4.1"
+    quote: "the resulting corpus uses a 7:1 token ratio of text-only to multimodal data."
+  train.masking:
+    value: "sample-level attention masking within packed sequences"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "Similar to DeepSeek-V4, we employ sample-level attention masking during pre-training."
+  train.objective:
+    value: "multimodal (image + text) input from the start of pretraining"
+    source: report
+    at: "p.7 §2.1"
+    quote: "with multimodal data incorporated from the start of language-model pre-training"
+    note: "Vision encoder frozen until LR decay, then trained jointly at a smaller LR (p.15 §2.5)."
+  scaling.hp_rule:
+    value: "AdamW LR reused for Muon by rescaling update RMS to 0.18"
+    source: report
+    at: "p.22 §4.2.2"
+    quote: "rescale the RMS of each update matrix to 0.18 for reutilization of the AdamW learning rate"
+  scaling.ladder:
+    value: "ladder over model parameters and training data (sizes not disclosed)"
+    source: report
+    at: "p.20 §4.1"
+    quote: "a scaling ladder over model parameters and training data is carefully designed to guide large-scale training runs"

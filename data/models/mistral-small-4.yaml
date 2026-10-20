@@ -1,0 +1,171 @@
+name: Mistral-Small-4-119B-2603
+org: Mistral AI
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  card: {url: https://huggingface.co/mistralai/Mistral-Small-4-119B-2603/resolve/a11f36bebf709121056b1dbcc943d1c6afbe494d/README.md, kind: model-card}
+  config: {url: https://huggingface.co/mistralai/Mistral-Small-4-119B-2603/resolve/a11f36bebf709121056b1dbcc943d1c6afbe494d/config.json, kind: config}
+  blog: {url: https://web.archive.org/web/20261006190028/https://mistral.ai/news/mistral-small-4/, kind: blog}
+  modeling_mistral4: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/mistral4/modeling_mistral4.py, kind: code}
+  data_summary: {url: "https://web.archive.org/web/20261011054034id_/https://legal.mistral.ai/documents/Mistral%20Small%204%20-%20Public%20Summary%20of%20Training%20Content.docx.pdf", kind: paper}
+
+not_disclosed: [moe.balancing, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  num_key_value_heads: "MLA; equals num_attention_heads, so repeat_kv is the identity"
+  n_group: "1: group-limited routing inactive"
+  topk_group: "1: group-limited routing inactive"
+
+facts:
+  meta.released:
+    value: "2026-03-16"
+    source: blog
+    at: "Introducing Mistral Small 4; header"
+    quote: "Introducing Mistral Small 4 March 16, 2026"
+    note: "Same post: \"Mistral Small 4 is released under the Apache 2.0 license\"."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+
+  params.active:
+    value: 6_500_000_000
+    source: card
+    at: "README.md; Key Features"
+    quote: "119B parameters, with 6.5B activated per token."
+    note: "The blog says 6B active (8B including embedding and output layers); the card title says A6B."
+  params.active_non_embedding:
+    value: 6_000_000_000
+    source: blog
+    at: "Key architectural details"
+    quote: "119B total parameters, with 6B active parameters per token (8B including embedding and output layers)."
+  params.note:
+    value: "Card's 6.5B active has no stated scope; the blog gives 6B without and 8B with embedding and output layers."
+    source: blog
+    at: "Key architectural details"
+    quote: "119B total parameters, with 6B active parameters per token (8B including embedding and output layers)."
+  params.total:
+    value: 119_000_000_000
+    source: card
+    at: "README.md; Key Features"
+    quote: "119B parameters, with 6.5B activated per token."
+
+  shape.d_model: {value: 4096, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 36, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab: {value: 131_072, source: config, at: "/text_config/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+  attn.global_layers:
+    value: 36
+    source: config
+    at: "/text_config/num_hidden_layers"
+    note: "Every block uses Mistral4Attention (MLA); /text_config/sliding_window is null."
+  attn.head_dim:
+    value: 128
+    source: config
+    at: "/text_config/qk_nope_head_dim + /text_config/qk_rope_head_dim"
+    note: "configuration_mistral4.py recomputes head_dim and qk_head_dim (both 128 in config) as this sum."
+  attn.v_head_dim: {value: 128, source: config, at: "/text_config/v_head_dim"}
+  attn.heads: {value: 32, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: MLA
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4Attention docstring"
+    quote: "Multi-headed Latent Attention (MLA) from Deepseek V2, with support for rope interleave."
+  attn.kv_lora_rank: {value: 256, source: config, at: "/text_config/kv_lora_rank"}
+  attn.position:
+    value: "partial RoPE (MLA decoupled, interleaved, 64 of 128 QK dims)"
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4Attention.forward"
+    quote: "q_rot, k_rot = apply_rotary_pos_emb_interleave(q_rot, k_rot, cos, sin)"
+    note: "Config /text_config/rope_interleave is true."
+  attn.q_lora_rank: {value: 1024, source: config, at: "/text_config/q_lora_rank"}
+  attn.qk_norm:
+    value: false
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4Attention.forward"
+    quote: "q_states = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))"
+    note: "RMSNorm is applied only to the Q and KV latents; per-head Q/K are not normalized."
+  attn.rope_dim: {value: 64, source: config, at: "/text_config/qk_rope_head_dim"}
+  attn.rope_theta: {value: 10000, source: config, at: "/text_config/rope_parameters/rope_theta"}
+  attn.scale:
+    value: "queries × (1 + 0.1·ln(1 + ⌊pos/8192⌋)) (Llama-4 style)"
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; get_llama_4_attn_scale"
+    quote: "scaling = 1 + beta * torch.log(1 + torch.floor(positions_ids / max_position_embeddings))"
+    note: "beta = /text_config/rope_parameters/llama_4_scaling_beta (0.1), length = original_max_position_embeddings (8192)."
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4Experts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "Config /text_config/hidden_act is silu."
+  ffn.bias:
+    value: false
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.dense_layers:
+    value: 0
+    source: config
+    at: "/text_config/first_k_dense_replace"
+    note: "All 36 blocks are MoE; /text_config/intermediate_size (12288) is unused."
+  moe.expert_dim: {value: 2048, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.experts: {value: 128, source: config, at: "/text_config/n_routed_experts"}
+  moe.norm_topk: {value: true, source: config, at: "/text_config/norm_topk_prob"}
+  moe.routed_scale: {value: 1.0, source: config, at: "/text_config/routed_scaling_factor"}
+  moe.router:
+    value: softmax
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4TopkRouter.forward"
+    quote: "scores = router_logits.softmax(-1)"
+  moe.shared: {value: 1, source: config, at: "/text_config/n_shared_experts"}
+  moe.shared_dim:
+    value: 2048
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4MoE.__init__"
+    quote: "config=config, intermediate_size=config.moe_intermediate_size * config.n_shared_experts"
+    basis: inferred
+    note: "moe_intermediate_size 2048 × n_shared_experts 1."
+  moe.top_k: {value: 4, source: config, at: "/text_config/num_experts_per_tok"}
+
+  norm.eps: {value: 1.0e-6, source: config, at: "/text_config/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling_mistral4
+    at: "modeling_mistral4.py; Mistral4DecoderLayer.__init__"
+    quote: "self.input_layernorm = Mistral4RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+
+  ctx.extension:
+    value: "YaRN factor 128 over original 8,192 (release config)"
+    source: config
+    at: "config.json; text_config.rope_parameters"
+    quote: "\"factor\": 128.0, \"llama_4_scaling_beta\": 0.1, \"mscale\": 1.0, \"mscale_all_dim\": 1.0, \"original_max_position_embeddings\": 8192,"
+    note: "Training-time context stages are not disclosed. Same dict: rope_type/type yarn, beta_fast 32, beta_slow 1."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Key Features"
+    quote: "256k context length"
+    note: "Config /text_config/max_position_embeddings is 1,048,576."
+  train.cutoff:
+    value: "July 2025"
+    source: data_summary
+    at: "§1.3 Latest date of data acquisition/collection"
+    quote: "The latest date of data collection was July 2025."
+  train.data:
+    value: "multilingual text and images: Common Crawl and other public datasets, licensed and third-party datasets, synthetic data, user interaction data (subject to opt-out)"
+    source: data_summary
+    at: "§2.1 Publicly available datasets"
+    quote: "The datasets used to train the model include Common Crawl."
+    note: "§1.3 ticks \"More than 10 trillions tokens\" for the text training data."

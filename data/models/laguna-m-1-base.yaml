@@ -1,0 +1,214 @@
+name: Laguna-M.1-base
+org: Poolside
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/poolside/Laguna-M.1-base/resolve/628037ad548abdf6445ed00d1a691ac36c9dad2f/README.md, kind: model-card}
+  config: {url: https://huggingface.co/poolside/Laguna-M.1-base/resolve/628037ad548abdf6445ed00d1a691ac36c9dad2f/config.json, kind: config}
+  modeling_laguna: {url: https://huggingface.co/poolside/Laguna-M.1/resolve/2bf8a4ab6d2e8e1e0d92a41318532a0fee1640d6/modeling_laguna.py, kind: code}
+  report: {url: https://web.archive.org/web/20261004102254id_/https://poolside.ai/assets/laguna/laguna-m1-xs2-technical-report.pdf, kind: paper}
+
+not_disclosed: [mtp.depth, ctx.pretrain, ctx.final, train.lr_peak, train.lr_min, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  mlp_layer_types: "not read by modeling_laguna.py; MoE placement comes from mlp_only_layers and decoder_sparse_step"
+
+facts:
+  meta.released:
+    value: "2026-05-25"
+    source: report
+    at: "p.1 title block"
+    quote: "RESEARCH@POOLSIDE.AI MAY 25, 2026"
+    note: "Technical report date; M.1 was API-only from 2026-04-28 and its weights were published after the report."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+
+  params.active:
+    value: 23_400_000_000
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "out of which 23.4B (including embeddings) are activated per token"
+  params.active_non_embedding:
+    value: 22_600_000_000
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "out of which 23.4B (including embeddings) are activated per token"
+    basis: inferred
+    note: "23.4B − 2 × 100,352 × 4,096 (input embedding and untied LM head) = 22.58B, rounded to the 0.1B precision of the stated count."
+  params.note:
+    value: "Active count includes embeddings."
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "out of which 23.4B (including embeddings) are activated per token"
+  params.total:
+    value: 225_800_000_000
+    source: report
+    at: "p.5 §3.1 Architecture & Training"
+    quote: "LAGUNA M.1 has 225.8B total parameters"
+
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.layers: {value: 70, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 100_352, source: config, at: "/vocab_size"}
+  shape.tokenizer:
+    value: "BPE trained on internal data; shared with XS.2"
+    source: report
+    at: "p.5 §3.1"
+    quote: "Both models share the same tokenizer with a vocabulary size of 100,352 tokens, trained with Byte-Pair Encoding [75] on our internal datasets."
+
+  attn.gate:
+    value: "softplus, per element, on attention output before o_proj"
+    source: card
+    at: "README.md; Model overview"
+    quote: "Attention: 64 Q-heads, 8 KV-heads, head dimension 128, with softplus attention output gating"
+    note: "Per element: config /gating = \"per-element\" (one gate per head channel); XS.2 moved to per-head."
+  attn.global_layers:
+    value: 70
+    source: card
+    at: "README.md; Model overview"
+    quote: "Layers: 70 layers with global attention"
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.heads: {value: 64, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: GQA
+    source: card
+    at: "README.md; Highlights"
+    quote: "Laguna M.1 uses global attention across all layers with 64 Q-heads, 8 KV-heads"
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.layout:
+    value: "all global"
+    source: card
+    at: "README.md; Highlights"
+    quote: "Laguna M.1 uses global attention across all layers"
+    note: "Config sliding_window 0 means SWA is disabled."
+  attn.position:
+    value: RoPE
+    source: card
+    at: "README.md; Model overview"
+    quote: "Positional encoding: RoPE with YaRN"
+  attn.qk_norm:
+    value: true
+    source: modeling_laguna
+    at: "Laguna-M.1 modeling_laguna.py; LagunaAttention.__init__"
+    quote: "self.q_norm = LagunaRMSNorm(config.head_dim, eps=config.rms_norm_eps)"
+  attn.rope_fraction: {value: 1, source: config, at: "/rope_parameters/full_attention/partial_rotary_factor"}
+  attn.rope_theta: {value: 500_000, source: config, at: "/rope_parameters/full_attention/rope_theta"}
+  attn.v_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.bias:
+    value: false
+    source: modeling_laguna
+    at: "Laguna-M.1 modeling_laguna.py; LagunaAttention.__init__"
+    quote: "self.q_proj = nn.Linear(config.hidden_size, self.num_heads * config.head_dim, bias=False)"
+
+  ffn.activation:
+    value: SwiGLU
+    source: card
+    at: "README.md; Model overview"
+    quote: "Dense layers: first 3 layers are dense SwiGLU; remaining 67 layers are sparse MoE"
+  ffn.dim: {value: 16384, source: config, at: "/intermediate_size"}
+  ffn.bias:
+    value: false
+    source: modeling_laguna
+    at: "Laguna-M.1 modeling_laguna.py; LagunaMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.balancing:
+    value: "auxiliary-loss-free"
+    source: card
+    at: "README.md; Highlights"
+    quote: "Laguna M.1 uses 67 sparse MoE layers with 256 experts, top-k=16 routing and auxiliary-loss-free load balancing"
+    note: "Report §3.1.3 says M.1 padding tokens were \"included in the load-balancing loss\"; coefficient not disclosed."
+  moe.dense_layers:
+    value: 3
+    source: config
+    at: "/mlp_only_layers | len"
+    note: "Layers 0-2; decoder_sparse_step 1 makes every other layer MoE (LagunaDecoderLayer.__init__)."
+
+  moe.expert_dim: {value: 1024, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/num_experts"}
+  moe.router:
+    value: sigmoid
+    source: modeling_laguna
+    at: "Laguna-M.1 modeling_laguna.py; LagunaTopKRouter"
+    quote: "Laguna MoE router using sigmoid scoring (not softmax)."
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale:
+    value: 1.0
+    source: config
+    at: "/moe_routed_scaling_factor"
+    note: "Routed-expert modulation (2.5) was introduced in XS.2 (report §3.1)."
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model overview"
+    quote: "Experts: 256 experts with 1 shared expert; top-k=16 routing"
+  moe.shared_dim: {value: 1024, source: config, at: "/shared_expert_intermediate_size"}
+  moe.top_k: {value: 16, source: config, at: "/num_experts_per_tok"}
+
+  norm.placement:
+    value: pre
+    source: report
+    at: "p.5 §3.1"
+    quote: "LAGUNA XS.2 and M.1 are both Mixture-of-Experts (MoE) [77] models using a pre-norm Transformer architecture"
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "p.5 §3.1"
+    quote: "with RMSNorm [103] as the normalization layer"
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.extension:
+    value: "YaRN factor 64 over original 4,096 (release config)"
+    source: config
+    at: "config.json; rope_parameters.full_attention"
+    quote: "\"rope_type\": \"yarn\", \"factor\": 64.0, \"original_max_position_embeddings\": 4096,"
+    note: "M.1's long-context training stages are not disclosed; the report's 32K/128K recipe is stated for XS.2. Same dict: beta_fast 64, beta_slow 1, attention_factor 1.416; max_position_embeddings 262,144."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Model overview"
+    quote: "Context window: 262,144 tokens"
+
+  train.optimizer:
+    value: "Muon + AdamW (AdamW for non-matrix parameters)"
+    source: report
+    at: "p.8 §3.1.3 Expert Collapse"
+    quote: "To align the effective weight decay between matrix parameters (updated by Muon)"
+    note: "Same sentence: non-matrix parameters updated by AdamW. Muon in M.1 pre-training: §3.1.2 Distributed Muon reports its overhead \"during LAGUNA M.1 pre-training\"."
+  train.schedule:
+    value: cosine
+    source: report
+    at: "p.5 §3.1 From Laguna M.1 to Laguna XS.2"
+    quote: "Second, we adopted a Warmup-Stable-Decay (WSD) learning rate schedule [34] instead of cosine."
+    basis: inferred
+    note: "Listed as an M.1 → XS.2 change, implying M.1 used cosine. Phase boundaries not disclosed."
+  train.tokens:
+    value: ">30T"
+    source: report
+    at: "p.9 §3.2"
+    quote: "In total, both models were trained on more than 30T tokens."
+  train.data:
+    value: "sampled from a ~27T unique-token pool (web, code, educational, academic, synthetic); manually designed mixture with a high-precision web pipeline"
+    source: report
+    at: "p.9 §3.2"
+    quote: "We trained both LAGUNA M.1 and LAGUNA XS.2 from scratch on a pre-training corpus sampled from a pool of ∼27T unique tokens."
+    note: "Same section: for M.1 \"we used a high-precision pipeline with a manually designed mixture\"; the Table 4 AutoMixer mix is XS.2's."
+  train.hardware:
+    value: "6,144 H200"
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
+  train.stability:
+    value: "FP32 LM-head input-gradient all-reduce to fix positive logit drift; no z-loss"
+    source: report
+    at: "p.9 §3.1.3"
+    quote: "We therefore enforce the LM head input-gradient all-reduce in FP32 while keeping the layer tensor-parallel, resolving this numerical instability."
+    note: "Introduced after M.1 logit drift; the report does not say at what point in pretraining. Same paragraph: \"no z-loss\"."
+  train.masking:
+    value: "document masking; position ids reset at document boundaries"
+    source: report
+    at: "p.6 §3.1.2 Model Factory component: Titan"
+    quote: "resetting position indices at document boundaries to avoid RoPE-related rounding under document masking in attention"

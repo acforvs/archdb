@@ -1,0 +1,300 @@
+name: Olmo-3-1125-32B
+org: Ai2
+kind: base
+
+sources:
+  config: {url: https://huggingface.co/allenai/Olmo-3-1125-32B/resolve/c2b61dae89a1ad10e4ad5653d0e46b590902607b/config.json, kind: config}
+  report: {url: https://arxiv.org/pdf/2512.13961v2, kind: paper}
+  pretrain_script: {url: https://raw.githubusercontent.com/allenai/OLMo-core/5f6f58a133e7ef577d596295f2c8db4651c27857/src/scripts/official/OLMo3/OLMo-3-1025-32B-pretrain.py, kind: code}
+  modeling_olmo3: {url: https://raw.githubusercontent.com/huggingface/transformers/8cb5963cc22174954e7dca2c0a3320b7dc2f4edc/src/transformers/models/olmo3/modeling_olmo3.py, kind: code}
+  blog: {url: "https://web.archive.org/web/20251120152225/https://allenai.org/blog/olmo3", kind: blog}
+  card: {url: https://huggingface.co/allenai/Olmo-3-1125-32B/resolve/c2b61dae89a1ad10e4ad5653d0e46b590902607b/README.md, kind: model-card}
+
+not_disclosed: [params.active_non_embedding]
+
+facts:
+  meta.released:
+    value: "2025-11-20"
+    source: blog
+    at: "Olmo 3 announcement; header date"
+    quote: "November 20, 2025"
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; front matter"
+    quote: "license: apache-2.0"
+
+  params.total:
+    value: 32_000_000_000
+    source: report
+    at: "p.1 abstract"
+    quote: "We introduce Olmo 3, a family of state-of-the-art, fully-open language models at the 7B and 32B"
+    note: "Size designation; no exact parameter count is reported."
+  params.active:
+    value: 32_000_000_000
+    source: report
+    at: "p.1 abstract"
+    quote: "We introduce Olmo 3, a family of state-of-the-art, fully-open language models at the 7B and 32B"
+    note: "Dense model; all parameters active."
+
+  shape.d_model: {value: 5120, source: config, at: "/hidden_size"}
+  shape.layers: {value: 64, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab:
+    value: 100_278
+    source: config
+    at: "/vocab_size"
+    note: "Training script pads the embedding to a multiple of 128 (100,352 rows); the released checkpoint is trimmed to 100,278."
+  shape.tokenizer:
+    value: "OLMo 2 tokenizer, derived from OpenAI cl100k"
+    source: report
+    at: "p.10 §3.2 Tokenizer"
+    quote: "We process data for each stage using the same tokenizer as OLMo 2, which is derived from OpenAI"
+
+  attn.global_layers: {value: 16, source: config, at: "/layer_types | count full_attention"}
+  attn.local_layers: {value: 48, source: config, at: "/layer_types | count sliding_attention"}
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "p.9 §3.2; Table 33 caption p.85"
+    quote: "the 32B model uses grouped-query attention (Ainslie et al., 2023) for increased efficiency."
+  attn.layout:
+    value: "3 SWA : 1 global (last layer global)"
+    source: report
+    at: "p.9 §3.2 Architecture"
+    quote: "We add SWA at three out of every four layers, and ensure that the last layer always uses full attention."
+  attn.window: {value: 4096, source: config, at: "/sliding_window"}
+  attn.local_heads:
+    value: 40
+    source: config
+    at: "/num_attention_heads"
+    note: "Olmo3Attention reads the same num_attention_heads, num_key_value_heads and head_dim for both layer types; only sliding_window and the rotary embedding differ."
+  attn.local_kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.local_head_dim:
+    value: 128
+    source: modeling_olmo3
+    at: "modeling_olmo3.py; Olmo3Attention.__init__"
+    quote: 'self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)'
+    basis: inferred
+    note: "Same Olmo3Attention class for both layer types; hidden_size 5120 / 40 heads = 128."
+  attn.local_rope_theta:
+    value: 500_000
+    source: config
+    at: "/rope_theta"
+    note: "Sliding layers use Olmo3RotaryEmbedding(config, rope_type=\"default\"), i.e. rope_theta without YaRN."
+  attn.heads: {value: 40, source: config, at: "/num_attention_heads"}
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.head_dim:
+    value: 128
+    source: modeling_olmo3
+    at: "modeling_olmo3.py line 146; Olmo3Attention.__init__"
+    quote: 'self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)'
+    basis: inferred
+    note: "config.json has no head_dim, so hidden_size 5120 / 40 heads = 128."
+  attn.position:
+    value: RoPE
+    source: report
+    at: "p.85 Table 33; §3.6.4"
+    quote: "RoPE scaling YaRN on full attn. layers"
+  attn.rope_theta: {value: 500_000, source: config, at: "/rope_theta"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.qk_norm:
+    value: true
+    source: modeling_olmo3
+    at: "modeling_olmo3.py lines 164–184; Olmo3Attention"
+    quote: "self.q_norm = Olmo3RMSNorm(config.num_attention_heads * self.head_dim, config.rms_norm_eps)"
+    note: "RMSNorm over the full Q and K projections (all heads jointly), not per head; paper Table 33 lists QK-Norm."
+
+  ffn.activation:
+    value: SwiGLU
+    source: report
+    at: "p.85 Table 33"
+    quote: "Activation SwiGLU"
+    note: "Config hidden_act silu; Olmo3MLP computes down_proj(act_fn(gate_proj(x)) * up_proj(x))."
+  ffn.dim: {value: 27648, source: config, at: "/intermediate_size"}
+  ffn.bias:
+    value: false
+    source: modeling_olmo3
+    at: "modeling_olmo3.py; Olmo3MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "p.85 Table 33"
+    quote: "Layer norm RMSNorm"
+  norm.placement:
+    value: "post (on sublayer outputs, inside the residual branch)"
+    source: report
+    at: "p.85 Table 33"
+    quote: "Layer norm applied to Outputs"
+    note: "OLMo 2-style reordered norm: residual + norm(sublayer(x)); see Olmo3DecoderLayer."
+
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.pretrain:
+    value: 8192
+    source: report
+    at: "p.9 §3.2 Architecture"
+    quote: "We train with a context window of 8192 tokens (increased from 4096 tokens for OLMo 2) during pretraining and midtraining stages."
+  ctx.final:
+    value: 65_536
+    source: report
+    at: "p.30 §3.6"
+    quote: "the methodology we used to scale Olmo 3’s context window from 8,192 to 65,536 tokens."
+  ctx.max:
+    value: 65_536
+    source: report
+    at: "p.5 §2.1"
+    quote: "Olmo 3 is our first model with long-context capabilities, supporting up to 65K context after extension."
+    note: "Config max_position_embeddings 65536."
+  ctx.extension:
+    value: "YaRN on full-attention layers only (SWA RoPE unchanged); 8K → 65K over 100B tokens after midtraining, 34% long / 66% midtraining data, best-fit packing, intra-document masking"
+    source: report
+    at: "p.30 §3.6"
+    quote: "During long-context extension, we apply YaRN (Peng et al., 2023) to full attention layers, and do not adjust positional embeddings on sliding-window attention layers"
+    note: "Released config rope_scaling: rope_type yarn, factor 8, original_max_position_embeddings 8192, attention_factor 1.2079441541679836, beta_fast 32, beta_slow 1."
+
+  mtp.depth:
+    value: 0
+    source: pretrain_script
+    at: "OLMo-3-1025-32B-pretrain.py; build_config"
+    quote: "model_config = TransformerConfig.olmo3_32B("
+    note: "Official pretraining config builds a plain decoder with next-token loss; OLMo-core at this commit has no MTP module."
+
+  train.tokens:
+    value: 5_700_000_000_000
+    source: report
+    at: "p.85 Table 35"
+    quote: "Total training tokens 5.5T 100B (twice) 100B"
+    basis: inferred
+    note: "5.5T pretraining + 100B midtraining (two seeds, averaged) + 100B long-context along the released model's lineage; Table 13 lists 6.2T for 32B Stage 3."
+
+  train.optimizer:
+    value: "AdamW (OLMo-core SkipStepAdamW)"
+    source: pretrain_script
+    at: "OLMo-3-1025-32B-pretrain.py; build_config"
+    quote: "optim=SkipStepAdamWConfig("
+  train.lr_peak:
+    value: 6e-4
+    source: pretrain_script
+    at: "OLMo-3-1025-32B-pretrain.py; module constants"
+    quote: "LR = 6e-4"
+    note: "Paper Table 35: 6.0 × 10^-4."
+  train.lr_min:
+    value: 6.210e-5
+    source: report
+    at: "p.10 Figure 4 caption"
+    quote: "Due to the truncation, the real final learning rate is 6.210 × 10"
+    note: "End of stage-1 pretraining (exponent −5 is a superscript in the PDF). Midtraining and long-context stages each decay linearly from 2.071e-4 to 0 (Table 35)."
+  train.schedule:
+    value: "2000-step warmup; cosine over one epoch (5.93T) targeting 10% of peak, truncated at 5.5T; midtraining and long-context: linear decay 2.071e-4 → 0"
+    source: report
+    at: "p.10 Figure 4; p.85 Table 35"
+    quote: "The learning rate schedule is a cosine schedule over one epoch (5.93T tokens), truncated at 5.5T tokens."
+  train.warmup:
+    value: "2000 steps"
+    source: report
+    at: "p.10 Figure 4 caption"
+    quote: "Warm-up is 2000 steps, and the peak learning rate is 6 × 10"
+    note: "Long-context stage has its own 200-step warmup; midtraining none (Table 35)."
+  train.batch:
+    value: "1,024 × 8,192 (8.39M tokens) pretraining; 512 × 8,192 (4.19M tokens) midtraining; 128 × 65,536 (8.39M tokens) long-context"
+    source: report
+    at: "p.85 Table 35"
+    quote: "Batch size (# tokens) 8,388,608 4,194,304 8,388,608"
+  train.batch_tokens:
+    value: 8_388_608
+    source: report
+    at: "p.85 Table 35, Olmo 3 Base 32B pretraining column"
+    quote: "Batch size (# tokens) 8,388,608 4,194,304 8,388,608"
+    note: "1,024 instances × 8,192 tokens; no ramp."
+  train.weight_decay:
+    value: 0.1
+    source: pretrain_script
+    at: "OLMo-3-1025-32B-pretrain.py; build_config"
+    quote: "weight_decay=0.1,"
+    note: "Embeddings excluded (weight_decay=0.0 override; paper Table 33: no weight decay on embeddings)."
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: pretrain_script
+    at: "OLMo-3-1025-32B-pretrain.py; build_config"
+    quote: "betas=(0.9, 0.95),"
+  train.grad_clip:
+    value: 1.0
+    source: pretrain_script
+    at: "OLMo-3-1025-32B-pretrain.py; build_config"
+    quote: "max_grad_norm=1.0,"
+  train.precision:
+    value: BF16
+    source: report
+    at: "p.9 §3.2 Training"
+    quote: "using bfloat16 precision throughout."
+    note: "Pretraining script sets Float8Config(enabled=False); FSDP params bf16, reductions fp32."
+  train.stability:
+    value: "z-loss 1e-5; QK-norm; no weight decay on embeddings"
+    source: pretrain_script
+    at: "OLMo-3-1025-32B-pretrain.py; build_config"
+    quote: "z_loss_multiplier=1e-5,"
+    note: "Paper Table 33 lists the same z-loss weight, QK-Norm and no embedding weight decay."
+  train.masking:
+    value: "intra-document masking during long-context extension"
+    source: report
+    at: "p.35 §3.6.3"
+    quote: "During long-context extension, we apply intra-document masking to ensure that each training sequence attends only to tokens originating from the same underlying document"
+    note: "Not stated for pretraining or midtraining."
+  train.data:
+    value: "Dolma 3 Mix, 5.93T: Common Crawl 76.1%, olmOCR science PDFs 13.6%, Stack-Edu code 6.89%, FineMath 3+ 2.56%, arXiv 0.86%, Wikipedia/Wikibooks 0.04%; upsampled from a 9.31T pool"
+    source: report
+    at: "p.14 §3.4, Table 4"
+    quote: "Common Crawl Web pages 8.14T 9.67B 4.51T (76.1%)"
+    note: "The 32B run stopped at 5.5T of this one-epoch mix."
+  train.cutoff:
+    value: "December 2024"
+    source: report
+    at: "p.15 §3.4.1 Text extraction"
+    quote: "We start with 104 dumps from the CommonCrawl corpus, with a cutoff date of December 31, 2024."
+    note: "olmOCR science PDFs also cut off December 2024; smaller sources earlier."
+  train.hardware:
+    value: "H100 80GB; pretraining 512 GPUs for ~9.5 days then 1024 for ~35 days; midtraining 2 × 512; long-context 1024"
+    source: report
+    at: "p.7 §2 runtime breakdown; p.85 Table 34"
+    quote: "The initial pretraining phase on 5.5T tokens took about 9.5 days on 512 GPUs, followed by an additional 35 days on 1024 GPUs."
+    note: "Table 34: 8× NVIDIA H100 (80GB HBM3) nodes; durations include crash resumptions."
+  train.averaging:
+    value: "midtraining: weights of two 100B runs with different data-order seeds averaged; long-context: checkpoints at steps 10,000, 11,000, 11,921 averaged"
+    source: report
+    at: "p.35 §3.6.3 Model souping; p.85 Table 35"
+    quote: "we merge the last three checkpoints from the end of the extension run (at steps 10,000, 11,000, and 11,921) to produce our final long-context Olmo 3 Base 32B."
+  train.stages:
+    value:
+      - name: pretraining
+        tokens: 5_500_000_000_000
+        seq_len: 8192
+        lr: 6e-4
+        batch_tokens: 8_388_608
+        note: "Dolma 3 Mix; cosine to 5.93T truncated at 5.5T."
+        quote: "The initial pretraining phase on 5.5T tokens took about 9.5 days on 512 GPUs, followed by an additional 35 days on 1024 GPUs."
+      - name: midtraining
+        tokens: 100_000_000_000
+        seq_len: 8192
+        lr: 2.071e-4
+        batch_tokens: 4_194_304
+        note: "Dolma 3 Dolmino Mix; no warmup, linear decay to 0; two runs with different data-order seeds, weights averaged."
+        quote: "Midtraining consisted of two parallel runs on 512 GPUs each, covering 100B tokens per run"
+      - name: long-context
+        tokens: 100_000_000_000
+        seq_len: 65_536
+        lr: 2.071e-4
+        batch_tokens: 8_388_608
+        steps: 11_921
+        note: "Dolma 3 Longmino Mix; 200-step warmup, linear decay to 0; final model averages checkpoints at steps 10,000, 11,000, 11,921."
+        quote: "Long-context extension was executed as a single run on 1024 GPUs"
+    source: report
+    at: "p.3 §2; p.30–35 §3.5–3.6; p.85 Table 35"
+
+  scaling.ladder:
+    value: "Data ablations up to 1B params at 100B tokens; mix swarms of 30M models at 3B tokens (5× Chinchilla)"
+    source: report
+    at: "p.11 §3.3; p.18 §3.4 swarm construction"
+    quote: "up to our largest experiment scale of 1B parameters at 100B tokens"

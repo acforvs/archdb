@@ -1,0 +1,410 @@
+name: Motif-3-Base
+org: Motif Technologies
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/Motif-Technologies/Motif-3-Base/resolve/ac7c9a74d113691e789b3df34d4ef685eeaef9a1/README.md, kind: model-card}
+  config: {url: https://huggingface.co/Motif-Technologies/Motif-3-Base/resolve/ac7c9a74d113691e789b3df34d4ef685eeaef9a1/config.json, kind: config}
+  index: {url: https://huggingface.co/Motif-Technologies/Motif-3-Base/resolve/ac7c9a74d113691e789b3df34d4ef685eeaef9a1/model.safetensors.index.json, kind: config}
+  modeling_motif: {url: https://huggingface.co/Motif-Technologies/Motif-3-Base/resolve/ac7c9a74d113691e789b3df34d4ef685eeaef9a1/modeling_motif.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2608.09119v1, kind: paper}
+  train_model: {url: https://raw.githubusercontent.com/MotifTechnologies/motif3-training-example/f2cad4115bde073bc61dead4dce8db9711db0ab6/llm_training/motif/model/model.py, kind: code}
+
+not_disclosed: [train.warmup, train.weight_decay, train.betas, train.grad_clip, params.active_non_embedding]
+
+config_unused:
+  k_ratio: not read by modeling_motif.py
+  max_window_layers: not read by modeling_motif.py
+
+facts:
+  meta.released:
+    value: "2026-08-10"
+    source: report
+    at: "p.1 arXiv stamp"
+    quote: "arXiv:2608.09119v1 [cs.AI] 10 Aug 2026"
+    note: "Card is undated; the Hugging Face repository was created 2026-08-09."
+  meta.license:
+    value: mit
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: mit"
+  params.total:
+    value: 314_000_000_000
+    source: report
+    at: "p.1 Abstract"
+    quote: "We introduce Motif 3, a decoder-only Mixture-of-Experts language model with 314 billion total parameters and 13.2 billion parameters activated for each token."
+  params.active:
+    value: 13_200_000_000
+    source: report
+    at: "p.1 Abstract"
+    quote: "We introduce Motif 3, a decoder-only Mixture-of-Experts language model with 314 billion total parameters and 13.2 billion parameters activated for each token."
+
+  shape.layers: {value: 53, source: config, at: "/num_hidden_layers"}
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.vocab: {value: 220_160, source: config, at: "/vocab_size"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "SuperBPE trained from scratch (stage 2 adds multi-word superword tokens), 220,160 vocab"
+    source: report
+    at: "p.15 §4.1 Tokenizer"
+    quote: "We trained the Motif 3 tokenizer from scratch using the SuperBPE reference implementation"
+
+  attn.kind:
+    value: "GDLA (MLA latent KV + grouped differential attention), SWA"
+    source: report
+    at: "p.1 Abstract"
+    quote: "Motif 3 is built around Grouped Differential Latent Attention (GDLA), which integrates grouped differential attention with the compressed key-value representation of Multi-head Latent Attention."
+  attn.layout:
+    value: "3 SWA : 1 global (global first: layers 0, 4, …, 52)"
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "Under zero-based indexing, layers 0, 4, 8, . . . use full attention, while the three intervening layers use sliding-window attention."
+    note: "Both layer types use GDLA; config use_sliding_window true, sliding_window_pattern interleave."
+  attn.global_layers:
+    value: 14
+    source: modeling_motif
+    at: "modeling_motif.py; MotifGDLAttention.__init__"
+    quote: 'elif pattern == "interleave" and layer_idx % period != 0:'
+    basis: inferred
+    note: "Config has no per-layer list; with /sliding_window_period 4 and /num_hidden_layers 53, layers 0, 4, …, 52 are full attention."
+  attn.local_layers:
+    value: 39
+    source: modeling_motif
+    at: "modeling_motif.py; MotifGDLAttention.__init__"
+    quote: 'elif pattern == "interleave" and layer_idx % period != 0:'
+    basis: inferred
+    note: "53 layers (/num_hidden_layers) minus the 14 with layer_idx % 4 == 0 (/sliding_window_period 4)."
+  attn.window:
+    value: 128
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "the remaining layers use sliding-window attention with a window of 128 tokens."
+    note: "config sliding_window 128; HF code passes sliding_window + 1 to flash attention."
+  attn.heads:
+    value: 80
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "GDLA uses 80 query heads and 16 KV heads"
+    note: "num_attention_heads 80, num_key_value_heads 16. All 80 heads (64 signal + 16 noise, g = 4) compute attention; each group of 4 signal + 1 noise heads shares one of 16 KV heads up-projected from the latent. Each noise output is subtracted from its group's signal outputs, so W_O sees 64 heads × 128."
+  attn.head_dim:
+    value: 192
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "with a query-key head dimension of 192, a value-head dimension of 128, and a 64-dimensional rotary component."
+    note: "config head_dim 192 = 128 NoPE + 64 RoPE."
+  attn.v_head_dim:
+    value: 128
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "with a query-key head dimension of 192, a value-head dimension of 128, and a 64-dimensional rotary component."
+  attn.kv_lora_rank:
+    value: 512
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "The query and KV low-rank dimensions are 1,024 and 512, respectively."
+    note: "config kv_lora_rank 512; v_head_dim 128."
+  attn.q_lora_rank:
+    value: 1024
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "The query and KV low-rank dimensions are 1,024 and 512, respectively."
+  attn.rope_dim:
+    value: 64
+    source: report
+    at: "p.19 §4.3 Model configuration"
+    quote: "with a query-key head dimension of 192, a value-head dimension of 128, and a 64-dimensional rotary component."
+    note: "config qk_rope_head_dim 64."
+  attn.position:
+    value: "partial RoPE (decoupled 64-dim RoPE key shared across heads + 128 NoPE dims); YaRN on global layers only"
+    source: report
+    at: "p.19 §4.3 Batch size and context-length schedule"
+    quote: "The full-attention layers use a DeepSeek-YaRN extension from the original 4K context length to 256K, with an extension factor of 64, while the sliding-window layers retain local RoPE without long-range extension."
+  attn.rope_theta:
+    value: 10000
+    source: config
+    at: "/rope_scaling/rope_theta"
+    note: "Top-level rope_theta is also 10000."
+  attn.local_heads:
+    value: 80
+    source: config
+    at: "/num_attention_heads"
+    note: "MotifGDLAttention reads the same head counts and dims for SWA and full layers; only the window and rotary embedding differ."
+  attn.local_kv_heads: {value: 16, source: config, at: "/num_key_value_heads"}
+  attn.local_head_dim:
+    value: 192
+    source: config
+    at: "/head_dim"
+    note: "QK 192, V 128 (/v_head_dim), as in global layers."
+  attn.local_rope_theta:
+    value: 10000
+    source: config
+    at: "/swa_rope_theta"
+    note: "SWA layers build their own rotary embedding with rope_scaling None (no YaRN)."
+  attn.qk_norm:
+    value: false
+    source: modeling_motif
+    at: "modeling_motif.py; MotifGDLAttention.forward"
+    quote: "kv_proj = self.wkv_b(self.kv_norm(kv_latent))"
+    note: "RMSNorm is applied only to the Q and KV latents before up-projection, not per head."
+  attn.gate:
+    value: "element-wise sigmoid gate from the normalized query latent, on the differential output before W_O"
+    source: report
+    at: "p.5 §2.2.3"
+    quote: "Before the final output projection, the differential representation is modulated by an element-wise sigmoid gate computed from the normalized query latent"
+    note: "config elementwise_attn_output_gate true; diff_v2 true selects the input-dependent λ variant (the only one in HF code)."
+  attn.scale:
+    value: "global layers: 1/sqrt(192) × (0.1·ln 64 + 1)² (YaRN mscale); SWA layers: 1/sqrt(192)"
+    source: modeling_motif
+    at: "modeling_motif.py; MotifGDLAttention.__init__"
+    quote: "self.scaling = self.scaling * mscale_val * mscale_val"
+    note: "/rope_factor 64, /mscale 1. Differential output: attn1 - sigmoid(lambda_proj(x)) * attn2, λ per token and signal head (report Eq. 12–13)."
+  attn.bias:
+    value: false
+    source: modeling_motif
+    at: "modeling_motif.py; MotifGDLAttention.__init__"
+    quote: "self.wq_a = nn.Linear(self.hidden_size, self.q_lora_rank, bias=False)"
+    note: "wq_b, wkv_a, wkv_b, lambda_proj and wo are also bias=False."
+
+  ffn.activation:
+    value: "Expert-Specific PolyNorm (gated: PolyNorm(gate) × up; per-expert sigmoid-bounded coefficients)"
+    source: report
+    at: "p.6 §2.4"
+    quote: "Motif 3 instead replaces the SiLU gate activation with Expert-Specific PolyNorm, whose polynomial coefficients and bias are learned independently for each expert."
+    note: "config hidden_act poly_norm. PolyNorm(z) = Σ_{n=1..3} a_n·z^n/RMS(z^n) + b; dense layers and the shared expert use a single PolyNorm. Code multiplies the activation output by /polynorm_output_scale 0.5."
+  ffn.clamp:
+    value: "none (soft FFN-output magnitude penalty instead)"
+    source: report
+    at: "p.16 §4.2 FFN magnitude regularization"
+    quote: "We avoid this forward-pass intervention because activation outliers are not necessarily meaningless numerical artifacts."
+    note: "Routed-expert PolyNorm bias is clipped to [-0.5, 0.5] (Eq. 24, /polynorm_bias_clamp); the HF code's ±1e6 /hidden_clamp is a numerical guard."
+  ffn.dim:
+    value: 12288
+    source: report
+    at: "p.18 §4.3 Model configuration"
+    quote: "The first two layers use dense feed-forward networks with an intermediate dimension of 12,288"
+  ffn.bias:
+    value: false
+    source: modeling_motif
+    at: "modeling_motif.py; MotifMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Up and down projections also bias=False; the PolyNorm activation itself has a learned scalar bias."
+
+  moe.experts:
+    value: 384
+    source: report
+    at: "p.18 §4.3 Model configuration"
+    quote: "Each MoE layer contains 384 routed experts and one shared expert."
+    note: "config num_experts 384."
+  moe.top_k:
+    value: 8
+    source: report
+    at: "p.18 §4.3 Model configuration"
+    quote: "The router uses normalized sigmoid scores and selects eight routed experts per token."
+    note: "config experts_top_k 8."
+  moe.shared:
+    value: 1
+    source: report
+    at: "p.18 §4.3 Model configuration"
+    quote: "Each MoE layer contains 384 routed experts and one shared expert."
+  moe.expert_dim:
+    value: 1280
+    source: report
+    at: "p.18 §4.3 Model configuration"
+    quote: "Each routed expert has an intermediate dimension of 1,280."
+  moe.shared_dim:
+    value: 1280
+    source: config
+    at: "/moe_intermediate_size"
+    note: "1 shared expert (/num_shared_experts) of the routed-expert width (MoE.__init__)."
+  moe.dense_layers:
+    value: 2
+    source: report
+    at: "p.18 §4.3 Model configuration"
+    quote: "The first two layers use dense feed-forward networks with an intermediate dimension of 12,288, while the remaining 51 layers use sparse MoE feed-forward networks."
+    note: "config n_dense_first_layers 2, interleave_moe_layer_step 1."
+  moe.router:
+    value: normalized sigmoid
+    source: report
+    at: "p.18 §4.3 Model configuration"
+    quote: "The router uses normalized sigmoid scores and selects eight routed experts per token."
+    note: "Routing computed in FP32; config score_func sigmoid, route_norm true."
+  moe.norm_topk: {value: true, source: config, at: "/route_norm"}
+  moe.routed_scale: {value: 2.0, source: config, at: "/route_scale"}
+  moe.balancing:
+    value: "aux-loss-free bias (coefficient 1e-3) + sequence-wise aux loss 1e-4 (2.4e-4 layer 2, 2.0e-4 layers 3–5) + cosine-decayed Gaussian router-logit noise"
+    source: report
+    at: "p.19 §4.3 Hyperparameters"
+    quote: "The sequence-wise auxiliary load-balancing loss is summed over tokens and uses a default weight of 1 × 10−4 . We increase this weight to 2.4 × 10−4 for layer 2 and to 2.0 × 10−4 for layers 3–5."
+    note: "Bias coefficient 1 × 10−3 in the same paragraph; router noise in §4.2. Collapsed routers were replaced with an adjacent layer's router and biases."
+
+  mtp.depth:
+    value: 1
+    source: report
+    at: "p.7 Table 1"
+    quote: "MTP head 1 layer for self-speculative decoding"
+    note: "One DeepSeek-V3-style MTP module (§2.5); the index holds only mtp_layers.0."
+  mtp.modules:
+    value: 1
+    source: index
+    at: "model.safetensors.index.json; weight_map keys"
+    quote: "model.mtp_layers.0.input_proj.weight"
+    note: "Only mtp_layers.0 in the index; training code builds one module (multi_token_preds=1)."
+  mtp.block:
+    value: "concat(h, RMSNorm(next-token embedding)) → linear 2d→d → GDLA block (SWA, no mHC) with dense PolyNorm FFN → RMSNorm → shared output head"
+    source: train_model
+    at: "llm_training/motif/model/model.py; compute_mtp_loss, Motif.__init__"
+    quote: "h_out = model.mtp_layer[str(token_idx)](torch.cat([h_in, next_h], dim=-1))"
+    note: "Code comment: 'Force dense FFN, SWA, and no MHC for MTP blocks'."
+  mtp.ffn:
+    value: "dense (12288)"
+    source: train_model
+    at: "llm_training/motif/model/model.py; Motif.__init__"
+    quote: "interleave_moe_layer_step=0: always use dense FeedForward (no MoE)"
+    note: "Dense FFN width is intermediate_dim 12288; index has mlp.gate_proj/up_proj/down_proj, no experts."
+  mtp.shares_embedding:
+    value: true
+    source: train_model
+    at: "llm_training/motif/model/model.py; compute_mtp_loss"
+    quote: "mtp_loss = loss_fn(model.output(h), shifted_labels)"
+    note: "The next-token embedding is the main tok_embeddings output (raw_embeds in Motif.forward)."
+  mtp.loss_weight:
+    value: "0.2"
+    source: report
+    at: "p.19 §4.3 Hyperparameters"
+    quote: "The MTP auxiliary objective uses a loss weight of 0.2."
+    note: "Training code multiplies by mtp_depth_decay 0.95 and divides the summed loss by 1 + weight."
+  mtp.released:
+    value: true
+    source: index
+    at: "/weight_map | has mtp_layers."
+    note: "The card says the MTP head is not shipped, but shard model-00104-of-00155 contains mtp_layers.0 (GDLA + dense PolyNorm FFN, 19 tensors); the HF modeling code does not load it."
+
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "p.2 §2.1"
+    quote: "We apply RMSNorm [74] before each sublayer"
+  norm.placement:
+    value: pre
+    source: report
+    at: "p.2 §2.1"
+    quote: "We apply RMSNorm [74] before each sublayer and use modified manifold-constrained hyper-connections (mHC) [68] in place of conventional residual additions."
+  norm.eps: {value: 1e-5, source: config, at: "/rms_norm_eps"}
+  norm.residual:
+    value: "modified mHC: 4 streams, Sinkhorn-Knopp doubly stochastic residual mixing, post-mapping multiplier annealed 2 → 1 during pretraining"
+    source: report
+    at: "p.5–6 §2.3"
+    quote: "We use an expansion rate of n = 4, corresponding to four parallel residual streams."
+    note: "config mhc_enabled true, mhc_expansion_rate 4. Mappings computed in FP32 from an RMSNorm of the flattened streams; 20 Sinkhorn iterations (/mhc_sinkhorn_iters); embedding copied to all 4 streams and streams averaged before the final norm (MotifModel.forward)."
+
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.19 §4.3 Batch size and context-length schedule"
+    quote: "Pretraining begins with sequences of up to 4K tokens."
+  ctx.final:
+    value: 262_144
+    source: card
+    at: "README.md; 2. Model Summary"
+    quote: "Context Length 262,144 (256K)"
+    note: "Report §4.3: a dedicated long-context stage with sequences of up to 256K tokens."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Key Features"
+    quote: "Native 256K context (262,144 tokens), trained with window-aware context parallelism."
+    note: "config max_position_embeddings 262144."
+  ctx.extension:
+    value: "4K → 32K during the LR decay phase → 256K stage; DeepSeek-YaRN factor 64 on global layers only"
+    source: report
+    at: "p.19 §4.3 Batch size and context-length schedule"
+    quote: "During the learning-rate decay phase, we transition to a maximum sequence length of 32K tokens, followed by a dedicated long-context stage with sequences of up to 256K tokens."
+    note: "Config rope_scaling: rope_type yarn, factor 64, original_max_position_embeddings 4096 (original_seq_len), beta_fast 32, beta_slow 1, theta 10000."
+
+  train.tokens:
+    value: 12_500_000_000_000
+    source: report
+    at: "p.14 §4.1 Data"
+    quote: "Motif 3 is pretrained on approximately 12.5 trillion tokens, measured with the Motif tokenizer"
+  train.optimizer:
+    value: "Muon + AdamW (AdamW for embeddings, output head and vector parameters)"
+    source: report
+    at: "p.10 §3.3"
+    quote: "Embeddings, the output projection, and vector-shaped parameters are instead optimized with AdamW."
+    note: "Each routed expert is orthogonalized as its own matrix; Newton–Schulz in BF16."
+  train.lr_peak:
+    value: 3e-4
+    source: report
+    at: "p.19 §4.3 Hyperparameters"
+    quote: "Training starts with a learning rate of 3 × 10−4 and follows a warmup-stable-decay (WSD) learning-rate schedule."
+  train.lr_min:
+    value: 3e-5
+    source: report
+    at: "p.19 §4.3 Hyperparameters"
+    quote: "The subsequent 256K long-context stage continues from this checkpoint and further reduces the learning rate to 3 × 10−5 ."
+  train.schedule:
+    value: "WSD: stable at 3e-4, decay to 7.5e-5 during the 4K → 32K transition, then 256K stage decays to 3e-5"
+    source: report
+    at: "p.19 §4.3 Hyperparameters"
+    quote: "The stable phase performs the majority of pretraining at the maximum learning rate, after which the decay phase reduces the learning rate to 7.5 × 10−5 while transitioning from 4K to 32K sequences."
+  train.batch:
+    value: "up to 75M tokens"
+    source: report
+    at: "p.19 §4.3 Batch size and context-length schedule"
+    quote: "The global training batch contains up to 75 million tokens."
+  train.batch_tokens:
+    value: 75_000_000
+    source: report
+    at: "p.19 §4.3 Batch size and context-length schedule"
+    quote: "The global training batch contains up to 75 million tokens."
+    note: "Stated as an upper bound; no ramp described."
+  train.precision:
+    value: "MXFP8 for MoE expert grouped GEMMs and EP dispatch; BF16 elsewhere; FP32 master weights, gradients, router logits and Muon states; BF16 gradient communication with FP32 reduction"
+    source: report
+    at: "p.9 §3.2"
+    quote: "More specifically, we apply MXFP8 [59] to the MoE experts"
+  train.stability:
+    value: "QK-Clip (τ=100, 200 in the 256K stage; every 10 steps; key-side share 1/(1+√G)); FFN-output magnitude penalty (weight 2e-4, threshold 128, 1,024 on the final layer); mHC post-multiplier annealing; FP32 routing; router replacement on collapse"
+    source: report
+    at: "p.11 §3.3 QK-Clip; p.19 §4.3"
+    quote: "We perform monitoring and clipping every 10 steps, using τ = 100 during main pre-training and τ = 200 during the 256K-token long-context stage."
+    note: "Penalty values: 'The FFN magnitude regularizer uses a loss weight of 2.0 × 10−4 and a threshold of 128' (p.19)."
+  train.masking:
+    value: "document-masked packing"
+    source: report
+    at: "p.13 §3.5 Attention-Workload-Aware Re-Scheduling"
+    quote: "Document-masked packing concatenates multiple documents into a fixed-length sequence while preventing cross-document attention."
+    note: "Stated in the long-context training section; not stated separately for the 4K stage."
+  train.data:
+    value: "~70% NVIDIA Nemotron pretraining collection (some components filtered), most of the rest in-house web, STEM and synthetic; dedicated Korean, multilingual, legal and financial data; dynamic mixture 19 → 57 datasets; reasoning data <5%"
+    source: report
+    at: "p.14 §4.1 Data"
+    quote: "The retained Nemotron data account for approximately 70% of the full Motif 3 pretraining corpus."
+    note: "Long-context stage uses ~5% of the corpus reconstructed as long-context data (§4.3)."
+  train.cutoff:
+    value: "March 2026"
+    source: report
+    at: "p.14 §4.1 Data"
+    quote: "The latest data included in the corpus were collected through March 2026, which we use as the model’s knowledge cutoff."
+  train.hardware:
+    value: "B200 GPUs (count not stated); EP 8, DP-shard 8, no PP"
+    source: report
+    at: "p.7 §3.1"
+    quote: "With expert and parameter sharding, optimizer-state CPU offloading, and the memory capacity of B200 GPUs, our 314B-parameter model fits within the available device memory"
+  train.stages:
+    value:
+      - name: main
+        seq_len: 4096
+        lr: 3e-4
+        note: "WSD stable phase."
+        quote: "Pretraining begins with sequences of up to 4K tokens."
+      - name: decay
+        seq_len: 32768
+        note: "LR decays to 7.5e-5 while moving from 4K to 32K sequences."
+        quote: "During the learning-rate decay phase, we transition to a maximum sequence length of 32K tokens"
+      - name: long-context
+        seq_len: 262_144
+        note: "LR decays to 3e-5; ~5% of the corpus rebuilt as long-context data; EP 8 + CP 8."
+        quote: "followed by a dedicated long-context stage with sequences of up to 256K tokens."
+    source: report
+    at: "p.19 §4.3"

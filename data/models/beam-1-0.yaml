@@ -1,0 +1,229 @@
+name: Beam-1.0-501B-A23B
+org: Reflection AI
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  announcement: {url: https://web.archive.org/web/20261016133639/https://reflection.ai/blog/introducing-beam, kind: blog}
+  card: {url: https://huggingface.co/reflection/Beam-1.0-501B-A23B/resolve/78f8f654d40a40919b8e9954b40dd879ecb9a692/README.md, kind: model-card}
+  config: {url: https://huggingface.co/reflection/Beam-1.0-501B-A23B/resolve/78f8f654d40a40919b8e9954b40dd879ecb9a692/config.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/beam/modeling_beam.py, kind: code}
+  available: {url: https://web.archive.org/web/20261016165656/https://reflection.ai/blog/beam-is-available, kind: blog}
+
+not_disclosed:
+  - params.active_non_embedding
+  - mtp.depth
+  - ctx.pretrain
+  - ctx.final
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+facts:
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  meta.released:
+    value: "2026-10-16"
+    source: available
+    at: "Beam is now available (post header)"
+    quote: "Beam is now available October 16, 2026"
+    note: "Post: 'Today, we have released Beam’s model weights on Hugging Face'; the Oct 5 announcement preceded the weights."
+  params.total:
+    value: 501_300_000_000
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "Total Parameters 501.3B"
+  params.active:
+    value: 23_400_000_000
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "Active Parameters 23.4B"
+
+  shape.d_model: {value: 5120, source: config, at: "/hidden_size"}
+  shape.layers: {value: 52, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 151_936, source: config, at: "/vocab_size"}
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: card
+    at: "README.md; Model Overview table; Attention"
+    quote: "Gated GQA + Sliding Window Attention"
+  attn.layout:
+    value: "5 SWA : 1 global ×8, then 3 SWA : 1 global"
+    source: config
+    at: "config.json; layer_types"
+    quote: '"sliding_attention", "full_attention", "sliding_attention"'
+    basis: inferred
+    note: "/layer_types has full_attention at layers 5, 11, ..., 47 and 51; all others sliding_attention."
+  attn.global_layers: {value: 9, source: config, at: "/layer_types | count full_attention"}
+  attn.local_layers: {value: 43, source: config, at: "/layer_types | count sliding_attention"}
+  attn.heads: {value: 48, source: config, at: "/num_attention_heads"}
+  attn.kv_heads:
+    value: 8
+    source: config
+    at: "/num_key_value_heads"
+    note: "Same count on SWA and global layers (BeamAttention)."
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.window: {value: 512, source: config, at: "/sliding_window"}
+  attn.local_heads:
+    value: 48
+    source: config
+    at: "/num_attention_heads"
+    note: "BeamAttention builds q/k/v from the same num_attention_heads, num_key_value_heads and head_dim for both layer types; only sliding_window differs."
+  attn.local_kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.local_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.local_rope_theta: {value: 10000.0, source: config, at: "/rope_parameters/sliding_attention/rope_theta"}
+  attn.position:
+    value: "RoPE (SWA), NoPE (global)"
+    source: hf-transformers
+    at: "modeling_beam.py; BeamAttention.forward"
+    quote: "# Sliding-attention layers use RoPE; full-attention layers use NoPE with position-dependent query scaling."
+    note: "Config /rope_parameters: sliding_attention rope_theta 10000.0, full_attention null."
+  attn.qk_norm:
+    value: true
+    source: hf-transformers
+    at: "modeling_beam.py; BeamAttention.__init__"
+    quote: "self.q_norm = BeamRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+  attn.scale:
+    value: "1/sqrt(head_dim); global (NoPE) layers also scale q by (1 + n/2048)^0.1 at 1-based position n (SSMax-style)"
+    source: hf-transformers
+    at: "modeling_beam.py; compute_attention_scaling"
+    quote: "Scalable-softmax query scale, `(1 + position / 2048) ** 0.1`, for layers that run without RoPE."
+    note: "Code computes exp(0.1 · log1p((position_ids + 1) / 2048)) with 0-based position_ids; SWA layers are unscaled."
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.gate:
+    value: "elementwise sigmoid gate, gate_proj of the normed attention input plus a per-head bias, before o_proj"
+    source: hf-transformers
+    at: "modeling_beam.py; BeamAttention.forward"
+    quote: "gate = self.gate_proj(hidden_states).view_as(attn_output) + self.gate_bias[None, None, :, None]"
+
+  ffn.activation:
+    value: SwiGLU
+    source: hf-transformers
+    at: "modeling_beam.py; BeamMLP.forward"
+    quote: "# Beam evaluates the SwiGLU activation and product in FP32."
+    note: "act_fn is config /hidden_act silu; routed experts use the same gate × up form (BeamExperts._apply_gate)."
+  ffn.dim: {value: 20480, source: config, at: "/intermediate_size"}
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_beam.py; BeamMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Routed experts hold only gate_up_proj and down_proj weights (BeamExperts)."
+
+  moe.dense_layers:
+    value: 3
+    source: config
+    at: "/mlp_layer_types | count dense"
+    note: "Card: 52: 3 dense + 49 MoE."
+  moe.expert_dim: {value: 2560, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/num_experts"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+  moe.shared:
+    value: 0
+    source: hf-transformers
+    at: "modeling_beam.py; BeamMoE"
+    quote: "final_hidden_states = final_hidden_states * self.routed_scaling_factor"
+    basis: inferred
+    note: "BeamMoE holds only the router and routed experts; no shared-expert module."
+  moe.router:
+    value: sigmoid
+    source: hf-transformers
+    at: "modeling_beam.py; BeamTopKRouter.forward"
+    quote: "scores = router_logits.sigmoid()"
+  moe.routed_scale: {value: 2.5, source: config, at: "/routed_scaling_factor"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.groups:
+    value: "8 groups, top-4 groups per token (group score = sum of top-2 biased scores)"
+    source: hf-transformers
+    at: "modeling_beam.py; BeamTopKRouter.forward"
+    quote: "group_idx = torch.topk(group_scores, k=self.topk_group, dim=-1)[1]"
+    note: "Config /n_group 8, /topk_group 4."
+  moe.balancing:
+    value: "auxiliary-loss-free bias with cosine-decayed bias updates, plus sequence-level balancing"
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Stable and balanced MoE optimization"
+    quote: "introducing cosine decay of expert-bias updates to reduce routing perturbations later in training"
+    note: "Also: 'Sequence-level balancing further encourages balanced expert utilization'. Coefficients not disclosed."
+
+  norm.type:
+    value: RMSNorm
+    source: hf-transformers
+    at: "modeling_beam.py; BeamDecoderLayer.__init__"
+    quote: "self.input_layernorm = BeamRMSNorm(config.hidden_size, config.rms_norm_eps)"
+  norm.placement:
+    value: sandwich
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Stable and balanced MoE optimization"
+    quote: "Combined with SandwichNorm, elementwise attention gating, and FP32 residual accumulation"
+    note: "Post-norms apply before the depth-scaled residual add."
+  norm.eps: {value: 1.0e-6, source: config, at: "/rms_norm_eps"}
+  norm.residual:
+    value: "depth-scaled sum r·sqrt((k-1)/k) + h/sqrt(k), k = 2(i+1) for attention and 2(i+1)+1 for FFN in 0-indexed layer i; FP32 residual accumulation"
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Stable and balanced MoE optimization"
+    quote: "we developed a depth-based scaling approach that counteracts activation growth as sublayer outputs accumulate, helping keep residual norms stable as model depth increases. Combined with SandwichNorm, elementwise attention gating, and FP32 residual accumulation"
+    note: "Formula from modeling_beam.py depth_scaled_residual_add and BeamDecoderLayer.__init__."
+  norm.logit_softcap: {value: 30, source: config, at: "/final_logit_softcapping"}
+
+  ctx.max:
+    value: 1_048_576
+    source: config
+    at: "/max_position_embeddings"
+    note: "Card: context window of 1M tokens."
+  ctx.extension:
+    value: "extended to 1M during midtraining"
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Building a strong prior for RL in Midtraining"
+    quote: "Midtraining also extends Beam’s effective context length to 1M tokens."
+    note: "Method and pretraining sequence length not disclosed."
+
+  train.tokens:
+    value: 23_800_000_000_000
+    source: announcement
+    at: "Introduction"
+    quote: "We pretrained the model on 23.8 trillion diverse, curated, high-quality tokens from the web and proprietary licensed datasets"
+    note: "Whether midtraining tokens are included is not stated."
+  train.stages:
+    value:
+      - name: pretraining
+        tokens: 23_800_000_000_000
+        quote: "Beam was pretrained on 23.8 trillion diverse high-quality tokens from the web, public sources, and proprietary licensed datasets."
+      - name: midtraining
+        note: "Reasoning-rich, tool-use and long-context data; extends effective context to 1M."
+        quote: "Midtraining also extends Beam’s effective context length to 1M tokens."
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning"
+  train.hardware:
+    value: "6,144 NVIDIA GB300 (NVL72), under four weeks"
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Frontier-grade pretraining infrastructure"
+    quote: "Beam was pretrained end-to-end in under four weeks on a cluster of 6,144 NVIDIA GB300 NVL72 GPUs."
+  train.data:
+    value: "web, code, PDF-derived STEM and licensed data; code and technical content repeated multiple times"
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Quality-centric data curation"
+    quote: "We repeated code and technical content multiple times to increase the model’s exposure over the course of its training horizon."
+    note: "About 95% of raw Internet tokens are eliminated through parsing, deduplication and curation."
+  train.stability:
+    value: "nine semi-automatic rewinds for gradient-norm spikes or suspected SDCs"
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Frontier-grade pretraining infrastructure"
+    quote: "We executed nine semi-automatic rewinds throughout, attributed either to non-deterministic gradient norm spikes or to suspected SDCs."
+  train.cutoff:
+    value: "2026-06-30 (knowledge cutoff)"
+    source: card
+    at: "README.md; Model Overview table; Knowledge cutoff"
+    quote: "Knowledge cutoff June 30, 2026"
+    note: "Card's knowledge cutoff for the released instruction-tuned model; no separate pretraining data cutoff is stated."

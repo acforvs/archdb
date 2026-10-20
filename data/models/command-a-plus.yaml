@@ -1,0 +1,189 @@
+name: Command A+ (command-a-plus-05-2026)
+org: Cohere
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+
+sources:
+  blog: {url: https://web.archive.org/web/20261010184826/https://cohere.com/blog/command-a-plus, kind: blog}
+  card: {url: https://huggingface.co/CohereLabs/command-a-plus-05-2026-bf16/resolve/5fb6fde5fd12ff89356aae552e11883bc49f069b/README.md, kind: model-card}
+  config: {url: https://huggingface.co/CohereLabs/command-a-plus-05-2026-bf16/resolve/5fb6fde5fd12ff89356aae552e11883bc49f069b/config.json, kind: config}
+  index: {url: https://huggingface.co/CohereLabs/command-a-plus-05-2026-bf16/resolve/5fb6fde5fd12ff89356aae552e11883bc49f069b/model.safetensors.index.json, kind: config}
+  modeling_cohere2_moe: {url: https://raw.githubusercontent.com/huggingface/transformers/e0eb2810ac1b2caf6d082f247d8d37162ecf67a0/src/transformers/models/cohere2_moe/modeling_cohere2_moe.py, kind: code}
+
+not_disclosed:
+  - params.active_non_embedding
+  - mtp.depth
+  - ctx.pretrain
+  - ctx.final
+  - train.tokens
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.batch
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+config_unused:
+  _sliding_window_pattern: "not read by modeling_cohere2_moe.py; layer_types is explicit"
+  layer_switch: "not read by modeling_cohere2_moe.py; layer_types is explicit"
+  order_of_interleaved_layers: "not read by modeling_cohere2_moe.py; layer_types is explicit"
+  position_embedding_type: "not read by modeling_cohere2_moe.py; code always rotates interleaved pairs (repeat_interleave)"
+  rotary_pct: "not read by modeling_cohere2_moe.py; full head_dim is rotated"
+  use_embedding_sharing: "not read by modeling_cohere2_moe.py; duplicate of /text_config/tie_word_embeddings"
+  use_gated_activation: "not read by modeling_cohere2_moe.py; MLP is always act(gate) * up"
+  use_parallel_block: "not read by modeling_cohere2_moe.py; decoder layer is always parallel"
+  prefix_dense_intermediate_size: "used only by dense layers; first_k_dense_replace is 0"
+  prefix_dense_sliding_window_pattern: "used only by dense layers; first_k_dense_replace is 0"
+  logit_scale: "read by Cohere2MoeForCausalLM.forward as a logit multiplier; 1.0 leaves logits unscaled"
+
+facts:
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  meta.released:
+    value: "2026-05-20"
+    source: blog
+    at: "post header"
+    quote: "May 20, 2026 4 minute read Introducing Command A+"
+    note: "Post: 'Today, we’re releasing Command A+ open-source.'"
+  params.active:
+    value: 25_000_000_000
+    source: card
+    at: "README.md; Model Summary"
+    quote: "Model Size: 25B active parameters, 218B total parameters"
+  params.note:
+    value: "Card does not state scope; the checkpoint index lists 218,750,277,872 parameters including the SigLIP vision tower and projector."
+    source: index
+    at: "model.safetensors.index.json; metadata.total_parameters"
+    quote: '"total_parameters": 218750277872'
+  params.total:
+    value: 218_000_000_000
+    source: card
+    at: "README.md; Model Summary"
+    quote: "Model Size: 25B active parameters, 218B total parameters"
+
+  shape.d_model: {value: 4096, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 32, source: config, at: "/text_config/num_hidden_layers"}
+  shape.tied_embeddings: {value: true, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "New Cohere tokenizer, first used in Command A+"
+    source: blog
+    at: "Efficiency section"
+    quote: "Command A+ is the first model to use our latest tokenizer"
+  shape.vocab: {value: 262_144, source: config, at: "/text_config/vocab_size"}
+
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+  attn.global_layers: {value: 8, source: config, at: "/text_config/layer_types | count full_attention"}
+  attn.head_dim: {value: 128, source: config, at: "/text_config/head_dim"}
+  attn.heads: {value: 128, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: "GQA, SWA"
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "The attention layers interleave sliding-window attention layers with Rotational Positional Embeddings and global attention layers without positional embeddings in a 3:1 ratio"
+  attn.kv_heads: {value: 8, source: config, at: "/text_config/num_key_value_heads"}
+  attn.layout:
+    value: "3 SWA : 1 global"
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "global attention layers without positional embeddings in a 3:1 ratio"
+  attn.local_layers: {value: 24, source: config, at: "/text_config/layer_types | count sliding_attention"}
+  attn.position:
+    value: "RoPE (SWA), NoPE (global)"
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "The attention layers interleave sliding-window attention layers with Rotational Positional Embeddings and global attention layers without positional embeddings"
+    note: "config rope_theta 50000 applies only to the sliding-window layers; rotation is GPT-J-style interleaved pairs."
+  attn.qk_norm:
+    value: false
+    source: modeling_cohere2_moe
+    at: "modeling_cohere2_moe.py; Cohere2MoeAttention.forward"
+    quote: "query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2) key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)"
+  attn.window: {value: 4096, source: config, at: "/text_config/sliding_window"}
+  attn.local_heads:
+    value: 128
+    source: config
+    at: "/text_config/num_attention_heads"
+    note: "Cohere2MoeAttention uses the same num_attention_heads, num_key_value_heads and head_dim for both layer types; only sliding_window and RoPE differ."
+  attn.local_kv_heads: {value: 8, source: config, at: "/text_config/num_key_value_heads"}
+  attn.local_head_dim: {value: 128, source: config, at: "/text_config/head_dim"}
+  attn.local_rope_theta:
+    value: 50000
+    source: config
+    at: "/text_config/rope_parameters/rope_theta"
+    note: "Cohere2MoeRotaryEmbedding reads rope_parameters rope_theta; one rotary table, applied only on sliding-window layers."
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_cohere2_moe
+    at: "modeling_cohere2_moe.py; Cohere2MoeExperts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn from config hidden_act silu; the shared expert (Cohere2MoeMLP) uses the same gate × up form."
+  ffn.bias:
+    value: false
+    source: modeling_cohere2_moe
+    at: "modeling_cohere2_moe.py; Cohere2MoeMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.balancing:
+    value: "additive expert bias"
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "We use additive-bias-based load balancing to encourage balanced token load across all experts"
+    note: "Dropless, token-choice routing."
+  moe.dense_layers: {value: 0, source: config, at: "/text_config/first_k_dense_replace"}
+  moe.expert_dim: {value: 4096, source: config, at: "/text_config/intermediate_size"}
+  moe.experts: {value: 128, source: config, at: "/text_config/num_experts"}
+  moe.norm_topk: {value: true, source: config, at: "/text_config/norm_topk_prob"}
+  moe.router:
+    value: "normalized sigmoid (over the top-k logits)"
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "swap out the softmax router activation function with a normalized sigmoid over the topk expert logits per token"
+    note: "Config expert_selection_fn sigmoid with norm_topk_prob; Cohere2MoeTopKRouter takes top-k of raw logits, then sigmoid and renormalizes."
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "and a single shared expert is applied to all tokens"
+  moe.shared_dim:
+    value: 16384
+    source: modeling_cohere2_moe
+    at: "modeling_cohere2_moe.py; Cohere2MoeSparseMoeBlock.__init__"
+    quote: "intermediate_size=config.intermediate_size * config.num_shared_experts,"
+    basis: inferred
+    note: "intermediate_size 4096 × num_shared_experts 4 (config.json), built as one MLP; checkpoint shared_experts.gate_proj is [16384, 4096]. Combined as (routed + shared) / 2 (shared_expert_combination_strategy average)."
+  moe.top_k: {value: 8, source: config, at: "/text_config/num_experts_per_tok"}
+
+  norm.eps: {value: 1.0e-5, source: config, at: "/text_config/layer_norm_eps"}
+  norm.placement:
+    value: parallel
+    source: modeling_cohere2_moe
+    at: "modeling_cohere2_moe.py; Cohere2MoeDecoderLayer.forward"
+    quote: "hidden_states = residual + hidden_states_attention + hidden_states_mlp"
+    note: "One pre-norm (input_layernorm) feeds both attention and MoE."
+  norm.type:
+    value: "LayerNorm (no bias)"
+    source: modeling_cohere2_moe
+    at: "modeling_cohere2_moe.py; Cohere2MoeDecoderLayer.__init__"
+    quote: "else Cohere2MoeLayerNorm(hidden_size=config.hidden_size, eps=config.layer_norm_eps)"
+    note: "rms_norm_eps is null in config.json, so LayerNorm (mean-subtracted, weight only) is used."
+
+  ctx.max:
+    value: 131_072
+    source: card
+    at: "README.md; Context Length"
+    quote: "Command A+ supports a context length of 128K & 64K output length."
+    note: "Card: 128K input plus 64K output; config max_position_embeddings is 200,000."
+
+  train.data:
+    value: "48 languages"
+    source: card
+    at: "README.md; Languages covered"
+    quote: "The model has been trained on 48 languages"

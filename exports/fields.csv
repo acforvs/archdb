@@ -1,0 +1,138 @@
+field,group,label,type,unit,derived,definition
+meta.released,meta,Released,date,,False,"Date the weights (or, if earlier, the technical report) were first made public, YYYY-MM-DD, as dated by the publisher. A Hugging Face repository creation date is used only when no dated publisher page exists, with a note."
+meta.license,meta,License,str,,False,"License of the released weights as declared by the publisher (model card metadata or license file), e.g. apache-2.0, mit, or the name of a custom license."
+params.total,params,Reported total params,float,params,False,"Total parameter count as reported by the publisher. See params.note for whether embeddings, MTP heads or vision towers are included."
+params.active,params,Reported active params,float,params,False,"Parameters used per token in the forward pass, as reported by the publisher."
+params.active_prefill,params,Active params (prefill),float,params,False,Parameters used per prompt token during prefill when the publisher states it differs from decode (e.g. YOCO-style designs that skip the upper half of the stack).
+params.active_non_embedding,params,Active non-embedding (stated),float,params,False,"Active parameters excluding the input embedding and the output head (unembedding). Stated by the publisher, or computed from params.active by subtracting vocab × d_model for each of the embedding and output head that params.active is stated to include (basis inferred, note with the arithmetic). Not disclosed when the scope of params.active is not stated."
+params.counted_total,params,Counted total params,float,params,True,"Parameters of the text backbone counted from the released checkpoint's safetensors headers (embedding, output head, all experts and other weights; excluding MTP modules, vision/audio towers and n-gram lookup tables). Shown only when the counts reproduce the publisher's stated total and active parameters within 5% under some scope."
+params.counted_embedding,params,Counted embedding + head,float,params,True,"Input embedding plus output head (once if tied), counted from the checkpoint."
+params.counted_lookup,params,Counted lookup tables,float,params,True,"Parameters in n-gram / Engram / per-layer embedding tables counted from the checkpoint. Like the token embedding, they are lookups and are excluded from params.counted_total and params.counted_active_non_embedding."
+params.counted_active_non_embedding,params,Counted active params (non-embedding),float,params,True,"Active parameters per token excluding the input embedding and output head, counted from the checkpoint as all non-expert weights plus routed-expert weights × top_k / experts. Same validation as params.counted_total."
+params.note,params,Counting scope,str,,False,"What the publisher's counts include or exclude (MTP modules, embeddings, vision encoder, n-gram tables)."
+params.embedding,params,Embedding params,float,params,False,"Parameters in input embedding and output head, as reported."
+params.non_embedding,params,Non-embedding params,float,params,False,"Parameters excluding embedding and output head, as reported."
+shape.layers,shape,Layers,int,layers,False,"Number of transformer blocks in the main backbone (attention or token mixer plus FFN), excluding MTP modules."
+shape.d_model,shape,d_model,int,elements,False,Residual stream width.
+shape.vocab,shape,Vocab,int,count,False,"Embedding table rows (vocab_size in config, may include padding)."
+shape.tied_embeddings,shape,Tied embeddings,bool,,False,Input embedding and output head share weights.
+shape.memory,shape,Lookup memory,str,,False,"Hashed n-gram or conditional-memory tables outside the dense backbone (Engram, n-gram embeddings), with size and placement."
+shape.tokenizer,shape,Tokenizer,str,,False,Tokenizer type and lineage as described by the publisher (e.g. byte-level BPE shared with an earlier model).
+shape.aspect,shape,d_model / layers,float,ratio,True,"Width-to-depth ratio, d_model divided by the number of blocks."
+attn.kind,attn,Token mixers,str,,False,"Token-mixing layer types in the backbone, e.g. GQA, MLA, SWA, Gated DeltaNet, Mamba-2, DSA (DeepSeek sparse attention)."
+attn.layout,attn,Layer layout,str,,False,"Interleaving of mixer types, written as a repeating unit, e.g. '3 GDN : 1 GQA' or '5 SWA : 1 global'."
+attn.global_layers,attn,Global-attention layers,int,layers,False,"Layers whose KV cache grows with full context (dense or sparse global attention, MLA). Excludes sliding-window and linear/recurrent layers."
+attn.swa_ratio,attn,SWA : global,float,ratio,True,"attn.local_layers divided by attn.global_layers, the sliding-window to global interleave ratio (5 for '5 SWA : 1 global')."
+attn.linear_ratio,attn,Linear : global,float,ratio,True,attn.linear_layers divided by attn.global_layers (3 for '3 Gated DeltaNet : 1 GQA').
+attn.local_layers,attn,Sliding-window layers,int,layers,False,Layers with a fixed attention window.
+attn.linear_layers,attn,Linear / SSM layers,int,layers,False,"Layers with a fixed-size recurrent state (linear attention, DeltaNet variants, Mamba)."
+attn.heads,attn,Query heads,int,count,False,Query heads in the global-attention layers.
+attn.kv_heads,attn,KV heads,int,count,False,"Key/value heads in the global-attention layers. Not applicable to MLA, whose cache is a shared latent."
+attn.qk_width,attn,Heads × head dim,int,elements,True,"attn.heads × attn.head_dim, the query projection width of global layers."
+attn.group_size,attn,Q heads / KV head,float,ratio,True,attn.heads divided by attn.kv_heads in global layers.
+attn.head_dim,attn,QK head dim,int,elements,False,"Query/key dimension per head in global-attention layers (for MLA, nope + rope dims)."
+attn.v_head_dim,attn,V head dim,int,elements,False,Value dimension per head in global layers (MLA v_head_dim; stated for MLA even when equal to the QK head dim).
+attn.window,attn,Window,int,tokens,False,Sliding-window size of the local layers.
+attn.long_window_layers,attn,Long-window SWA layers,int,layers,False,Sliding-window layers (counted in attn.local_layers) that use attn.long_window instead of attn.window.
+attn.long_window,attn,Long window,int,tokens,False,Window of the attn.long_window_layers.
+attn.local_kv_heads,attn,SWA KV heads,int,count,False,KV heads in sliding-window layers (stated even when equal to attn.kv_heads).
+attn.local_heads,attn,SWA query heads,int,count,False,Query heads in sliding-window layers (stated even when equal to attn.heads).
+attn.local_head_dim,attn,SWA head dim,int,elements,False,Head dimension (K and V) in sliding-window layers (stated even when equal to attn.head_dim).
+attn.kv_lora_rank,attn,MLA KV latent,int,elements,False,Width of the compressed KV latent that MLA caches per token per layer.
+attn.q_lora_rank,attn,MLA Q latent,int,elements,False,Width of the low-rank query projection in MLA; 0 when queries use a full-rank projection.
+attn.rope_dim,attn,Decoupled RoPE dim,int,elements,False,Width of the shared positional key that MLA caches next to the latent.
+attn.position,attn,Positional encoding,str,,False,"Positional scheme in global layers: RoPE, partial RoPE, NoPE, or mixed per layer type."
+attn.rope_theta,attn,RoPE base,float,,False,RoPE base frequency of the global layers at release.
+attn.local_rope_theta,attn,SWA RoPE base,float,,False,RoPE base frequency of the sliding-window layers (stated even when equal to attn.rope_theta).
+attn.rope_fraction,attn,Rotary fraction,float,ratio,False,Fraction of each head's QK dimensions that are rotated.
+attn.qk_norm,attn,QK norm,bool,,False,Queries and keys are normalized per head before the dot product.
+attn.gate,attn,Output gate,str,,False,"Gate applied to the attention output before the output projection, with its placement."
+attn.softcap,attn,Attention logit softcap,float,,False,tanh soft-capping value applied to attention logits.
+attn.sparse,attn,Sparse attention,str,,False,"Token-selection mechanism inside global layers, e.g. DSA lightning indexer with top-k."
+attn.scale,attn,Attention scaling,str,,False,"Query-key scaling when it is not 1/sqrt(head_dim), e.g. query_pre_attn_scalar, length-dependent (SSMax-style) scaling, or value scaling."
+attn.sinks,attn,Attention sinks,str,,False,"Learned sink logits or sink bias in the softmax, with the layer types that use them."
+attn.bias,attn,QKV bias,bool,,False,Query/key/value projections have bias terms.
+attn.linear_kind,attn,Linear-mixer details,str,,False,"Configuration of the linear / SSM layers (e.g. Gated DeltaNet heads and dims, Mamba-2 state size), as one string."
+attn.linear_heads,attn,Linear-mixer heads,int,count,False,Value heads (or SSM heads) in the linear / SSM layers.
+attn.linear_head_dim,attn,Linear-mixer head dim,int,elements,False,"Head dimension of the linear / SSM layers (value head dim for DeltaNet variants, head_dim for Mamba-2)."
+attn.indexer_dim,attn,Indexer key dim,int,elements,False,"Width of the sparse-attention indexer key cached per token in each global layer (DSA lightning indexer), counted in the KV cache."
+attn.kv_sharing,attn,Cross-layer KV sharing,str,,False,"Layers that reuse another layer's KV cache instead of computing their own (YOCO-style, cross-layer attention), and which layers own caches."
+attn.kv_groups,attn,KV cache groups,list,,False,"Explicit KV cache description for designs the standard formula cannot express (compressed or shared caches). Each item: name, layers (layers owning this cache), elements (scalars per cache entry, K and V together), tokens_per_entry (compression ratio, 1 if none), window (entries kept, for sliding windows), quote. When present, KV fields are computed from it."
+attn.conv,attn,Short conv kernel,int,elements,False,Kernel size of the causal short convolution in linear / SSM layers or attention projections.
+ffn.activation,ffn,Activation,str,,False,"FFN activation (SwiGLU, GeGLU, ...)."
+ffn.dim,ffn,Dense FFN dim,int,elements,False,Intermediate width of the dense FFN layers that are actually executed.
+ffn.clamp,ffn,Activation clamp,str,,False,"Clamping of GLU gate / up activations (e.g. SwiGLU limit 7), with the layers it applies to."
+ffn.bias,ffn,FFN bias,bool,,False,FFN projections have bias terms.
+ffn.mult,ffn,Dense FFN / d_model,float,ratio,True,ffn.dim divided by shape.d_model.
+moe.experts,moe,Routed experts,int,count,False,Routed experts per MoE layer.
+moe.top_k,moe,Experts per token,int,count,False,Routed experts selected per token.
+moe.shared,moe,Shared experts,int,count,False,Always-on experts per MoE layer.
+moe.expert_dim,moe,Expert dim,int,elements,False,Intermediate width of one routed expert.
+moe.shared_dim,moe,Shared expert dim,int,elements,False,Total intermediate width of the shared expert(s).
+moe.dense_layers,moe,Leading dense layers,int,layers,False,Number of initial blocks that use a dense FFN instead of MoE.
+moe.router,moe,Router score,str,,False,"Gating function over expert logits (softmax, sigmoid)."
+moe.balancing,moe,Load balancing,str,,False,"Load-balancing method, with coefficients where disclosed."
+moe.routed_scale,moe,Routed scaling factor,float,,False,Multiplier applied to the combined routed-expert output (routed_scaling_factor).
+moe.norm_topk,moe,Renormalize top-k,bool,,False,Selected expert weights are renormalized to sum to 1.
+moe.groups,moe,Group-limited routing,str,,False,"Expert groups and groups selected per token, or node-limited routing, when used."
+moe.latent_dim,moe,Expert latent dim,int,elements,False,"Width of the projected space routed experts operate in (LatentMoE), when smaller than d_model."
+moe.latent_ratio,moe,Latent compression α (d_model / latent),float,ratio,True,"shape.d_model divided by moe.latent_dim, how much LatentMoE compresses the hidden state before routed experts."
+moe.granularity,moe,Expert dim / d_model,float,ratio,True,moe.expert_dim divided by shape.d_model.
+moe.sparsity,moe,Sparsity (experts / top-k),float,ratio,True,Routed experts divided by experts selected per token.
+moe.active_fraction,moe,Active / total,float,ratio,True,params.active divided by params.total.
+mtp.depth,mtp,MTP depth,int,count,False,Additional future tokens predicted during pretraining (0 when the model was trained without MTP).
+mtp.modules,mtp,MTP modules,int,count,False,MTP modules with distinct weights. 1 with mtp.depth > 1 means one module is applied recursively.
+mtp.block,mtp,MTP module,str,,False,"Contents of one MTP module (mixer and FFN type, norms, how the previous hidden state and next-token embedding are combined)."
+mtp.ffn,mtp,MTP FFN,str,,False,"FFN in the MTP module: 'dense' or 'MoE', with its width when it differs from the backbone."
+mtp.shares_embedding,mtp,MTP shares embedding/head,bool,,False,MTP modules use the main model's input embedding and output head.
+mtp.params,mtp,MTP params,float,params,False,Parameters of all MTP modules as reported by the publisher.
+mtp.loss_weight,mtp,MTP loss weight,str,,False,"Weight of the MTP loss, including its schedule."
+mtp.released,mtp,MTP weights released,bool,,False,The released checkpoint contains the MTP module weights.
+norm.type,norm,Norm,str,,False,Normalization layer type in the blocks.
+norm.placement,norm,Norm placement,str,,False,"Pre-norm, post-norm, or sandwich (pre and post)."
+norm.logit_softcap,norm,Final logit softcap,float,,False,tanh soft-capping value on output logits.
+norm.eps,norm,Norm epsilon,float,,False,Epsilon of the block normalization layers.
+norm.residual,norm,Residual stream,str,,False,"Residual design when it is not a plain sum, e.g. hyper-connections with n streams, gated residuals, depth-scaled residuals, FP32 residual accumulation."
+norm.embedding,norm,Embedding scaling,str,,False,"Scaling or normalization applied to input embeddings (e.g. × sqrt(d_model), RMSNorm after embedding)."
+norm.output_scale,norm,Output logit scaling,str,,False,Scaling applied to output logits other than a softcap (e.g. muP-style width multiplier).
+ctx.pretrain,ctx,Pretraining context,int,tokens,False,Sequence length of the main pretraining stage.
+ctx.final,ctx,Trained context,int,tokens,False,Longest sequence length trained on after context extension.
+ctx.max,ctx,Advertised context,int,tokens,False,"Longest context the publisher says the model supports, possibly beyond trained length via RoPE scaling."
+ctx.extension,ctx,Extension method,str,,False,"How context was extended (stages, RoPE base change, YaRN factor)."
+train.tokens,train,Pretraining tokens,float,tokens,False,"Tokens seen in pretraining including annealing and context extension, as reported."
+train.optimizer,train,Optimizer,str,,False,Optimizer used for the bulk of parameters.
+train.lr_peak,train,Peak LR,float,lr,False,Peak learning rate of the main pretraining stage.
+train.lr_min,train,Final LR,float,lr,False,Learning rate at the end of the decay.
+train.schedule,train,LR schedule,str,,False,Learning-rate schedule shape with phase boundaries.
+train.warmup,train,Warmup,str,,False,Warmup length in steps or tokens.
+train.batch,train,Batch size,str,,False,"Global batch size, including any batch-size ramp: sequences × sequence length (token total), or the token total alone when only that is stated."
+train.batch_tokens,train,Batch (tokens),float,tokens,False,"Global batch size in tokens during the main pretraining stage, after any ramp (sequences × sequence length when stated in sequences, marked inferred)."
+train.weight_decay,train,Weight decay,float,,False,Decoupled weight decay coefficient.
+train.betas,train,Adam betas,str,,False,"(beta1, beta2) of the Adam-family optimizer or its AdamW fallback."
+train.grad_clip,train,Grad clip,float,,False,Global gradient-norm clipping threshold.
+train.dropout,train,Dropout,float,,False,"Dropout rate applied during pretraining, with placement in the note. Recorded only when the publisher states it."
+train.precision,train,Training precision,str,,False,"Matmul precision of pretraining (BF16, FP8 recipe, NVFP4 recipe) with the scaling granularity where disclosed. Never inferred from the released checkpoint dtype."
+train.init,train,Initialization,str,,False,Weight initialization (std or scheme) as stated by the publisher; config initializer_range alone is not evidence.
+train.stability,train,Stability measures,str,,False,"Interventions used during pretraining to keep it stable (QK-clip, z-loss, logit caps, spike handling), with coefficients."
+train.masking,train,Document masking,str,,False,Whether attention crosses document boundaries within a packed sequence.
+train.objective,train,Extra objectives,str,,False,"Objectives beyond next-token prediction and MTP (fill-in-the-middle rate, distillation, multimodal tokens from the start)."
+train.data,train,Data mix,str,,False,"Pretraining data composition as disclosed (domain shares, synthetic fraction, repetition)."
+train.cutoff,train,Data cutoff,str,,False,Pretraining data cutoff date.
+train.hardware,train,Hardware,str,,False,"Accelerators used for pretraining, count and duration where stated."
+train.compute,train,Compute,str,,False,Pretraining compute as stated (GPU-hours or FLOPs).
+train.averaging,train,Checkpoint averaging,str,,False,EMA or checkpoint merging applied to produce the released base weights.
+train.stages,train,Stages,list,,False,"Ordered pretraining stages. Each item: name, tokens, seq_len, lr, batch_tokens, batch_sequences, steps, note, quote, and source when it differs from the fact's source."
+scaling.parametrization,scaling,Parametrization,str,,False,"Width/depth parametrization used to transfer hyperparameters: SP (standard), μP, CompleteP, u-μP, depth-μP, with the multipliers that differ from SP. Only when stated."
+scaling.hp_rule,scaling,HP selection rule,str,,False,"How peak LR, batch size or other hyperparameters were chosen for the released run (fitted scaling law with its formula, μP transfer from a proxy width, sweep), as stated."
+scaling.ladder,scaling,Scaling ladder,str,,False,"Smaller models trained to choose the architecture or recipe (sizes, token budgets), as disclosed."
+scaling.tpp,scaling,Tokens / param,float,ratio,True,train.tokens divided by params.total.
+scaling.tpp_active,scaling,Tokens / active param (non-embedding),float,ratio,True,"train.tokens divided by params.counted_active_non_embedding, or by the stated params.active_non_embedding when there is no validated checkpoint count."
+scaling.batch_ratio,scaling,Batch / critical-batch scaling (B / D^0.47),float,ratio,True,"train.batch_tokens divided by train.tokens^0.47, proportional to B / Bcrit(D). Critical batch size grows about as D^0.47 (Zhang et al. 2024; Power Lines fits D^0.462), so equal values mean the same batch relative to the critical batch for the training horizon; larger means a larger batch than that scaling suggests."
+scaling.adamw_tau,scaling,AdamW timescale τ,float,ratio,True,"B / (η λ D) with B = train.batch_tokens, η = train.lr_peak, λ = train.weight_decay and D = train.tokens: the AdamW EMA timescale as a fraction of training (Bergsma et al. 2025, Power Lines, arXiv 2505.13738). Computed only when the optimizer is AdamW; uses the peak LR."
+kv.bytes_per_token,kv,KV bytes / token,float,bytes,True,"BF16 KV cache per token of a sequence at the selected context, kv.bytes_at_context divided by the context (131,072 tokens in exports). Includes sliding-window caches, so for SWA models it falls as context grows. Applies to prefill and decode alike."
+kv.growth_per_token,kv,KV growth / token,float,bytes,True,"BF16 KV-cache bytes added per additional token once sliding windows are full, i.e. global layers and sparse-attention indexer keys only. The limit of kv.bytes_per_token at long context."
+kv.bytes_per_token_per_active,kv,KV bytes / token / B active,float,bytes,True,"kv.bytes_per_token divided by active parameters in billions (131,072 tokens in exports)."
+kv.bytes_at_context_per_active,kv,KV at context / B active,float,bytes,True,"kv.bytes_at_context divided by active parameters in billions (131,072 tokens in exports)."
+kv.bytes_at_context,kv,KV at context,float,bytes,True,"BF16 KV cache for one sequence at the selected context (131,072 tokens in exports), including sliding-window layers capped at their window and indexer keys. Excludes recurrent state, MTP or draft layers and compressor tail state."
+eval.aa_index,eval,AA Intelligence Index,float,score,False,"Artificial Analysis Intelligence Index v4.3.2 of the post-trained model, from a dated Wayback snapshot of its Artificial Analysis page. The note names the variant (reasoning setting)."
+eval.deepswe,eval,DeepSWE pass@1,float,score,False,"DeepSWE v1.1 pass@1 (Datacurve; 113 tasks, same mini-swe-agent scaffold for every model), as a fraction."

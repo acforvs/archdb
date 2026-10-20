@@ -1,0 +1,222 @@
+name: K2-Horizon-375B-A23B (mid_4_6000)
+org: MBZUAI IFM
+kind: base
+note: "Describes tag mid_4_6000, the final Midtraining Stage 4 checkpoint (before RL and SFT). Stage 4 trains on a mix shifted toward agentic and reasoning SFT data, so this is not a pure pretraining checkpoint (that is pretrain_ph2_240000, at 8K context)."
+
+sources:
+  card: {url: https://huggingface.co/IFM/K2-Horizon-375B-A23B/resolve/78272deca7adc2f90d154288b5161172283c80b3/README.md, kind: model-card}
+  config: {url: https://huggingface.co/IFM/K2-Horizon-375B-A23B/resolve/7d22cc0ac26a91003d19482efa71070244239b11/config.json, kind: config}
+  modeling_k2_horizon: {url: https://huggingface.co/IFM/K2-Horizon-375B-A23B/resolve/7d22cc0ac26a91003d19482efa71070244239b11/modeling_k2_horizon.py, kind: code}
+  blog: {url: "http://web.archive.org/web/20260903154432/https://ifm.ai/blog/k2/", kind: blog}
+  xllm_transformer: {url: https://raw.githubusercontent.com/ifm-ai/xllm/3578359ad320e4d18efaca071854ba2019201f31/xllm/models/transformer.py, kind: code}
+
+not_disclosed: [params.active_non_embedding, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+facts:
+  meta.released:
+    value: "2026-09-03"
+    source: blog
+    at: "ifm.ai/blog/k2 (Wayback snapshot 2026-09-03); header"
+    quote: "September 3, 2026"
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+  params.total:
+    value: 375_000_000_000
+    source: card
+    at: "README.md; introduction"
+    quote: "a sparse Mixture-of-Experts model that stores 375B parameters and runs 23B per token"
+  params.active:
+    value: 23_000_000_000
+    source: card
+    at: "README.md; introduction"
+    quote: "a sparse Mixture-of-Experts model that stores 375B parameters and runs 23B per token"
+
+  shape.d_model: {value: 6144, source: config, at: "/hidden_size"}
+  shape.layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  shape.vocab: {value: 250_624, source: config, at: "/vocab_size"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+
+  attn.kind:
+    value: GQA
+    source: config
+    at: "config.json; num_attention_heads, num_key_value_heads"
+    quote: '"num_key_value_heads": 8'
+    note: "48 query heads share 8 KV heads; sliding_window null, no MoVA experts (/mova_num_experts 0)."
+  attn.layout:
+    value: "61 GQA"
+    source: config
+    at: "config.json; num_hidden_layers, use_sliding_window"
+    quote: '"use_sliding_window": false'
+  attn.global_layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  attn.heads: {value: 48, source: config, at: "/num_attention_heads"}
+  attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.position:
+    value: "partial RoPE (64 of 128 QK dims)"
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonAttention.forward"
+    quote: "split_size_or_sections=[self.rope_head_dim, self.head_dim - self.rope_head_dim],"
+    note: "rope_head_dim is config /rope_head_dim (64); the remaining 64 dims per head carry no position."
+  attn.rope_fraction:
+    value: 0.5
+    source: config
+    at: "config.json; rope_head_dim, head_dim"
+    quote: '"rope_head_dim": 64'
+    basis: inferred
+    note: "rope_head_dim 64 divided by head_dim 128."
+  attn.rope_theta: {value: 10_000_000, source: config, at: "/rope_parameters/rope_theta"}
+  attn.qk_norm: {value: false, source: config, at: "/query_key_norm"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonMLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU (/hidden_act); dense FFN, routed and shared experts all use K2HorizonMLP."
+  ffn.bias:
+    value: false
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.dim: {value: 16384, source: config, at: "/intermediate_size"}
+
+  moe.experts: {value: 192, source: config, at: "/num_experts"}
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+  moe.shared: {value: 1, source: config, at: "/num_shared_experts"}
+  moe.expert_dim: {value: 1792, source: config, at: "/moe_intermediate_size"}
+  moe.shared_dim:
+    value: 1792
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonSparseMoeBlock.__init__"
+    quote: "intermediate_size=config.moe_intermediate_size * config.num_shared_experts)"
+    note: "1792 × 1 shared expert."
+  moe.dense_layers:
+    value: 3
+    source: config
+    at: "/mlp_only_layers | len"
+    note: "Layers 0, 1, 2 use the 16384-wide dense FFN; decoder_sparse_step 1 makes every later layer MoE."
+  moe.router: {value: sigmoid, source: config, at: "/router_score_func"}
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/router_scaling_factor"}
+  moe.balancing:
+    value: "per-expert bias for top-k selection only (update rate 1e-3)"
+    source: xllm_transformer
+    at: "xllm/models/transformer.py; ConfStore[\"k2-horizon-375B-a23B\"]"
+    quote: "num_experts=192, num_activated_experts=8, num_shared_experts=1, expert_inter_dim=1792, moe_router_score_func='sigmoid', moe_router_bias=True, moe_router_bias_update_rate=1e-3,"
+    note: "HF code adds gate.bias (config moe_gate_bias) to scores for selection only; whether the 375B run also used an auxiliary loss is not stated (config router_aux_loss_coef 1e-4 is a loader value)."
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonDecoderLayer.__init__"
+    quote: "self.input_layernorm = K2HorizonRMSNorm("
+    note: "layernorm_num_groups 1: one normalization group over d_model."
+  norm.placement:
+    value: pre
+    source: modeling_k2_horizon
+    at: "modeling_k2_horizon.py; K2HorizonDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.pretrain:
+    value: 8192
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Pretraining — Phase 1 | 211000 | 7.08T | 8K"
+  ctx.final:
+    value: 524_288
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Midtraining — Stage 3 | 3500 | 117B | 512K | Context extension."
+    note: "512K = 524,288 tokens (Highlights)."
+  ctx.max:
+    value: 524_288
+    source: card
+    at: "README.md; Highlights"
+    quote: "Native 524,288-token context from the midtraining stages onward."
+    note: "config max_position_embeddings 524288."
+  ctx.extension:
+    value: "8K → 32K (1.09T) → 128K (503B) → 512K (117B, then 201B with agentic/reasoning SFT data)"
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Midtraining — Stage 1 | 32500 | 1.09T | 32K | Context extension."
+    note: "RoPE base raised with length: config rope_theta 500000 at branch pretrain_ph2_240000, 1e6 at mid_1_32500, 1e7 from mid_2_15000; no RoPE scaling (rope_type default)."
+
+  mtp.depth:
+    value: 0
+    source: xllm_transformer
+    at: "xllm/models/transformer.py; TransformerOutputLayer.forward"
+    quote: "loss = vocab_parallel_cross_entropy(logits, y)"
+    basis: inferred
+    note: "xLLM, the training code, has no MTP implementation; the loss is next-token cross-entropy, and the checkpoint has no MTP weights."
+
+  train.batch:
+    value: "~33.5M tokens"
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Pretraining — Phase 2 | 240000 | 8.05T | 8K"
+    basis: inferred
+    note: "8.05T / 240,000 steps (Phase 1: 7.08T / 211,000 steps gives the same); sequences per batch and any ramp not stated."
+  train.batch_tokens:
+    value: 33_500_000
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Pretraining — Phase 2 | 240000 | 8.05T | 8K"
+    basis: inferred
+    note: "8.05T tokens / 240,000 steps, to the card's 3-significant-figure precision."
+
+  train.tokens:
+    value: 17_041_000_000_000
+    source: card
+    at: "README.md; Training Overview"
+    quote: "Token budgets cover only the additional training in that stage or phase."
+    basis: inferred
+    note: "Sum of the per-stage budgets quoted in train.stages (7.08T + 8.05T + 1.09T + 503B + 117B + 201B) through mid_4_6000; includes the 201B Stage 4 tokens with SFT data in the mix."
+  train.data:
+    value: "Phase 2 continues on newer and better data; Midtraining Stage 4 shifts the mix toward agentic and reasoning SFT data"
+    source: card
+    at: "README.md; Training Overview table"
+    quote: "Continued context extension from Stage 3, with the data mix shifted toward agentic and reasoning SFT data."
+  train.stages:
+    value:
+      - name: pretraining-phase-1
+        tokens: 7_080_000_000_000
+        seq_len: 8192
+        steps: 211_000
+        quote: "Pretraining — Phase 1 | 211000 | 7.08T | 8K | Pretraining."
+      - name: pretraining-phase-2
+        tokens: 8_050_000_000_000
+        seq_len: 8192
+        steps: 240_000
+        note: "Continued from Phase 1 with newer and better data."
+        quote: "Pretraining — Phase 2 | 240000 | 8.05T | 8K | Continued pretraining from Phase 1, with newer and better data."
+      - name: midtraining-1
+        tokens: 1_090_000_000_000
+        seq_len: 32768
+        steps: 32_500
+        note: "Context extension."
+        quote: "Midtraining — Stage 1 | 32500 | 1.09T | 32K | Context extension."
+      - name: midtraining-2
+        tokens: 503_000_000_000
+        seq_len: 131_072
+        steps: 15_000
+        note: "Context extension."
+        quote: "Midtraining — Stage 2 | 15000 | 503B | 128K | Context extension."
+      - name: midtraining-3
+        tokens: 117_000_000_000
+        seq_len: 524_288
+        steps: 3500
+        note: "Context extension."
+        quote: "Midtraining — Stage 3 | 3500 | 117B | 512K | Context extension."
+      - name: midtraining-4
+        tokens: 201_000_000_000
+        seq_len: 524_288
+        steps: 6000
+        note: "Mix shifted toward agentic and reasoning SFT data; final checkpoint is tag mid_4_6000."
+        quote: "Midtraining — Stage 4 | 6000 | 201B | 512K | Continued context extension from Stage 3, with the data mix shifted toward agentic and reasoning SFT data."
+    source: card
+    at: "README.md; Training Overview table"

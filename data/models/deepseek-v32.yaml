@@ -1,0 +1,209 @@
+name: DeepSeek-V3.2
+org: DeepSeek
+kind: reasoning
+note: "Post-trained release; the card names deepseek-ai/DeepSeek-V3.2-Exp-Base as its base. Recipe facts cover the DSA continued pre-training from a DeepSeek-V3.1-Terminus base checkpoint (already extended to 128K)."
+
+sources:
+  config: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3.2/resolve/a7e62ac04ecb2c0a54d736dc46601c5606cf10a6/config.json, kind: config}
+  inference-config: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3.2/resolve/a7e62ac04ecb2c0a54d736dc46601c5606cf10a6/inference/config_671B_v3.2.json, kind: config}
+  inference-model: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3.2/resolve/a7e62ac04ecb2c0a54d736dc46601c5606cf10a6/inference/model.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2512.02556v1, kind: paper}
+  transparency: {url: https://web.archive.org/web/20261019095912id_/https://fe-static.deepseek.com/chat/transparency/deepseek-v3.2-model-card-0414-EN.pdf, kind: paper}
+  weight-index: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3.2/resolve/a7e62ac04ecb2c0a54d736dc46601c5606cf10a6/model.safetensors.index.json, kind: config}
+  card: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3.2/resolve/a7e62ac04ecb2c0a54d736dc46601c5606cf10a6/README.md, kind: model-card}
+
+not_disclosed: [params.active_non_embedding, mtp.depth, ctx.pretrain, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  num_key_value_heads: "not read by inference/model.py (MLA)"
+  n_layers: "duplicate of config.json /num_hidden_layers"
+  n_dense_layers: "duplicate of config.json /first_k_dense_replace"
+  n_heads: "duplicate of config.json /num_attention_heads"
+  moe_inter_dim: "duplicate of config.json /moe_intermediate_size"
+  n_activated_experts: "duplicate of config.json /num_experts_per_tok"
+  route_scale: "duplicate of config.json /routed_scaling_factor"
+  score_func: "duplicate of config.json /scoring_func"
+
+facts:
+  meta.released:
+    value: "2025-12-01"
+    source: transparency
+    at: "p.2; General Information"
+    quote: "Release date December 1, 2025"
+  meta.license:
+    value: mit
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: mit"
+  params.active:
+    value: 37_000_000_000
+    source: transparency
+    at: "p.3; Model properties; Total model size"
+    quote: "671B parameters, of which 37B are activated for each token"
+  params.total:
+    value: 671_000_000_000
+    source: transparency
+    at: "p.3; Model properties; Total model size"
+    quote: "671B parameters, of which 37B are activated for each token"
+
+  shape.d_model: {value: 7168, source: config, at: "/hidden_size"}
+  shape.layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 129_280, source: config, at: "/vocab_size"}
+
+  attn.global_layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.head_dim: {value: 192, source: config, at: "/qk_nope_head_dim + /qk_rope_head_dim"}
+  attn.heads: {value: 128, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: "MLA, DSA"
+    source: report
+    at: "p.3 §2.1"
+    quote: "we instantiate DSA based on MLA (DeepSeek-AI, 2024) for DeepSeek-V3.2."
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.indexer_dim:
+    value: 128
+    source: config
+    at: "/index_head_dim"
+    note: "One indexer key per token per layer (Indexer.wk projects dim to index_head_dim; k_cache stored FP8 with per-128 scales); /index_n_heads 64 query heads, /index_topk 2048."
+  attn.qk_norm:
+    value: false
+    source: inference-model
+    at: "inference/model.py; MLA.forward"
+    quote: "q = q.view(bsz, seqlen, self.n_local_heads, self.qk_head_dim)"
+    note: "q_norm and kv_norm act on the Q and KV latents before up-projection; per-head Q/K are not normalized."
+  attn.layout:
+    value: "61 DSA"
+    source: inference-model
+    at: "inference/model.py lines 498–545; MLA.__init__"
+    quote: "self.indexer = Indexer(args)"
+    note: "Every MLA layer builds a lightning indexer; 61 layers per /num_hidden_layers."
+  attn.q_lora_rank: {value: 1536, source: config, at: "/q_lora_rank"}
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta:
+    value: 10000
+    source: config
+    at: "/rope_theta"
+    note: "YaRN on the rope dims: /rope_scaling type yarn, factor 40, beta_fast 32, beta_slow 1, mscale 1, mscale_all_dim 1, original_max_position_embeddings 4096."
+  attn.scale:
+    value: "1/sqrt(192) × (0.1·ln 40 + 1)² (YaRN mscale, s = 40)"
+    source: inference-model
+    at: "inference/model.py lines 533–537; MLA.__init__"
+    quote: "self.softmax_scale = self.softmax_scale * mscale * mscale"
+    note: "Applied when the configured max_seq_len exceeds original_seq_len 4096 (default max_seq_len 16384); mscale = 0.1·ln(rope_factor 40) + 1."
+  attn.position:
+    value: "partial RoPE (decoupled 64-dim RoPE key shared across heads + 128 NoPE dims per head)"
+    source: inference-model
+    at: "inference/model.py line 568; MLA.forward"
+    quote: "k_pe = apply_rotary_emb(k_pe.unsqueeze(2), freqs_cis)"
+  attn.sparse:
+    value: "DSA: lightning indexer (64 heads × 128, ReLU, FP8), top-2048 KV tokens per query"
+    source: report
+    at: "p.4 §2.1.1"
+    quote: "select 2048 key-value tokens for each query token"
+    note: "Indexer heads and dim from config /index_n_heads, /index_head_dim; ReLU and FP8 from p.3 §2.1."
+  attn.v_head_dim: {value: 128, source: config, at: "/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: inference-model
+    at: "inference/model.py line 643 (MLP.forward); same in Expert.forward"
+    quote: "return self.w2((F.silu(self.w1(x).float()) * self.w3(x).float()).type_as(x))"
+    note: "config /hidden_act silu."
+  ffn.bias:
+    value: false
+    source: inference-model
+    at: "inference/model.py lines 620–631 (MLP.__init__) and 721–733 (Expert.__init__)"
+    quote: "self.w1 = ColumnParallelLinear(dim, inter_dim)"
+    note: "Linear and its parallel subclasses default to bias=False."
+  ffn.dim: {value: 18432, source: config, at: "/intermediate_size"}
+
+  moe.dense_layers: {value: 3, source: config, at: "/first_k_dense_replace", note: "All later layers are MoE (/moe_layer_freq 1)."}
+  moe.balancing:
+    value: "auxiliary-loss-free expert bias (added to scores for top-k selection only); coefficients not stated"
+    source: inference-model
+    at: "inference/model.py; Gate.forward"
+    quote: "scores = scores + self.bias"
+    note: "config /topk_method noaux_tc; gating weights come from the unbiased scores."
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/n_routed_experts"}
+  moe.groups:
+    value: "8 expert groups, top-4 groups per token (group score: sum of its top-2 biased expert scores)"
+    source: inference-config
+    at: "inference/config_671B_v3.2.json; /n_expert_groups, /n_limited_groups"
+    quote: '"n_expert_groups": 8, "n_limited_groups": 4'
+    note: "Applied in Gate.forward of inference/model.py; config /n_group 8, /topk_group 4."
+  moe.norm_topk: {value: true, source: config, at: "/norm_topk_prob"}
+  moe.routed_scale: {value: 2.5, source: config, at: "/routed_scaling_factor"}
+  moe.router: {value: sigmoid, source: config, at: "/scoring_func"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim:
+    value: 2048
+    source: config
+    at: "/moe_intermediate_size"
+    note: "1 shared expert (/n_shared_experts) of the routed-expert width."
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.released:
+    value: true
+    source: weight-index
+    at: "model.safetensors.index.json; /weight_map"
+    quote: '"model.layers.61.eh_proj.weight"'
+    note: "1 MTP layer (/num_nextn_predict_layers) with MLA+DSA and MoE; the V3.2 report does not describe MTP training."
+
+
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: inference-model
+    at: "inference/model.py lines 831–851; Block.forward"
+    quote: "x, residual = self.attn_norm(x), x"
+  norm.type:
+    value: RMSNorm
+    source: inference-model
+    at: "inference/model.py lines 828–829 (Block.__init__) and 884 (Transformer.__init__)"
+    quote: "self.norm = RMSNorm(args.dim)"
+    note: "Quote is the final norm; Block.__init__ builds attn_norm and ffn_norm with the same RMSNorm(args.dim)."
+
+  ctx.max:
+    value: 131_072
+    source: transparency
+    at: "p.3; Model properties"
+    quote: "Context length 128K"
+    note: "config /max_position_embeddings 163840 is 4096 × YaRN factor 40."
+  ctx.final:
+    value: 131_072
+    source: report
+    at: "p.4 §2.1.1"
+    quote: "with each step consisting of 480 sequences of 128K tokens, resulting in a total of 943.7B tokens."
+
+  train.stages:
+    value:
+      - name: "dense warm-up (indexer only)"
+        tokens: 2_100_000_000
+        seq_len: 131_072
+        lr: 1e-3
+        steps: 1000
+        batch_sequences: 16
+        note: "Dense attention; all parameters frozen except the indexer, trained with a KL loss to the main attention distribution."
+        quote: "We train the indexer for only 1000 steps, with each step consisting of 16 sequences of 128K tokens, resulting in a total of 2.1B tokens."
+      - name: "sparse training"
+        tokens: 943_700_000_000
+        seq_len: 131_072
+        lr: 7.3e-6
+        steps: 15000
+        batch_sequences: 480
+        note: "Top-2048 selection; all parameters trained; indexer input detached and trained only by the indexer KL loss."
+        quote: "We train both the main model and the indexer for 15000 steps, with each step consisting of 480 sequences of 128K tokens, resulting in a total of 943.7B tokens."
+    source: report
+    at: "p.4 §2.1.1"
+  train.data:
+    value: "same distribution as the DeepSeek-V3.1-Terminus 128K long-context extension data"
+    source: report
+    at: "p.3 §2.1.1"
+    quote: "the distribution of training data is totally aligned with the 128K long context extension data used for DeepSeek-V3.1-Terminus."
+  train.objective:
+    value: "lightning-indexer KL loss to the head-summed main attention distribution; indexer input detached from the LM loss"
+    source: report
+    at: "p.4 §2.1.1"
+    quote: "we set a KL-divergence loss as the training objective of the indexer"

@@ -1,0 +1,293 @@
+name: Qwen3.8-Flash-Next
+org: Qwen
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint. Recipe facts are from the technical report."
+
+sources:
+  card: {url: https://huggingface.co/Qwen/Qwen3.8-Flash-Next/resolve/de4b8e4d43b917e7706784d8bb445c9af86a3540/README.md, kind: model-card}
+  config: {url: https://huggingface.co/Qwen/Qwen3.8-Flash-Next/resolve/de4b8e4d43b917e7706784d8bb445c9af86a3540/config.json, kind: config}
+  weights-index: {url: https://huggingface.co/Qwen/Qwen3.8-Flash-Next/resolve/de4b8e4d43b917e7706784d8bb445c9af86a3540/model.safetensors.index.json, kind: config}
+  hf-transformers: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/qwen4_exp/modeling_qwen4_exp.py, kind: code}
+  hf-config-code: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/qwen4_exp/configuration_qwen4_exp.py, kind: code}
+  report: {url: https://raw.githubusercontent.com/QwenLM/Qwen3.8-Flash-Next/69885871a64393807d988b27b1b5e380e8f28526/tech_report.pdf, kind: paper}
+  blog: {url: "https://web.archive.org/web/20260922022512id_/https://qwen.ai/api/v2/article/?language=en-US&path=qwen3.8-flash-next&type=qwen_ai", kind: blog}
+
+not_disclosed: [mtp.depth, mtp.loss_weight, ctx.pretrain, train.tokens, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.weight_decay, train.betas, train.grad_clip, train.precision, params.active_non_embedding]
+
+config_unused:
+  mamba_ssm_dtype: GDN recurrent-state dtype for serving; not read by modeling_qwen4_exp.py
+  mrope_interleaved: not read; the modeling code always interleaves the T/H/W sections
+  split_ngram_parts: n-gram table sharding for loading; not read by modeling_qwen4_exp.py
+  hybrid: MTP sub-config flag; not read by modeling_qwen4_exp.py
+
+facts:
+  meta.released:
+    value: "2026-08-26"
+    source: report
+    at: "p.1 header date"
+    quote: "2026-08-26"
+    note: "Same date as the qwen.ai blog API entry; Hugging Face repository created 2026-08-24."
+  meta.license: {value: "other (qwen-community-1.0)", source: card, at: "README.md; YAML front matter", quote: "license_name: qwen-community-1.0"}
+
+  params.active:
+    value: 6_000_000_000
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "125B with 6B activated, plus 51B n-gram embedding and 4B MTP"
+  params.note:
+    value: "Language-model count; excludes the 51B n-gram embedding tables and the 4B MTP module."
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "125B with 6B activated, plus 51B n-gram embedding and 4B MTP"
+  params.total:
+    value: 125_000_000_000
+    source: report
+    at: "p.1 §1 Introduction"
+    quote: "with 125B total parameters, 6B activated per token, and additional 51B parameters of n-gram embedding tables"
+
+  shape.d_model: {value: 2560, source: config, at: "/text_config/hidden_size"}
+  shape.layers: {value: 48, source: config, at: "/text_config/num_hidden_layers"}
+  shape.memory:
+    value: "Hashed bigram/trigram embedding at the input of layer 2, 51B params held in host memory: 16 hash heads (8 per order) of ~20M rows × 160 dims; residual-stream-gated value plus dilated short conv added to all 4 residual branches"
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "N-gram Embedding: 20,000,000 (bigrams/trigrams at layer 2)"
+    note: "Head layout and dims from config ngram_size=3, heads_per_ngram=8, ngram_vocab_size_base, ple_embed_dim=2560, ple_layer_ids [2], make_ngram_vocab_size_divisible_by 128, ple_conv_kernel_size 4 (dilation ngram_size) and Qwen4ExpTextNGramEmbedding / Qwen4ExpTextPLELayer."
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab: {value: 248_320, source: config, at: "/text_config/vocab_size"}
+
+  attn.gate:
+    value: "sigmoid, elementwise on the attention output before o_proj; gate projected jointly with Q"
+    source: hf-transformers
+    at: "modeling_qwen4_exp.py; Qwen4ExpTextAttention.forward"
+    quote: "attn_output = attn_output * torch.sigmoid(gate)"
+  attn.global_layers:
+    value: 12
+    source: config
+    at: "/text_config/layer_types | count full_attention"
+    note: "The checkpoint labels the QSA layers full_attention."
+  attn.head_dim: {value: 256, source: config, at: "/text_config/head_dim"}
+  attn.heads: {value: 24, source: config, at: "/text_config/num_attention_heads"}
+  attn.kind:
+    value: "Gated DeltaNet, QSA"
+    source: card
+    at: "README.md; Highlights; Hybrid Attention with QSA"
+    quote: "has been reworked into Gated DeltaNet and Qwen Sparse Attention (QSA)"
+    note: "QSA is GQA (24 Q / 2 KV heads) restricted to indexer-selected micro-blocks."
+  attn.kv_heads: {value: 2, source: config, at: "/text_config/num_key_value_heads"}
+  attn.layout:
+    value: "3 Gated DeltaNet : 1 QSA"
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "12 × (3 × (Gated DeltaNet → MoE) → 1 × (Qwen Sparse Attention → MoE))"
+    note: "Config full_attention_interval 4; layer_types lists the same pattern."
+  attn.linear_layers: {value: 36, source: config, at: "/text_config/layer_types | count linear_attention"}
+  attn.position:
+    value: "partial RoPE"
+    source: card
+    at: "README.md; Model Overview; Qwen Sparse Attention"
+    quote: "Rotary Position Embedding Dimension: 64"
+    note: "64 of 256 head dims rotated; config rope_parameters mrope_section [11, 11, 10], interleaved in code."
+  attn.qk_norm:
+    value: true
+    source: hf-transformers
+    at: "modeling_qwen4_exp.py; Qwen4ExpTextAttention.__init__"
+    quote: "self.q_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+    note: "Per-head RMSNorm on Q and K in the QSA layers."
+  attn.rope_fraction: {value: 0.25, source: config, at: "/text_config/partial_rotary_factor"}
+  attn.rope_theta: {value: 10_000_000, source: config, at: "/text_config/rope_parameters/rope_theta"}
+  attn.bias: {value: false, source: config, at: "/text_config/attention_bias"}
+  attn.conv: {value: 4, source: config, at: "/text_config/linear_conv_kernel_dim"}
+  attn.linear_head_dim: {value: 128, source: config, at: "/text_config/linear_value_head_dim"}
+  attn.linear_heads: {value: 48, source: config, at: "/text_config/linear_num_value_heads"}
+  attn.linear_kind:
+    value: "Gated DeltaNet: 16 QK heads, 48 V heads, head dim 128, short conv 4, sigmoid output gate after RMSNorm"
+    source: card
+    at: "README.md; Model Overview; Gated DeltaNet"
+    quote: "Number of Linear Attention Heads: 48 for V and 16 for QK"
+    note: "Sigmoid output gate replaces the SiLU gate of original GDN (report §2.1.1, Eq. 11; config output_gate_type). QK heads/dim from config linear_num_key_heads and linear_key_head_dim."
+  attn.sparse:
+    value: "QSA: MQA indexer (4 query heads, 1 key head) scores 4-token average-pooled key blocks; top-512 blocks (2048-token budget) per query plus the trailing partial block"
+    source: report
+    at: "p.7 §2.1.2 Qwen Sparse Attention; Implementation Details"
+    quote: "With a token budget of K = 2048 and a compression ratio of r = 4, QSA selects up to 512 complete blocks for each query"
+    note: "Config indexer_n_heads 4, indexer_kv_heads 1, indexer_head_dim 128, indexer_budget 2048, indexer_compress_ratio 4. The MTP layer also uses QSA."
+
+  ffn.activation:
+    value: "SwiGLU"
+    source: hf-transformers
+    at: "modeling_qwen4_exp.py; Qwen4ExpTextExperts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn is SiLU (config hidden_act silu)."
+  ffn.bias:
+    value: false
+    source: hf-transformers
+    at: "modeling_qwen4_exp.py; Qwen4ExpTextMLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Shared-expert MLP; routed experts are bias-free weight tensors."
+  ffn.clamp:
+    value: "none"
+    source: report
+    at: "p.2 §1 Introduction; Training Stability"
+    quote: "without relying on explicit clipping methods such as qk-clip (Kimi Team, 2025) or SwiGLU-clip"
+    note: "Stated for the full-scale run; the released code applies no clamp."
+
+  moe.expert_dim: {value: 640, source: config, at: "/text_config/moe_intermediate_size"}
+  moe.experts: {value: 512, source: config, at: "/text_config/num_experts"}
+  moe.router:
+    value: softmax
+    source: hf-transformers
+    at: "modeling_qwen4_exp.py; Qwen4ExpTextTopKRouter.forward"
+    quote: "router_probs = torch.nn.functional.softmax(router_logits, dtype=torch.float, dim=-1)"
+    note: "Top-k taken after softmax; shared expert has its own sigmoid gate."
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model Overview; Mixture Of Experts"
+    quote: "10 Routed + 1 Shared"
+  moe.shared_dim: {value: 640, source: config, at: "/text_config/shared_expert_intermediate_size"}
+  moe.top_k: {value: 10, source: config, at: "/text_config/num_experts_per_tok"}
+  moe.dense_layers:
+    value: 0
+    source: card
+    at: "README.md; Model Overview; Hidden Layout"
+    quote: "12 × (3 × (Gated DeltaNet → MoE) → 1 × (Qwen Sparse Attention → MoE))"
+    note: "Every decoder layer builds Qwen4ExpTextSparseMoeBlock."
+  moe.balancing:
+    value: "global-batch load-balancing loss"
+    source: blog
+    at: "Qwen3.8-Flash-Next blog; Other Architecture Optimizations; Ultra-sparse MoE"
+    quote: "Ultra-sparse MoE : With global load balancing"
+    note: "Cites 'Demons in the Detail' (global-batch balancing); coefficient not stated."
+  moe.norm_topk:
+    value: true
+    source: hf-config-code
+    at: "configuration_qwen4_exp.py; Qwen4ExpTextConfig defaults"
+    quote: "norm_topk_prob: bool = True"
+    note: "config.json does not set norm_topk_prob, so the class default applies; read by Qwen4ExpTextTopKRouter."
+
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/text_config/mtp_num_hidden_layers"
+    note: "One MTP decoder layer (mtp.layers.0 only in the weight index); report: multi-step MTP."
+  mtp.block:
+    value: "one decoder layer (QSA + MoE, each through Gated Residual); RMSNormed hidden state and RMSNormed next-token embedding projected by separate fc_hidden and fc_embedding"
+    source: report
+    at: "p.7 §2.1.2 Qwen Sparse Attention; Implementation Details"
+    quote: "all full-attention layers in the backbone and MTP module are replaced with QSA"
+    note: "Weight names: pre_fc_norm_hidden, pre_fc_norm_embedding, fc_hidden, fc_embedding, hyper_connection_mixer, layers.0 (self_attn with indexer, attn/mlp hyper_connection, MoE mlp)."
+  mtp.ffn:
+    value: "MoE"
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.layers.0.mlp"
+    quote: "mtp.layers.0.mlp.shared_expert_gate.weight"
+  mtp.shares_embedding:
+    value: true
+    source: config
+    at: "config.json; text_config.mtp_use_dedicated_embeddings"
+    quote: '"mtp_use_dedicated_embeddings": false'
+    note: "The weight index has no MTP embedding or output head."
+  mtp.params:
+    value: 4_000_000_000
+    source: card
+    at: "README.md; Model Overview; Language Model"
+    quote: "125B with 6B activated, plus 51B n-gram embedding and 4B MTP"
+  mtp.released:
+    value: true
+    source: weights-index
+    at: "model.safetensors.index.json; weight_map mtp.* entries"
+    quote: "mtp.fc_hidden.weight"
+
+  norm.placement:
+    value: pre
+    source: report
+    at: "p.12 §2.2 Gated Residual"
+    quote: "GR also replaces the block’s pre-normalization rather than sitting in front of it"
+    note: "Normalization sits inside the Gated Residual read: per-branch RMSNorm over 4 residual branches, then a sigmoid elementwise gate."
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: hf-transformers
+    at: "modeling_qwen4_exp.py; Qwen4ExpTextRMSNorm.forward"
+    quote: "output = output * (1.0 + self.weight.float())"
+    note: "Report §2.1.1: zero-centered RMSNorm is applied to all RMSNorm layers."
+  norm.eps: {value: 1.0e-6, source: config, at: "/text_config/rms_norm_eps"}
+  norm.residual:
+    value: "Gated Residual: 4 residual branches, each RMSNormed; elementwise sigmoid read gate (rank-320 bottleneck) averages branches into the block input; output written to every branch with per-branch scalar 2·sigmoid; no branch mixing"
+    source: report
+    at: "p.11 §2.2 Residual; Gated Residual"
+    quote: "We use nr = 4 branches, with a separate GR module for the attention block and the MLP block of every layer."
+    note: "Separate GR per attention and MoE sublayer; a final GR read replaces the norm before the LM head. Branches = config hc_count 4; rank 320 per card/config hc_lowrank."
+
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.7 §2.1.2 Qwen Sparse Attention; Training Details"
+    quote: "Each step comprises 96 sequences of 256K tokens"
+    note: "256K-token sequences in the final continued-pretraining stage."
+  ctx.max:
+    value: 1_000_000
+    source: card
+    at: "README.md; Model Overview"
+    quote: "262,144 natively and extensible up to 1,000,000 tokens"
+    note: "262,144 native (config max_position_embeddings); beyond that via inference-time YaRN."
+
+  train.batch:
+    value: "constant (no batch-size warmup); size not disclosed"
+    source: report
+    at: "p.18 §3.2 Hyperparameter Scaling; Batch-Size Warmup Is No Longer Necessary"
+    quote: "we do not employ batch-size warmup in our production runs"
+  train.compute:
+    value: "~1/9 the training FLOPs of the 397B-A17B predecessor (~1/3 its tokens); absolute figure not disclosed"
+    source: report
+    at: "p.1 Abstract"
+    quote: "at 1/3 the activated parameters, 1/3 the training tokens, and roughly 1/9 the training FLOPs"
+  train.optimizer:
+    value: "Muon + AdamW"
+    source: report
+    at: "p.16 §3.1 Optimizer"
+    quote: "We use Muon as the main optimizer"
+    note: "Muon (Nesterov 0.95, Polar Express, 8 Newton–Schulz steps, update scaled by 0.2·sqrt(max(A,B)); qkv and GDN input projections split per head, fc1 into gate/up) on linear maps; AdamW on embeddings, output head, router and GR low-rank projections; Adam without weight decay on n-gram tables."
+  train.stages:
+    value:
+      - name: "QSA dense distillation (indexer only)"
+        tokens: "~2B"
+        seq_len: 262_144
+        lr: 1e-3
+        batch_sequences: 8
+        steps: 1000
+        quote: "only the indexer is trained for 1,000 steps, using a learning rate of 1 × 10−3 . Each step comprises 8 sequences of 256K tokens, amounting to approximately 2B training tokens in total."
+      - name: "QSA sparse training"
+        tokens: "~200B"
+        seq_len: 262_144
+        lr: 2.5e-5
+        batch_sequences: 96
+        steps: 8000
+        quote: "the backbone and indexer are jointly trained for 8,000 steps using a learning rate of 2.5 × 10−5 . Each step comprises 96 sequences of 256K tokens, totaling roughly 200B training tokens."
+    source: report
+    at: "p.6–7 §2.1.2 Qwen Sparse Attention; Training Details"
+    note: "Only the final 256K continued-pretraining stages are disclosed; earlier stages and the total token count are not."
+  train.init:
+    value: "MoE router parameters normalized at initialization"
+    source: blog
+    at: "Qwen3.8-Flash-Next blog; Other Architecture Optimizations; Training stability"
+    quote: "normalized MoE router initialization are retained"
+  train.stability:
+    value: "no QK-clip or SwiGLU-clip"
+    source: report
+    at: "p.2 §1 Introduction; Training Stability"
+    quote: "without relying on explicit clipping methods such as qk-clip (Kimi Team, 2025) or SwiGLU-clip"
+    note: "Report: the full-scale run had no loss spikes or anomalous gradient-norm fluctuations."
+
+  scaling.hp_rule:
+    value: "LR and batch from a hyperparameter scaling law refitted for the new architecture and Muon; target batch from step 0 (no batch-size warmup)"
+    source: card
+    at: "README.md; Highlights, Tailored Training Recipe"
+    quote: "Guided by refitted scaling laws, we eliminate traditional batch-size warmups and start directly at the target batch size"
+    note: "Report §3.2: the law gives LR and batch size; coefficients are not published."
+
+  scaling.ladder:
+    value: "28-layer 25B-A3B MoE (400B tokens at 4K + 80B at 32K) for architecture ablations; 35B-A3B for QSA; HP law checked on 20-layer 10.8B-A0.89B (4T tokens) and 48-layer 156B-A7B (419B tokens)"
+    source: report
+    at: "p.5 §2.1.1 Architecture Ablation; p.8 §2.1.2; pp.17–18 §3.2"
+    quote: "Each checkpoint corresponds to a 28-layer 25B-A3B MoE model based on the Qwen3.5 architecture, pretrained first on 400B tokens with a 4K context length, and subsequently on 80B tokens with a 32K context length."

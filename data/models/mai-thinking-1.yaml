@@ -1,0 +1,382 @@
+name: MAI-Thinking-1
+org: Microsoft AI
+kind: reasoning
+weights: closed
+note: "Facts describe MAI-Base-1, the pretrained base of MAI-Thinking-1; neither checkpoint is public (served via Microsoft Foundry)."
+
+sources:
+  report: {url: https://web.archive.org/web/20261011065901id_/http://microsoft.ai/pdf/mai-thinking-1.pdf, kind: paper}
+  build-blog: {url: https://web.archive.org/web/20261013022631/https://blogs.microsoft.com/blog/2026/06/02/microsoft-build-2026-be-yourself-at-work/, kind: blog}
+
+not_disclosed:
+  - mtp.depth
+  - moe.norm_topk
+  - norm.eps
+  - params.active_non_embedding
+
+facts:
+  meta.released:
+    value: "2026-06-02"
+    source: build-blog
+    at: "Microsoft Build 2026: Be yourself at work; byline"
+    quote: "Jun 2, 2026 | Kyle Daigle"
+    note: "Post announces MAI-Thinking-1 in private preview on Foundry."
+
+  params.total:
+    value: 962_000_000_000
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row"
+    quote: "MAI-Base-1 34.7B 962B 78 6656 13312 3072 10240 8/512 8/80"
+    note: "Rounded to 1T in the report text."
+  params.active:
+    value: 34_700_000_000
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row"
+    quote: "MAI-Base-1 34.7B 962B 78 6656 13312 3072 10240 8/512 8/80"
+    note: "Rounded to 35B in the report text."
+  params.note:
+    value: "Counts include the tied embedding (200,019 × 6656 ≈ 1.33B) once"
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row"
+    quote: "MAI-Base-1 34.7B 962B 78 6656 13312 3072 10240 8/512 8/80"
+    basis: inferred
+    note: "From Table 1 shapes: 39 MoE layers × 512 experts × 3·3072·5120 + 78 attention layers (80×128 Q/O, 8×128 K/V) + 39 dense FFNs (3·6656²) + latent projections + router + embedding = 962.1B total, 34.66B active."
+
+  shape.layers:
+    value: 78
+    source: report
+    at: "p.7 §2.2.1"
+    quote: "The final architecture of MAI-Base-1 has 78 layers."
+  shape.d_model:
+    value: 6656
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row (Hidden)"
+    quote: "MAI-Base-1 34.7B 962B 78 6656 13312 3072 10240 8/512 8/80"
+  shape.vocab:
+    value: 200_019
+    source: report
+    at: "p.6 §2.1"
+    quote: "we chose the o200k_base tokenizer with a vocabulary size of 200,019"
+  shape.tied_embeddings:
+    value: true
+    source: report
+    at: "p.6 §2.1"
+    quote: "the input and output embedding weights are tied"
+  shape.tokenizer:
+    value: "o200k_base (OpenAI)"
+    source: report
+    at: "p.6 §2.1"
+    quote: "we chose the o200k_base tokenizer with a vocabulary size of 200,019"
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "pairing 5 local attention layers (Beltagy et al., 2020) with 1 global attention layer"
+  attn.layout:
+    value: "5 SWA : 1 global"
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "pairing 5 local attention layers (Beltagy et al., 2020) with 1 global attention layer"
+    note: "The last layer of each group of 6 is global (p.7 §2.2.1)."
+  attn.global_layers:
+    value: 13
+    source: report
+    at: "p.7 §2.2.1"
+    quote: "For the 5:1 local to global attention ratio that we use, L must be a multiple of 6 so that the last attention layer applies global attention."
+    basis: inferred
+    note: "78 layers / 6 = 13 global."
+  attn.local_layers:
+    value: 65
+    source: report
+    at: "p.7 §2.2.1"
+    quote: "For the 5:1 local to global attention ratio that we use, L must be a multiple of 6 so that the last attention layer applies global attention."
+    basis: inferred
+    note: "78 layers × 5/6 = 65 local."
+  attn.window:
+    value: 512
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "with sliding window size of 512 and a base frequency of 10,000"
+  attn.heads:
+    value: 80
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row (KV/Q)"
+    quote: "MAI-Base-1 34.7B 962B 78 6656 13312 3072 10240 8/512 8/80"
+  attn.kv_heads:
+    value: 8
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "We use group-query attention with 8 KV heads (Ainslie et al., 2023) and a per-head dimension of 128."
+  attn.head_dim:
+    value: 128
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "We use group-query attention with 8 KV heads (Ainslie et al., 2023) and a per-head dimension of 128."
+  attn.local_heads:
+    value: 80
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row (KV/Q)"
+    quote: "MAI-Base-1 34.7B 962B 78 6656 13312 3072 10240 8/512 8/80"
+    note: "The report gives one head configuration for local and global layers."
+  attn.local_kv_heads:
+    value: 8
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "We use group-query attention with 8 KV heads (Ainslie et al., 2023) and a per-head dimension of 128."
+    note: "Stated for all attention layers."
+  attn.local_head_dim:
+    value: 128
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "We use group-query attention with 8 KV heads (Ainslie et al., 2023) and a per-head dimension of 128."
+    note: "Stated for all attention layers."
+  attn.position:
+    value: "RoPE (SWA), NoPE (global)"
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "The global attention layers do not use any position encoding"
+  attn.local_rope_theta:
+    value: 10000
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "with sliding window size of 512 and a base frequency of 10,000"
+  attn.qk_norm:
+    value: true
+    source: report
+    at: "p.6 §2.1 Attention"
+    quote: "We apply RMSNorms to the queries and the keys"
+  attn.bias:
+    value: false
+    source: report
+    at: "p.6 §2.1"
+    quote: "We do not use any biases in the model"
+
+  ffn.activation:
+    value: SwiGLU
+    source: report
+    at: "p.6 §2.1 Feed-forward and MoE"
+    quote: "we use SwiGLU (Shazeer, 2020) for both dense and MoE feed-forward layers"
+  ffn.dim:
+    value: 6656
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row (FFN) and caption"
+    quote: "The (Expert-)FFN sizes refer to the output size of the first linear layer, which is 2x of the input size for the second linear layer due to SwiGLU."
+    basis: inferred
+    note: "Table 1 FFN 13312 is the fused gate+up output; intermediate width 13312 / 2 = 6656. Dense FFNs alternate with MoE layers (39 each)."
+  ffn.bias:
+    value: false
+    source: report
+    at: "p.6 §2.1"
+    quote: "We do not use any biases in the model"
+
+  moe.experts:
+    value: 512
+    source: report
+    at: "p.6 §2.1 Feed-forward and MoE"
+    quote: "each compressed representation is routed to 8 out of the 512 experts with softmax gating"
+  moe.top_k:
+    value: 8
+    source: report
+    at: "p.6 §2.1 Feed-forward and MoE"
+    quote: "each compressed representation is routed to 8 out of the 512 experts with softmax gating"
+  moe.router:
+    value: softmax
+    source: report
+    at: "p.6 §2.1 Feed-forward and MoE"
+    quote: "each compressed representation is routed to 8 out of the 512 experts with softmax gating"
+    note: "Router input is the uncompressed hidden state."
+  moe.shared:
+    value: 0
+    source: report
+    at: "p.8 Table 2 caption"
+    quote: "over the interleaved layout of MAI-Base-1 (8/512 MoE + dense FFN)"
+    basis: inferred
+    note: "The report writes shared-expert variants as 7+1 shared; MAI-Base-1 is 8/512 routed only, and §2.1 finds shared experts give little or no benefit in the interleaved layout."
+  moe.expert_dim:
+    value: 5120
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row (Expert FFN) and caption"
+    quote: "The (Expert-)FFN sizes refer to the output size of the first linear layer, which is 2x of the input size for the second linear layer due to SwiGLU."
+    basis: inferred
+    note: "Table 1 Expert FFN 10240 is the fused gate+up output; intermediate width 10240 / 2 = 5120, matching the 962B total."
+  moe.latent_dim:
+    value: 3072
+    source: report
+    at: "p.7 Table 1, MAI-Base-1 row (Down Proj)"
+    quote: "MAI-Base-1 34.7B 962B 78 6656 13312 3072 10240 8/512 8/80"
+    note: "Shared down-projection before all-to-all dispatch, up-projection after combine (LatentMoE); changed from L78's 3328 so the dimension is divisible by 512 for DeepEP."
+  moe.dense_layers:
+    value: 1
+    source: report
+    at: "p.6 §2.1 Feed-forward and MoE"
+    quote: "Our first feedforward layer is dense"
+    note: "Thereafter dense FFN and MoE alternate layer by layer."
+  moe.balancing:
+    value: "global-batch GShard-style load-balancing loss (expert frequencies aggregated across DP ranks and micro-batches); dropless"
+    source: report
+    at: "p.6 §2.1 Feed-forward and MoE"
+    quote: "The GShard-style loss (Lepikhin et al., 2020) that we use performs similarly to the loss-free variant"
+
+  norm.type:
+    value: RMSNorm
+    source: report
+    at: "p.6 §2.1"
+    quote: "we employ RMSNorm (Zhang and Sennrich, 2019) at both the input and output immediately before the residual addition"
+  norm.placement:
+    value: sandwich
+    source: report
+    at: "p.6 §2.1"
+    quote: "we employ RMSNorm (Zhang and Sennrich, 2019) at both the input and output immediately before the residual addition"
+  norm.residual:
+    value: "FP32 residual stream"
+    source: report
+    at: "p.22 §2.6.3"
+    quote: "the entire residual stream all the way from the input embedding to the output"
+  train.dropout:
+    value: 0.15
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "We apply dropout 0.15 at each layer's output before the residual add."
+    note: "Applied to each sublayer output before the residual add."
+
+  ctx.pretrain:
+    value: 16384
+    source: report
+    at: "p.21 §2.6.1 Table 6"
+    quote: "Pre-training 30 T 16,384 8,192"
+  ctx.final:
+    value: 262_144
+    source: report
+    at: "p.21 §2.6.1 Table 6"
+    quote: "Mid-training 2 150 B 262,144 4,096"
+  ctx.max:
+    value: 262_144
+    source: report
+    at: "p.2 §1"
+    quote: "After mid-training, MAI-Thinking-1 achieves a maximum context length of 256K."
+  ctx.extension:
+    value: "16K → 64K (3.4T tokens, mid-training 1) → 256K (150B tokens, mid-training 2); same mixture re-packed at the longer length; Ulysses context parallelism"
+    source: report
+    at: "p.20 §2.5.4; p.21 Table 6; p.85–87 App. C"
+    quote: "the model is pre-trained at 16K, mid-trained at 64K (Stage 1), and then extended to 256K in a short dedicated phase (Stage 2)."
+    note: "App. C.5 gives 140B tokens for the 256K extension; Table 6 gives 150B, which matches the 3.55T mid-training total in §2."
+
+  train.tokens:
+    value: 33_550_000_000_000
+    source: report
+    at: "p.5 §2"
+    quote: "we ran a main pre-training phase of 30 trillion tokens, followed by mid-training phases totaling 3.55 trillion tokens"
+    basis: inferred
+    note: "30T pre-training + 3.55T mid-training (Table 6: 3.4T + 150B)."
+  train.stages:
+    value:
+      - name: pre-training
+        tokens: 30_000_000_000_000
+        seq_len: 16384
+        lr: 2e-4
+        batch_tokens: 134_000_000
+        note: "Peak LR; ~12B-token warmup, cosine to 2e-5. 8,192 GB200."
+        quote: "Pre-training 30 T 16,384 8,192"
+      - name: mid-training 1
+        tokens: 3_400_000_000_000
+        seq_len: 65536
+        lr: 2e-5
+        batch_tokens: 134_000_000
+        note: "Cosine 2e-5 → 1e-5, no warmup; STEM/math 35%, code 55%. 8,192 GB200."
+        quote: "Mid-training 1 3.4 T 65,536 8,192"
+      - name: mid-training 2
+        tokens: 150_000_000_000
+        seq_len: 262_144
+        lr: 1e-6
+        batch_tokens: 134_000_000
+        note: "Constant LR, no warmup. 4,096 GB200."
+        quote: "Mid-training 2 150 B 262,144 4,096"
+    source: report
+    at: "p.21–22 §2.6.1 Table 6, §2.6.2"
+  train.optimizer:
+    value: AdamW
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "MAI-Base-1 is optimized with AdamW (Loshchilov and Hutter, 2017) (β1 = 0.95, β2 = 0.925, ε = 10−8 )"
+  train.betas:
+    value: "(0.95, 0.925)"
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "MAI-Base-1 is optimized with AdamW (Loshchilov and Hutter, 2017) (β1 = 0.95, β2 = 0.925, ε = 10−8 )"
+    note: "Adam ε 1e-8."
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "a constant weight decay of 0.1, with reduced weight decay on attention weights (0.01) and embedding weights (0.005)"
+    note: "0.01 on attention weights, 0.005 on embedding weights."
+  train.grad_clip:
+    value: 1.0
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "The global gradient norm is clipped to 1.0."
+  train.lr_peak:
+    value: 2e-4
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "then decays along a cosine schedule from a peak of 2 × 10−4 to a minimum of 2 × 10−5"
+  train.lr_min:
+    value: 2e-5
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "then decays along a cosine schedule from a peak of 2 × 10−4 to a minimum of 2 × 10−5"
+    note: "End of pre-training; mid-training decays further to 1e-5, then 1e-6 constant."
+  train.warmup:
+    value: "~12B tokens (linear)"
+    source: report
+    at: "p.21 §2.6.2"
+    quote: "The learning rate follows a linear warmup of approximately 12 B tokens"
+  train.schedule:
+    value: "linear warmup ~12B tokens, cosine 2e-4 → 2e-5 (pre-training); cosine 2e-5 → 1e-5 (mid-training 1); constant 1e-6 (mid-training 2)"
+    source: report
+    at: "p.21–22 §2.6.2"
+    quote: "Mid-training phase 1 uses a cosine decay learning rate schedule with a peak learning rate of 2 × 10−5 and a minimum of 1 × 10−5 , without warmup."
+  train.batch:
+    value: "134M tokens, all phases"
+    source: report
+    at: "p.22 §2.6.2"
+    quote: "All phases use a global batch size of 134M tokens."
+  train.batch_tokens:
+    value: 134_000_000
+    source: report
+    at: "p.22 §2.6.2"
+    quote: "All phases use a global batch size of 134M tokens."
+  train.precision:
+    value: "FP8 with delayed scaling (1024-step amax history): E4M3 forward GEMMs, E5M2 data-gradient GEMMs; BF16 weight-gradient GEMMs with FP32 accumulation; BF16 default weights and activations"
+    source: report
+    at: "p.22 §2.6.3"
+    quote: "We use FP8 E4M3 for GEMMs in the forward pass, FP8 E5M2 for the data-gradient, and BF16 for the compute of the weight-gradient with FP32 gradient accumulation"
+    note: "FP32 for residual stream, pre-softmax activations, router, MoE combine, embedding/norm/router weights, LM-head GEMM, master weights and AdamW state; stochastic rounding on gradient downcasts."
+  train.init:
+    value: "normal std 0.02; residual output projections scaled by 1/sqrt(number of residual connections); attention output zero-init via zero output-RMSNorm gains"
+    source: report
+    at: "p.21–22 §2.6.2"
+    quote: "we initialize the attention output to zero, achieved by setting the output RMSNorm gains to zero."
+  train.data:
+    value: "30.0T tokens: code 54.6% (16.4T, 2.22 epochs), STEM 15.8%, web text 14.9%, math 5.4% (5.28 epochs), PDFs 4.7%, books and journals 3.1%, multilingual 1.6%; no LM-generated synthetic data"
+    source: report
+    at: "p.20 Table 5"
+    quote: "Code 7.4 16.4 54.6 2.22×"
+    note: "Mid-training mix: STEM/math 35%, code 55%, other 10% (p.20 §2.5.4)."
+  train.cutoff:
+    value: "web HTML Sep 2025, web PDFs Dec 2025, GitHub code Jun 2025, books and journals Mar 2026"
+    source: report
+    at: "p.13 Table 4"
+    quote: "Web HTML pages September 2025"
+  train.hardware:
+    value: "8,192 GB200 (pre-training, mid-training 1), 4,096 GB200 (mid-training 2); EP64 within NVLink domain, ZeRO-2"
+    source: report
+    at: "p.21 §2.6.1"
+    quote: "We use expert parallelism 64 with ZeRO-2 for pre-training and mid-training 1, and we enable ZeRO-3 (FSDP) for mid-training phase 2."
+  scaling.ladder:
+    value: "L12–L78 (365M/3.9B to 35.6B/1015B active/total): L layers, D = L·256/3, query heads L rounded up to a multiple of 16, 8 KV heads, 8/512 experts; architecture ablations at 100–200 TPP"
+    source: report
+    at: "p.7 §2.2.1, Table 1"
+    quote: "most architecture ablations are conducted near the Chinchilla optimal region (Hoffmann et al., 2022) at 100-200 TPP"
+    note: "Table 1 rungs L12, L18, L24, L30, L36, L42, L66, L78; MAI-Base-1 is L78 with latent 3072 instead of 3328 and Expert FFN 10240 instead of 9984."

@@ -1,0 +1,410 @@
+name: Step-3.5-Flash-Base
+org: StepFun
+kind: base
+
+sources:
+  config: {url: https://huggingface.co/stepfun-ai/Step-3.5-Flash-Base/resolve/19623ae192b589db21eb7793e75a5d3ea3ef0dae/config.json, kind: config}
+  index: {url: https://huggingface.co/stepfun-ai/Step-3.5-Flash-Base/resolve/19623ae192b589db21eb7793e75a5d3ea3ef0dae/model.safetensors.index.json, kind: config}
+  modeling_step3p5: {url: https://huggingface.co/stepfun-ai/Step-3.5-Flash/resolve/ab446a3de5e171ea341227e24bb1f090e1b771f7/modeling_step3p5.py, kind: code}
+  configuration_step3p5: {url: https://huggingface.co/stepfun-ai/Step-3.5-Flash/resolve/ab446a3de5e171ea341227e24bb1f090e1b771f7/configuration_step3p5.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2602.10604v2, kind: paper}
+  report_v1: {url: https://arxiv.org/pdf/2602.10604v1, kind: paper}
+  card: {url: https://huggingface.co/stepfun-ai/Step-3.5-Flash-Base/resolve/19623ae192b589db21eb7793e75a5d3ea3ef0dae/README.md, kind: model-card}
+
+not_disclosed: [train.betas]
+
+config_unused:
+  max_position_embedding: "misspelled; Step3p5Config and the RoPE module read max_position_embeddings"
+  use_qk_norm: "not read by modeling_step3p5.py; q_norm/k_norm are always applied"
+  use_moe: "not read by modeling_step3p5.py; MoE placement comes from moe_layers_enum"
+  moe_every_n_layer: "not read by modeling_step3p5.py"
+  attention_type: "label inside attention_other_setting; not read, layer type comes from layer_types"
+  true_head_dim: "not read by modeling_step3p5.py"
+
+facts:
+  meta.released:
+    value: "2026-02-11"
+    source: report_v1
+    at: "p.1 arXiv stamp"
+    quote: "arXiv:2602.10604v1 [cs.CL] 11 Feb 2026"
+    note: "Report predates the Base weights (Hugging Face repo created 2026-03-02)."
+
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+
+  params.total:
+    value: 196_000_000_000
+    source: report
+    at: "p.6 §2.2"
+    quote: "This configuration maintains an extensive knowledge capacity (196B total parameters)"
+  params.active:
+    value: 11_000_000_000
+    source: report
+    at: "p.6–7 §2.2"
+    quote: "restricting per-token activation to just 11B"
+  params.active_non_embedding:
+    value: 11_000_000_000
+    source: report
+    at: "p.27 Table 6"
+    quote: "Activated params / token (backbone) 11B"
+    note: "Table 6 states activated params exclude embedding/output matrices; backbone without the 3 MTP heads."
+  params.note:
+    value: "Backbone only: 198B total / 13B active with the 3 MTP heads; active count excludes embedding and output matrices."
+    source: report
+    at: "p.27 Table 6"
+    quote: "“Activated params” are reported per token and exclude embedding/output matrices."
+
+  shape.d_model: {value: 4096, source: config, at: "/hidden_size"}
+  shape.layers: {value: 45, source: config, at: "/num_hidden_layers"}
+  shape.vocab:
+    value: 128_815
+    source: config
+    at: "/vocab_size"
+    note: "Paper Table 6 gives 128,896."
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "p.7 §2.2"
+    quote: "This configuration repeats a four-layer motif consisting of three SWA layers (W =512) followed by a single full GQA-8 layer."
+  attn.layout:
+    value: "3 SWA : 1 global (leading global layer + 11 × [3 SWA, 1 global])"
+    source: report
+    at: "p.6 Figure 2 caption"
+    quote: "with a leading Full Attention layer followed by L = 11 Hybrid Blocks, each interleaving 3 Sliding Window Attention (SWA) layers with one Full Attention layer"
+  attn.global_layers:
+    value: 12
+    source: config
+    at: "/layer_types/0:45 | count full_attention"
+    note: "/layer_types has 46 entries; the last is the MTP layer."
+  attn.local_layers: {value: 33, source: config, at: "/layer_types/0:45 | count sliding_attention"}
+  attn.heads:
+    value: 64
+    source: report
+    at: "p.27 Table 6"
+    quote: "Query heads (full / SWA) 64 / 96"
+    note: "Full-attention layers; SWA layers use 96 (attn.local_heads)."
+  attn.local_heads:
+    value: 96
+    source: config
+    at: "/attention_other_setting/num_attention_heads"
+    note: "Step3p5Attention.__init__ reads it for sliding_attention layers."
+  attn.local_kv_heads:
+    value: 8
+    source: config
+    at: "/attention_other_setting/num_attention_groups"
+    note: "Step3p5Attention.__init__ reads it for sliding_attention layers."
+  attn.local_head_dim:
+    value: 128
+    source: config
+    at: "/head_dim"
+    note: "Step3p5Attention uses config head_dim for both layer types; /attention_other_setting/head_dim (128) is not read."
+  attn.kv_heads:
+    value: 8
+    source: config
+    at: "/num_attention_groups"
+    note: "Step3p5Attention reads num_attention_groups as the KV head count."
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.window: {value: 512, source: config, at: "/sliding_window"}
+  attn.position:
+    value: "partial RoPE (global, 64 of 128 dims), RoPE (SWA, all 128 dims)"
+    source: report
+    at: "p.27 Table 6"
+    quote: "RoPE dims (full / SWA) 64 / 128"
+  attn.local_rope_theta:
+    value: 10_000
+    source: config
+    at: "/rope_theta/1"
+    note: "Per-layer list read by Step3p5RotaryEmbedding; 10,000 on every sliding_attention layer."
+  attn.rope_fraction:
+    value: 0.5
+    source: config
+    at: "/partial_rotary_factors/0"
+    note: "Global layers; SWA layers use 1.0. Step3p5RotaryEmbedding reads the per-layer factor."
+  attn.rope_theta:
+    value: 1_000_000
+    source: config
+    at: "/rope_theta/0"
+    note: "Global layers; SWA layers 10,000. 10,000 for all layers at 4K, raised to 1M for full attention in the 32K portion of annealing (p.15 §4.2.3)."
+  attn.qk_norm:
+    value: true
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5Attention.__init__"
+    quote: "self.q_norm = Step3p5RMSNorm(self.head_dim, eps=config.rms_norm_eps)"
+    note: "Per-head zero-centered RMSNorm on Q and K, before RoPE; applied regardless of /use_qk_norm."
+  attn.gate:
+    value: "head-wise scalar sigmoid gate on each head's output, before o_proj; all layers"
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5Attention.forward"
+    quote: "self.head_dim) * gate_states.unsqueeze(-1).sigmoid()"
+    note: "Enabled by /use_head_wise_attn_gate; g_proj maps hidden_size → num_heads; paper App. A.1. Used instead of attention sinks (/sink false)."
+  attn.bias:
+    value: false
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5Attention.__init__"
+    quote: "self.q_proj = nn.Linear(config.hidden_size, self.q_size, bias=False)"
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5MLP.forward"
+    quote: "return self.down_proj(gate * up)"
+    note: "gate = SiLU(gate_proj(x)); routed experts use the same form (Step3p5MoEMLP.get_expert_output)."
+  ffn.dim: {value: 11264, source: config, at: "/intermediate_size"}
+  ffn.bias:
+    value: false
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+  ffn.clamp:
+    value: "gate capped at 7, up clamped to [−7, 7] in routed experts of layers 43–44; shared expert of layer 44 limit 16"
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5MoEMLP.get_expert_output"
+    quote: "up = up.clamp(min=-self.limit, max=self.limit)"
+    note: "Limits from /swiglu_limits and /swiglu_limits_shared (0-indexed, 0 = no clamp); paper §4.1.3 adopts activation clipping in deep MoE layers against expert activation blow-up."
+
+  moe.experts: {value: 288, source: config, at: "/moe_num_experts"}
+  moe.top_k: {value: 8, source: config, at: "/moe_top_k"}
+  moe.shared:
+    value: 1
+    source: report
+    at: "p.6 §2.2"
+    quote: "Each MoE layer contains 288 routed experts plus one shared expert"
+  moe.expert_dim: {value: 1280, source: config, at: "/moe_intermediate_size"}
+  moe.shared_dim: {value: 1280, source: config, at: "/share_expert_dim"}
+  moe.dense_layers:
+    value: 3
+    source: report
+    at: "p.6 §2.2"
+    quote: "Step 3.5 Flash adopts a 45-layer sparse-MoE Transformer backbone (3 dense layers and 42 MoE layers)"
+    note: "Config moe_layers_enum lists layers 3–44."
+  moe.router:
+    value: sigmoid
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5MoEMLP.router_bias_func"
+    quote: "gate_prob = torch.sigmoid(gating_output.float())"
+    note: "Bias (use_moe_router_bias) added for top-k selection only; moe_router_activation sigmoid; router logits computed in FP32 (/need_fp32_gate)."
+  moe.norm_topk:
+    value: true
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5MoEMLP.forward"
+    quote: "router_logits, self.top_k, renormalize=True)"
+    note: "Hard-coded in code; config norm_expert_weight true agrees."
+  moe.routed_scale:
+    value: 3.0
+    source: config
+    at: "/moe_router_scaling_factor"
+    note: "Applied to routed weights in Step3p5MoEMLP.forward; paper §4.1.2 motivates an explicit routed/shared scale against expert collapse."
+  moe.balancing:
+    value: "aux-loss-free bias (update rate 0.001 for the first 14.6T, decayed to 0 during annealing) + EP-group balance loss 0.001"
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "the bias update rate is 0.001 for the first 14.6T tokens and decays to 0.0 during annealing, and an EP-group balance loss with coefficient 0.001 is applied throughout pre-training."
+    note: "EP-group loss balances load across expert-parallel rank groups (Eq. 1, §2.2)."
+
+  mtp.depth:
+    value: 1
+    source: report
+    at: "p.7 §2.2"
+    quote: "we activate and optimize only MTP-1 in most training stages."
+    note: "MTP-2 and MTP-3 are cloned from MTP-1 and trained in a lightweight post-training phase; each head is SWA + dense FFN."
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/num_nextn_predict_layers"
+    note: "Only MTP-1 is trained in pre-training and shipped in the Base checkpoint; MTP-2/3 are cloned from it in post-training."
+  mtp.block:
+    value: "gated SWA attention + dense SwiGLU FFN; H-Norm(hidden) and E-Norm(next-token embedding) concatenated, then linear projection"
+    source: report
+    at: "p.6 Figure 2"
+    quote: "MTP modules use SWA and dense FFNs."
+    note: "Concat/norm layout from Figure 2; checkpoint has hnorm, enorm, eh_proj, g_proj in layer 45."
+  mtp.ffn:
+    value: dense
+    source: report
+    at: "p.7 §2.2"
+    quote: "Each MTP head consists of a SWA and a dense FFN"
+  mtp.shares_embedding:
+    value: false
+    basis: inferred
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.layers.45.transformer.shared_head.output.weight"'
+    note: "Input embedding shared (Figure 2), output head not: the MTP layer has its own 128,896 × 4,096 head (lm_head has 128,815 rows), and with it the layer holds 809,390,336 params, the paper's 0.81B per head."
+  mtp.params:
+    value: 810_000_000
+    source: report
+    at: "p.7 §2.2"
+    quote: "Each MTP head consists of a SWA and a dense FFN, adding only 0.81B parameters"
+    note: "Per head (~0.41% of the backbone), including its own output head; the Base checkpoint contains MTP-1 only."
+  mtp.loss_weight:
+    value: "0.3 in pre-training stage 1; 0.1 in stage 2"
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "The MTP loss weight is set to 0.3 in Pretraining Stage 1 and 0.1 in Pre-training Stage 2"
+  mtp.released:
+    value: true
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"model.layers.45.eh_proj.weight"'
+    note: "One MTP layer (index 45; /num_nextn_predict_layers 1)."
+
+  norm.type:
+    value: "RMSNorm (1+w gain)"
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5RMSNorm.forward"
+    quote: "normed = normed * (self.weight.float() + 1)"
+    note: "Paper Fig. 2: zero-centered RMSNorm throughout; applied regardless of /zero_centered."
+  norm.placement:
+    value: pre
+    source: modeling_step3p5
+    at: "modeling_step3p5.py; Step3p5DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.eps:
+    value: 1e-5
+    source: configuration_step3p5
+    at: "configuration_step3p5.py; Step3p5Config.__init__"
+    quote: "rms_norm_eps: float = 1e-5,"
+    note: "config.json does not set rms_norm_eps, so the class default applies."
+
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.14 §4.2.2"
+    quote: "Pre-training Stage 1: Open-domain pre-training (14.6T tokens, 4k context)."
+  ctx.final:
+    value: 32768
+    source: report
+    at: "p.14 §4.2.2"
+    quote: "then transitions to 1T tokens at 32k context under the same annealed mixture"
+    note: "End of pre-training; mid-training (750B tokens) then extends to 128K. Released Base config: max_seq_len 32768."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; 4.1 Technical Specifications"
+    quote: "Context Window | 256K"
+    note: "Base config.json sets max_seq_len 32768."
+  ctx.extension:
+    value: "last 1T tokens of annealing at 32K; full-attention RoPE θ 10K → 1M, SWA θ stays 10K"
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "set θFull = 1,000,000 only for full attention and maintain θSWA = 10,000 for the 32k portion of annealing."
+    note: "Mid-training goes to 128K with θFull 5M."
+
+  train.tokens:
+    value: 17_600_000_000_000
+    source: report
+    at: "p.13 §4.2"
+    quote: "Overall, we train on approximately 17.6T tokens for pre-training and 750B tokens for mid-training."
+    note: "Pre-training only (sum of stages: 14.6T + 2T + 1T); §1 says 17.2T; mid-training adds 750B."
+  train.optimizer:
+    value: "Muon (Polar Express orthogonalization, 6 iterations)"
+    source: report
+    at: "p.11 §4.1.1"
+    quote: "We therefore adopt the Polar Express [73] iteration and run a fixed T =6 steps to balance optimization quality and throughput."
+  train.lr_peak:
+    value: 2.5e-4
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "The learning rate is linearly warmed up from 0 to 2.5 × 10−4 over the first 2,000 steps"
+  train.lr_min:
+    value: 2e-5
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "keep the learning rate fixed at 2 × 10−5 for the 32k portion (1T tokens)."
+  train.warmup:
+    value: "2,000 steps"
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "The learning rate is linearly warmed up from 0 to 2.5 × 10−4 over the first 2,000 steps"
+  train.schedule:
+    value: "2,000-step linear warmup; cosine 2.5e-4 → 5e-5 over stage 1 (14.6T); cosine 5e-5 → 2e-5 over the 2T 4K anneal; constant 2e-5 for the 1T 32K portion"
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "In Pre-training Stage 2, we apply a secondary cosine decay from 5 × 10−5 to 2 × 10−5 over the 4k portion (2T tokens)"
+  train.batch:
+    value: "4,096 → 16,384 × 4,096 (67.1M tokens) over the first 400B tokens, then constant; 2,048 × 32,768 (67.1M tokens) in the 32K anneal"
+    source: report
+    at: "p.15 §4.2.3; p.11 Figure 3"
+    quote: "The global batch size gradually increases from 4096 to 16384 over the first 400B tokens, and keeps 16384 in the remaining training, and is set to 2k for the 32k portion of annealing."
+    note: "The report does not give the unit; read as sequences because both stages then give the same tokens per step."
+  train.batch_tokens:
+    value: 67_108_864
+    basis: inferred
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "The global batch size gradually increases from 4096 to 16384 over the first 400B tokens, and keeps 16384 in the remaining training"
+    note: "16,384 sequences × 4,096 tokens (stage 1 context); read as sequences since 2,048 × 32K in the 32K anneal gives the same tokens per step."
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "We use the Muon optimizer [34] throughout pre-training, set weight decay to 0.1"
+  train.grad_clip:
+    value: 1.0
+    source: report
+    at: "p.15 §4.2.3"
+    quote: "set weight decay to 0.1 and gradeint clip to 1.0."
+  train.precision:
+    value: "mixed precision; Muon Polar Express iteration (state and intermediates) in FP16"
+    source: report
+    at: "p.11–12 §4.1.1"
+    quote: "We therefore cast only the Polar Express iteration (state and intermediates) to float16"
+    note: "Rest of training stays mixed-precision (p.12); BF16 Polar Express caused rare unrecoverable loss spikes; the mixed-precision format is not stated."
+  train.stability:
+    value: "FP16 Polar Express in Muon; SwiGLU activation clipping in deep MoE layers; zero-centered RMSNorm; QK-norm; head-wise attention gate; per-expert activation/parameter-norm monitoring"
+    source: report
+    at: "p.11–13 §4.1; p.31 App. B"
+    quote: "This observation leads us to prefer activation clipping over weight clipping"
+    note: "One transient loss spike over the run (Figure 3)."
+  train.objective:
+    value: "metadata prefix (content type, language, domain, source) on every sample; its loss masked after ~3.8T tokens; PR-Dialogue template scaffolding masked during annealing"
+    source: report
+    at: "p.29 App. A.3"
+    quote: "After an initial phase of approximately 3.8T tokens, we keep M in the context but mask out its positions from the loss"
+  train.data:
+    value: "StepCrawl web and ePub/PDF, code (OpenCoder filters relaxed to ≤6 violations), GitHub PR/issue/commit (incl. 90B PR-Dialogue tokens), math/STEM, synthetic tool-use and reasoning; annealing upweights code, PR/issue/commit and high-quality knowledge"
+    source: report
+    at: "pp.13–14 §4.2.1–4.2.2; App. C"
+    quote: "We anneal the data mixture toward code and PR/Issue/Commit-centric sources, while increasing the share of higher-quality knowledge and reasoning-dense samples."
+  train.hardware:
+    value: "4,096 NVIDIA H800; 8 GPUs per node, 8×200 Gbps RoCE"
+    source: report
+    at: "p.9 §3.1"
+    quote: "Step 3.5 Flash is trained on a large-scale cluster with 4,096 NVIDIA H800 GPUs."
+    note: "PP8 with VPP, EP8, ZeRO-1 DP (§3.2)."
+  train.stages:
+    value:
+      - name: pre-training stage 1
+        tokens: 14_600_000_000_000
+        seq_len: 4096
+        lr: 2.5e-4
+        batch_sequences: 16384
+        note: "Open-domain mix; batch ramps from 4,096 over the first 400B tokens; cosine to 5e-5; MTP weight 0.3."
+        quote: "Pre-training Stage 1: Open-domain pre-training (14.6T tokens, 4k context)."
+      - name: pre-training stage 2 (annealing, 4K)
+        tokens: 2_000_000_000_000
+        seq_len: 4096
+        lr: 5e-5
+        batch_sequences: 16384
+        note: "Annealed mix; cosine 5e-5 → 2e-5; MTP weight 0.1; expert-bias update rate decays to 0."
+        quote: "This stage starts with 2T tokens at 4k context"
+      - name: pre-training stage 2 (annealing, 32K)
+        tokens: 1_000_000_000_000
+        seq_len: 32768
+        lr: 2e-5
+        batch_sequences: 2048
+        note: "Same annealed mix; constant LR; full-attention RoPE θ 1M."
+        quote: "then transitions to 1T tokens at 32k context under the same annealed mixture to initialize long-context training."
+    source: report
+    at: "p.14 §4.2.2; p.15 §4.2.3"
+
+  scaling.ladder:
+    value: "30B-A3B (48 layers, d 2048, 1.4T tokens) for attention-layout and data ablations; 100B-A10B (43 layers, d 4096, 250B tokens) for head-wise gate vs sink"
+    source: report
+    at: "p.30 Appendix A.4 Table 9; p.35 Appendix C.5"
+    quote: "Table 9: Training configuration for the 100B-A10B and the 30B-A3B architecture ablation suite."

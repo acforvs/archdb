@@ -1,0 +1,346 @@
+name: DeepSeek-V3-Base
+org: DeepSeek
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3-Base/resolve/afb92e1fa402c2be2a9eb085312bb02e0384d6c7/README.md, kind: model-card}
+  config: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3-Base/resolve/afb92e1fa402c2be2a9eb085312bb02e0384d6c7/config.json, kind: config}
+  modeling_deepseek: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3-Base/resolve/afb92e1fa402c2be2a9eb085312bb02e0384d6c7/modeling_deepseek.py, kind: code}
+  report: {url: https://arxiv.org/pdf/2412.19437v2, kind: paper}
+  weights-doc: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3-Base/resolve/afb92e1fa402c2be2a9eb085312bb02e0384d6c7/README_WEIGHTS.md, kind: model-card}
+  license: {url: https://huggingface.co/deepseek-ai/DeepSeek-V3-Base/resolve/afb92e1fa402c2be2a9eb085312bb02e0384d6c7/LICENSE-MODEL, kind: model-card}
+  announcement: {url: https://web.archive.org/web/20261017101856/https://api-docs.deepseek.com/news/news1226/, kind: blog}
+
+config_unused:
+  num_key_value_heads: "not read by DeepseekV3Attention (MLA)"
+
+facts:
+  meta.released:
+    value: "2024-12-26"
+    source: announcement
+    at: "DeepSeek API Docs news, Introducing DeepSeek-V3"
+    quote: "Introducing DeepSeek-V3 2024/12/26"
+  meta.license:
+    value: "other (DeepSeek License Agreement)"
+    source: license
+    at: "LICENSE-MODEL, title"
+    quote: "DEEPSEEK LICENSE AGREEMENT"
+    note: "Model weights; code is MIT (README.md §7)."
+  params.active:
+    value: 37_000_000_000
+    source: report
+    at: "p.22 §4.2"
+    quote: "DeepSeek-V3 comprises 671B total parameters, of which 37B are activated for each token."
+  params.active_non_embedding:
+    value: 35_700_000_000
+    source: weights-doc
+    at: "README_WEIGHTS.md; Main Model Weights, Parameter Count"
+    quote: "Activation parameters: 36.6B (including 0.9B for the output Head)."
+    basis: inferred
+    note: "36.6B − 129,280 × 7,168 (untied output head, stated as included; input embedding not listed) = ~35.7B. The report rounds the activated count to 37B."
+  params.note:
+    value: "671B excludes the MTP module; the released checkpoint is 685B (671B main model + 14B MTP)."
+    source: card
+    at: "README.md; Model Downloads"
+    quote: "The total size of DeepSeek-V3 models on HuggingFace is 685B, which includes 671B of the Main Model weights and 14B of the Multi-Token Prediction (MTP) Module weights."
+  params.total:
+    value: 671_000_000_000
+    source: report
+    at: "p.22 §4.2"
+    quote: "DeepSeek-V3 comprises 671B total parameters, of which 37B are activated for each token."
+
+  shape.d_model: {value: 7168, source: config, at: "/hidden_size"}
+  shape.layers: {value: 61, source: config, at: "/num_hidden_layers"}
+  shape.tokenizer:
+    value: "byte-level BPE, 128K vocab; pretokenizer merges punctuation with line breaks, a proportion of these split at random in training"
+    source: report
+    at: "p.22 §4.1"
+    quote: "The tokenizer for DeepSeek-V3 employs Byte-level BPE (Shibata et al., 1999) with an extended vocabulary of 128K tokens."
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.vocab: {value: 129_280, source: config, at: "/vocab_size"}
+
+  attn.global_layers:
+    value: 61
+    source: report
+    at: "p.22 §4.2"
+    quote: "We set the number of Transformer layers to 61 and the hidden dimension to 7168."
+    note: "Every block uses MLA."
+  attn.head_dim: {value: 192, source: config, at: "/qk_nope_head_dim + /qk_rope_head_dim"}
+  attn.heads: {value: 128, source: config, at: "/num_attention_heads"}
+  attn.kind:
+    value: MLA
+    source: report
+    at: "p.6 §2.1"
+    quote: "the basic architecture of DeepSeek-V3 is still within the Transformer (Vaswani et al., 2017) framework. For efficient inference and economical training, DeepSeek-V3 also adopts MLA and DeepSeekMoE"
+  attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
+  attn.layout:
+    value: "61 MLA"
+    source: report
+    at: "p.22 §4.2"
+    quote: "We set the number of Transformer layers to 61 and the hidden dimension to 7168."
+  attn.position:
+    value: "partial RoPE (decoupled 64-dim RoPE key shared across heads + 128 NoPE dims per head)"
+    source: report
+    at: "p.8 §2.1.1"
+    quote: "to produce the decoupled key that carries Rotary Positional Embedding (RoPE)"
+  attn.q_lora_rank: {value: 1536, source: config, at: "/q_lora_rank"}
+  attn.qk_norm:
+    value: false
+    source: modeling_deepseek
+    at: "modeling_deepseek.py lines 750–836; DeepseekV3Attention.forward"
+    quote: "torch.matmul(query_states, key_states.transpose(2, 3)) * self.softmax_scale"
+    note: "RMSNorm is applied only to the Q and KV latents before up-projection; projected per-head Q/K go straight to the scaled dot product."
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+  attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
+  attn.rope_theta: {value: 10000, source: config, at: "/rope_theta"}
+  attn.scale:
+    value: "1/sqrt(192) × (0.1·ln 40 + 1)² (YaRN mscale, s = 40)"
+    source: modeling_deepseek
+    at: "modeling_deepseek.py lines 689–695; DeepseekV3Attention.__init__"
+    quote: "self.softmax_scale = self.softmax_scale * mscale * mscale"
+    note: "mscale = 0.1·mscale_all_dim·ln(factor) + 1 with /rope_scaling/mscale_all_dim 1 and factor 40; the YaRN temperature from context extension (p.23 §4.3)."
+  attn.v_head_dim: {value: 128, source: config, at: "/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_deepseek
+    at: "modeling_deepseek.py line 389; DeepseekV3MLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "act_fn is SiLU (/hidden_act)."
+  ffn.bias:
+    value: false
+    source: modeling_deepseek
+    at: "modeling_deepseek.py line 383; DeepseekV3MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+    note: "Up and down projections also bias=False; dense FFN, routed and shared experts all use DeepseekV3MLP."
+  ffn.dim: {value: 18432, source: config, at: "/intermediate_size"}
+
+  moe.balancing:
+    value: "aux-loss-free bias (γ=0.001, frozen for the last 500B tokens) + sequence-wise loss α=1e-4"
+    source: report
+    at: "p.23 §4.2"
+    quote: "we set the bias update speed 𝛾 to 0.001 for the first 14.3T tokens, and to 0.0 for the remaining 500B tokens. For the balance loss, we set 𝛼 to 0.0001"
+    note: "Bias enters top-k selection only (config /topk_method noaux_tc)."
+  moe.dense_layers: {value: 3, source: config, at: "/first_k_dense_replace", note: "All later layers are MoE (/moe_layer_freq 1)."}
+  moe.expert_dim: {value: 2048, source: config, at: "/moe_intermediate_size"}
+  moe.experts: {value: 256, source: config, at: "/n_routed_experts"}
+  moe.groups:
+    value: "node-limited: each token sent to at most 4 of 8 nodes (groups)"
+    source: report
+    at: "p.23 §4.2"
+    quote: "As for the node-limited routing, each token will be sent to at most 4 nodes"
+    note: "Nodes ranked by the sum of the top K_r/M affinities on each node (p.10 §2.1.2); config /n_group 8, /topk_group 4."
+  moe.norm_topk:
+    value: true
+    source: report
+    at: "p.9 §2.1.2"
+    quote: "applies a normalization among all selected affinity scores to produce the gating values."
+    note: "config /norm_topk_prob true."
+  moe.routed_scale: {value: 2.5, source: config, at: "/routed_scaling_factor"}
+  moe.router: {value: sigmoid, source: config, at: "/scoring_func"}
+  moe.shared: {value: 1, source: config, at: "/n_shared_experts"}
+  moe.shared_dim:
+    value: 2048
+    source: config
+    at: "/moe_intermediate_size"
+    note: "1 shared expert (/n_shared_experts) of the routed-expert width."
+  moe.top_k: {value: 8, source: config, at: "/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 1
+    source: report
+    at: "p.22 §4.2"
+    quote: "The multi-token prediction depth 𝐷 is set to 1, i.e., besides the exact next token, each token will predict one additional token."
+  mtp.modules:
+    value: 1
+    source: config
+    at: "/num_nextn_predict_layers"
+  mtp.block:
+    value: "h' = M_k[RMSNorm(h); RMSNorm(Emb(t_{i+k}))] (2d→d projection), then one Transformer block identical to the main layers (MLA + MoE)"
+    source: report
+    at: "p.10 §2.2, Eq. 21"
+    quote: "a Transformer block TRM𝑘 (·), and a projection matrix 𝑀𝑘 ∈ R𝑑 ×2𝑑"
+  mtp.ffn:
+    value: MoE
+    source: weights-doc
+    at: "README_WEIGHTS.md; Multi-Token Prediction (MTP) Modules, Structural Details"
+    quote: "model.layers.61.self_attn & mlp (structure identical to the Main Model hidden layers)"
+    note: "Layer 61 is past /first_k_dense_replace 3, so 256 routed + 1 shared experts."
+  mtp.shares_embedding:
+    value: true
+    source: report
+    at: "p.10 §2.2"
+    quote: "Note that for each MTP module, its embedding layer is shared with the main model."
+    note: "Output head is shared as well (same section)."
+  mtp.params:
+    value: 11_500_000_000
+    source: weights-doc
+    at: "README_WEIGHTS.md; Multi-Token Prediction (MTP) Modules, Parameter Count"
+    quote: "Parameters: **11.5B unique parameters** (excluding the shared 0.9B Embedding and 0.9B output Head)."
+    note: "Excludes the shared embedding and head; the model card gives 14B for the MTP module weights."
+  mtp.loss_weight:
+    value: "0.3 for the first 10T tokens, 0.1 for the remaining 4.8T"
+    source: report
+    at: "p.23 §4.2"
+    quote: "The MTP loss weight 𝜆 is set to 0.3 for the first 10T tokens, and to 0.1 for the remaining 4.8T tokens."
+  mtp.released:
+    value: true
+    source: card
+    at: "README.md; Model Downloads"
+    quote: "The total size of DeepSeek-V3 models on HuggingFace is 685B, which includes 671B of the Main Model weights and 14B of the Multi-Token Prediction (MTP) Module weights."
+
+  norm.eps: {value: 1e-6, source: config, at: "/rms_norm_eps"}
+  norm.placement:
+    value: pre
+    source: modeling_deepseek
+    at: "modeling_deepseek.py lines 1195–1217; DeepseekV3DecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.type:
+    value: RMSNorm
+    source: modeling_deepseek
+    at: "modeling_deepseek.py lines 1160–1165; DeepseekV3DecoderLayer.__init__"
+    quote: "self.input_layernorm = DeepseekV3RMSNorm("
+
+  ctx.extension:
+    value: "YaRN (s=40, α=1, β=32) on the decoupled key; 4K → 32K (1000 steps, batch 1920) → 128K (1000 steps, batch 480), LR 7.3e-6"
+    source: report
+    at: "p.23 §4.3"
+    quote: "we apply YaRN (Peng et al., 2023a) for context extension and perform two additional training phases, each comprising 1000 steps, to progressively expand the context window from 4K to 32K and then to 128K."
+    note: "config /rope_scaling: type yarn, factor 40, beta_fast 32, beta_slow 1, mscale 1, original_max_position_embeddings 4096."
+  ctx.final:
+    value: 131_072
+    source: report
+    at: "p.23 §4.3"
+    quote: "During the second phase, the sequence length is increased to 128K, and the batch size is reduced to 480."
+  ctx.max:
+    value: 131_072
+    source: card
+    at: "README.md; Model Downloads table"
+    quote: "DeepSeek-V3-Base | 671B | 37B | 128K"
+    note: "config /max_position_embeddings 163840 is 4096 × YaRN factor 40, not the advertised length."
+  ctx.pretrain:
+    value: 4096
+    source: report
+    at: "p.22 §4.2"
+    quote: "We set the maximum sequence length to 4K during pre-training"
+
+  train.batch:
+    value: "3,072 → 15,360 × 4,096 (62.9M tokens) over the first 469B tokens, then constant"
+    source: report
+    at: "p.23 §4.2"
+    quote: "the batch size is gradually increased from 3072 to 15360 in the training of the first 469B tokens, and then keeps 15360 in the remaining training."
+  train.batch_tokens:
+    value: 62_914_560
+    source: report
+    at: "p.23 §4.2"
+    quote: "and then keeps 15360 in the remaining training."
+    basis: inferred
+    note: "15360 sequences × 4096 tokens (4K pretraining sequence length, p.22 §4.2), after the ramp from 3072 over the first 469B tokens."
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: report
+    at: "p.22 §4.2"
+    quote: "with hyper-parameters set to 𝛽1 = 0.9, 𝛽2 = 0.95, and weight_decay = 0.1."
+  train.grad_clip:
+    value: 1
+    source: report
+    at: "p.23 §4.2"
+    quote: "The gradient clipping norm is set to 1.0."
+  train.compute:
+    value: "2.664M H800 GPU-hours pretraining + 119K context extension (2.788M with 5K post-training)"
+    source: report
+    at: "p.5 §1, Table 1"
+    quote: "costs 2664K GPU hours. Combined with 119K GPU hours for the context length extension and 5K GPU hours for post-training"
+  train.data:
+    value: "14.8T tokens; math and code share raised vs DeepSeek-V2; multilingual coverage beyond English and Chinese"
+    source: report
+    at: "p.21 §4.1"
+    quote: "enhancing the ratio of mathematical and programming samples"
+  train.hardware:
+    value: "2048 H800 GPUs"
+    source: report
+    at: "p.5 §1"
+    quote: "3.7 days on our cluster with 2048 H800 GPUs"
+    note: "Pretraining took less than two months (same paragraph)."
+  train.init:
+    value: "random init, std 0.006 for all learnable parameters"
+    source: report
+    at: "p.22 §4.2"
+    quote: "All learnable parameters are randomly initialized with a standard deviation of 0.006."
+  train.lr_min:
+    value: 7.3e-6
+    source: report
+    at: "p.23 §4.2"
+    quote: "of 7.3 × 10−6 in the remaining 167B tokens."
+  train.masking:
+    value: "packed documents, no cross-sample attention masking"
+    source: report
+    at: "p.22 §4.1"
+    quote: "we implement the document packing method for data integrity but do not incorporate cross-sample attention masking during training."
+  train.objective:
+    value: "FIM at rate 0.1, PSM format, applied per document before packing"
+    source: report
+    at: "p.22 §4.1"
+    quote: "The FIM strategy is applied at a rate of 0.1, consistent with the PSM framework."
+  train.lr_peak:
+    value: 2.2e-4
+    source: report
+    at: "p.22 §4.2"
+    quote: "we first linearly increase it from 0 to 2.2 × 10−4 during the first 2K steps. Then, we keep a constant learning rate of 2.2 × 10−4 until the model consumes 10T training tokens."
+  train.optimizer:
+    value: AdamW
+    source: report
+    at: "p.22 §4.2"
+    quote: "We employ the AdamW optimizer (Loshchilov and Hutter, 2017) with hyper-parameters set to 𝛽1 = 0.9, 𝛽2 = 0.95, and weight_decay = 0.1."
+  train.precision:
+    value: "FP8 (E4M3) for Fprop, Dgrad and Wgrad of Linear layers; scales per 1×128 activation tile and 128×128 weight block; embedding, output head, MoE gating, norms and attention kept in BF16/FP32"
+    source: report
+    at: "p.15 §3.3.1"
+    quote: "we maintain the original precision (e.g., BF16 or FP32) for the following components: the embedding module, the output head, MoE gating modules, normalization operators, and attention operators."
+    note: "E4M3 on all tensors and 1×128 / 128×128 scaling: p.16–17 §3.3.2. Optimizer moments in BF16, master weights and gradients in FP32 (p.18 §3.3.3)."
+  train.schedule:
+    value: "2K-step warmup, constant to 10T, cosine to 2.2e-5 over 4.3T, then 2.2e-5 for 333B and 7.3e-6 for 167B"
+    source: report
+    at: "p.22 §4.2"
+    quote: "Subsequently, we gradually decay the learning rate to 2.2 × 10−5 in 4.3T tokens, following a cosine decay curve. During the training of the final 500B tokens, we keep a constant learning rate of 2.2 × 10−5 in the first 333B tokens"
+  train.stages:
+    value:
+      - name: main
+        tokens: 14_800_000_000_000
+        seq_len: 4096
+        quote: "We set the maximum sequence length to 4K during pre-training, and pre-train DeepSeek-V3 on 14.8T tokens."
+      - name: context-1
+        seq_len: 32768
+        lr: 7.3e-6
+        batch_sequences: 1920
+        steps: 1000
+        quote: "In the first phase, the sequence length is set to 32K, and the batch size is 1920."
+      - name: context-2
+        seq_len: 131_072
+        lr: 7.3e-6
+        batch_sequences: 480
+        steps: 1000
+        quote: "During the second phase, the sequence length is increased to 128K, and the batch size is reduced to 480."
+    source: report
+    at: "p.22–23 §4.2, §4.3"
+  train.tokens:
+    value: 14_800_000_000_000
+    source: report
+    at: "p.22 §4.2"
+    quote: "We set the maximum sequence length to 4K during pre-training, and pre-train DeepSeek-V3 on 14.8T tokens."
+  train.warmup:
+    value: "2000 steps"
+    source: report
+    at: "p.22 §4.2"
+    quote: "we first linearly increase it from 0 to 2.2 × 10−4 during the first 2K steps."
+  train.weight_decay:
+    value: 0.1
+    source: report
+    at: "p.22 §4.2"
+    quote: "with hyper-parameters set to 𝛽1 = 0.9, 𝛽2 = 0.95, and weight_decay = 0.1."
+  scaling.ladder:
+    value: "15.7B total (2.4B active) on 1.33T tokens; 228.7B total (20.9B active) on 540B tokens"
+    source: report
+    at: "p.26 §4.5.1 Table 4"
+    quote: "At the small scale, we train a baseline MoE model comprising 15.7B total parameters on 1.33T tokens. At the large scale, we train a baseline MoE model comprising 228.7B total parameters on 540B tokens."
+    note: "MTP ablation; aux-loss-free ablation uses the same sizes at 1.33T/578B tokens (Table 5), FP8 validation ~16B/1.33T and ~230B/~0.9T (App. B.1); active counts from Table 4."

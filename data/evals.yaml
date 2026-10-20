@@ -1,0 +1,676 @@
+ax-k2:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095049/https://artificialanalysis.ai/models/a-x-k2
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 21
+      source: aa
+      at: Artificial Analysis model page /models/a-x-k2, Wayback snapshot 2026-10-19
+      quote: A.X-K2 scores 21 on the Artificial Analysis Intelligence Index
+      note: 'Variant: A.X-K2. Index v4.3.2.'
+beam-1-0:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095120/https://artificialanalysis.ai/models/reflection-beam
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 30
+      source: aa
+      at: Artificial Analysis model page /models/reflection-beam, Wayback snapshot 2026-10-19
+      quote: Beam 1.0 scores 30 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Beam 1.0. Index v4.3.2.'
+command-a-plus:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095258/https://artificialanalysis.ai/models/command-a-plus
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 13
+      source: aa
+      at: Artificial Analysis model page /models/command-a-plus, Wayback snapshot 2026-10-19
+      quote: Command A+ scores 13 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Command A+. Index v4.3.2.'
+deepseek-v3:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095333/https://artificialanalysis.ai/models/deepseek-v3
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 8
+      source: aa
+      at: Artificial Analysis model page /models/deepseek-v3, Wayback snapshot 2026-10-19
+      quote: DeepSeek V3 (Dec '24) scores 8 on the Artificial Analysis Intelligence Index
+      note: 'Score of DeepSeek-V3, post-trained from this base. Variant: DeepSeek V3 (Dec ''24). Index v4.3.2.'
+deepseek-v32:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095458/https://artificialanalysis.ai/models/deepseek-v3-2-reasoning
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 21
+      source: aa
+      at: Artificial Analysis model page /models/deepseek-v3-2-reasoning, Wayback snapshot 2026-10-19
+      quote: DeepSeek V3.2 (Reasoning) scores 21 on the Artificial Analysis Intelligence Index
+      note: 'Variant: DeepSeek V3.2 (Reasoning). Index v4.3.2.'
+deepseek-v4-flash-base:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095633/https://artificialanalysis.ai/models/deepseek-v4-flash-0420
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 24
+      source: aa
+      at: Artificial Analysis model page /models/deepseek-v4-flash-0420, Wayback snapshot 2026-10-19
+      quote: DeepSeek V4 Flash 0420 (Max) scores 24 on the Artificial Analysis Intelligence Index
+      note: 'Score of DeepSeek-V4-Flash (0420 release), post-trained from this base. Variant: DeepSeek V4 Flash 0420 (Max). AA entry for the 0420 release (the 0731 update has its own entry). Index v4.3.2.'
+deepseek-v4-pro:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095717/https://artificialanalysis.ai/models/deepseek-v4-pro-0424
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 30
+      source: aa
+      at: Artificial Analysis model page /models/deepseek-v4-pro-0424, Wayback snapshot 2026-10-19
+      quote: DeepSeek V4 Pro 0424 (Max) scores 30 on the Artificial Analysis Intelligence Index
+      note: 'Variant: DeepSeek V4 Pro 0424 (Max). AA entry for the 0424 release, which matches this record''s weights (the 0813 update has its own entry). Index v4.3.2.'
+deepseek-v41:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019095908/https://artificialanalysis.ai/models/deepseek-v4-1-flash
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 39
+      source: aa
+      at: Artificial Analysis model page /models/deepseek-v4-1-flash, Wayback snapshot 2026-10-19
+      quote: DeepSeek V4.1 Flash (Max) scores 39 on the Artificial Analysis Intelligence Index
+      note: 'Variant: DeepSeek V4.1 Flash (Max). AA entry for the 0910 release, which matches this record''s weights (the 1017 update has its own entry). Index v4.3.2.'
+gemma-4-26b-a4b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019100045/https://artificialanalysis.ai/models/gemma-4-26b-a4b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 17
+      source: aa
+      at: Artificial Analysis model page /models/gemma-4-26b-a4b, Wayback snapshot 2026-10-19
+      quote: Gemma 4 26B A4B (Reasoning) scores 17 on the Artificial Analysis Intelligence Index
+      note: 'Score of Gemma-4-26B-A4B-it, post-trained from this base. Variant: Gemma 4 26B A4B (Reasoning). Index v4.3.2.'
+gemma-4-31b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019100237/https://artificialanalysis.ai/models/gemma-4-31b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 15
+      source: aa
+      at: Artificial Analysis model page /models/gemma-4-31b, Wayback snapshot 2026-10-19
+      quote: Gemma 4 31B (Reasoning) scores 15 on the Artificial Analysis Intelligence Index
+      note: 'Score of Gemma-4-31B-it, post-trained from this base. Variant: Gemma 4 31B (Reasoning). Index v4.3.2.'
+glm53:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019092921/https://artificialanalysis.ai/models/glm-5-3
+      kind: leaderboard
+    deepswe:
+      url: https://web.archive.org/web/20261009070156id_/https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 45
+      source: aa
+      at: Artificial Analysis model page /models/glm-5-3, Wayback snapshot 2026-10-19
+      quote: GLM-5.3 (Max) scores 45 on the Artificial Analysis Intelligence Index
+      note: 'Variant: GLM-5.3 (Max). Index v4.3.2.'
+    eval.deepswe:
+      value: 0.6895787139689579
+      source: deepswe
+      at: leaderboard-live.json (generated 2026-09-22), row model glm-5-3, Wayback snapshot 2026-10-09
+      quote: '"model": "glm-5-3", "harness": "mini-swe-agent", "reasoning_effort": "max", "config": "mini_swe_agent_glm_5_3_max", "source": "deep-swe", "pass_rate": 0.6895787139689579, "pass_at_1": 0.6895787139689579'
+      note: Reasoning effort max (the only configuration listed), mini-swe-agent, 4 runs, 451 scored attempts.
+glm53-flash:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019092930/https://artificialanalysis.ai/models/glm-5-3-flash
+      kind: leaderboard
+    deepswe:
+      url: https://web.archive.org/web/20261009070156id_/https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 42
+      source: aa
+      at: Artificial Analysis model page /models/glm-5-3-flash, Wayback snapshot 2026-10-19
+      quote: GLM-5.3-Flash scores 42 on the Artificial Analysis Intelligence Index
+      note: 'Variant: GLM-5.3-Flash. Index v4.3.2.'
+    eval.deepswe:
+      value: 0.6339285714285714
+      source: deepswe
+      at: leaderboard-live.json (generated 2026-09-22), row model glm-5-3-flash, Wayback snapshot 2026-10-09
+      quote: '"model": "glm-5-3-flash", "harness": "mini-swe-agent", "reasoning_effort": "max", "config": "mini_swe_agent_glm_5_3_flash_max", "source": "deep-swe", "pass_rate": 0.6339285714285714, "pass_at_1":
+        0.6339285714285714'
+      note: Reasoning effort max (the only configuration listed), mini-swe-agent, 4 runs, 448 scored attempts.
+gpt-oss-120b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019100442/https://artificialanalysis.ai/models/gpt-oss-120b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 12
+      source: aa
+      at: Artificial Analysis model page /models/gpt-oss-120b, Wayback snapshot 2026-10-19
+      quote: gpt-oss-120b (High) scores 12 on the Artificial Analysis Intelligence Index
+      note: 'Variant: gpt-oss-120b (High). Index v4.3.2.'
+granite-4-1-30b-base:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019100630/https://artificialanalysis.ai/models/granite-4-1-30b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 7
+      source: aa
+      at: Artificial Analysis model page /models/granite-4-1-30b, Wayback snapshot 2026-10-19
+      quote: Granite 4.1 30B scores 7 on the Artificial Analysis Intelligence Index
+      note: 'Score of Granite-4.1-30B, post-trained from this base. Variant: Granite 4.1 30B. Index v4.3.2.'
+hy3-preview-base:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019100827/https://artificialanalysis.ai/models/hy3-preview
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 23
+      source: aa
+      at: Artificial Analysis model page /models/hy3-preview, Wayback snapshot 2026-10-19
+      quote: Hy3-preview (Reasoning) scores 23 on the Artificial Analysis Intelligence Index
+      note: 'Score of Hy3-preview, post-trained from this base. Variant: Hy3-preview (Reasoning). Index v4.3.2.'
+inkling:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019101130/https://artificialanalysis.ai/models/inkling
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 25
+      source: aa
+      at: Artificial Analysis model page /models/inkling, Wayback snapshot 2026-10-19
+      quote: Inkling (Xhigh) scores 25 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Inkling (Xhigh). Index v4.3.2.'
+inkling-small:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019100954/https://artificialanalysis.ai/models/inkling-small
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 26
+      source: aa
+      at: Artificial Analysis model page /models/inkling-small, Wayback snapshot 2026-10-19
+      quote: Inkling Small scores 26 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Inkling Small. Index v4.3.2.'
+k-exaone-2:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019101312/https://artificialanalysis.ai/models/k-exaone-2-0-0803
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 20
+      source: aa
+      at: Artificial Analysis model page /models/k-exaone-2-0-0803, Wayback snapshot 2026-10-19
+      quote: K-EXAONE 2.0 0803 scores 20 on the Artificial Analysis Intelligence Index
+      note: 'Variant: K-EXAONE 2.0 0803. Index v4.3.2.'
+k2-horizon:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019101438/https://artificialanalysis.ai/models/k2-horizon-375b-a23b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 31
+      source: aa
+      at: Artificial Analysis model page /models/k2-horizon-375b-a23b, Wayback snapshot 2026-10-19
+      quote: K2 Horizon 375B A23B scores 31 on the Artificial Analysis Intelligence Index
+      note: 'Score of K2-Horizon-375B-A23B (RL and SFT from the final Midtraining Stage 4 checkpoint), post-trained from this base. Variant: K2 Horizon 375B A23B. Index v4.3.2.'
+k2-horizon-mova:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019134332/https://artificialanalysis.ai/models/k2-horizon-mova-36b-a4b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 25
+      source: aa
+      at: Artificial Analysis model page /models/k2-horizon-mova-36b-a4b, Wayback snapshot 2026-10-19
+      quote: K2 Horizon MoVA 36B A4B scores 25 on the Artificial Analysis Intelligence Index
+      note: 'Score of K2-Horizon-MoVA-36B-A4B (SFT checkpoint sft_2_2500 on main, from the final Midtraining Stage 4 checkpoint), post-trained from this base. Variant: K2 Horizon MoVA 36B A4B. Index v4.3.2.'
+kimi-k2:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019101736/https://artificialanalysis.ai/models/kimi-k2
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 13
+      source: aa
+      at: Artificial Analysis model page /models/kimi-k2, Wayback snapshot 2026-10-19
+      quote: Kimi K2 scores 13 on the Artificial Analysis Intelligence Index
+      note: 'Score of Kimi-K2-Instruct, post-trained from this base. Variant: Kimi K2. Index v4.3.2.'
+kimi-k2-5:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019101612/https://artificialanalysis.ai/models/kimi-k2-5
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 23
+      source: aa
+      at: Artificial Analysis model page /models/kimi-k2-5, Wayback snapshot 2026-10-19
+      quote: Kimi K2.5 (Reasoning) scores 23 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Kimi K2.5 (Reasoning). Index v4.3.2.'
+kimi-k3:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019102042/https://artificialanalysis.ai/models/kimi-k3
+      kind: leaderboard
+    deepswe:
+      url: https://web.archive.org/web/20261009070156id_/https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 44
+      source: aa
+      at: Artificial Analysis model page /models/kimi-k3, Wayback snapshot 2026-10-19
+      quote: Kimi K3 (Max) scores 44 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Kimi K3 (Max). Index v4.3.2.'
+    eval.deepswe:
+      value: 0.6851441241685144
+      source: deepswe
+      at: leaderboard-live.json (generated 2026-09-22), row model kimi-k3, Wayback snapshot 2026-10-09
+      quote: '"model": "kimi-k3", "harness": "mini-swe-agent", "reasoning_effort": "max", "config": "mini_swe_agent_kimi_k3_max", "source": "deep-swe", "pass_rate": 0.6851441241685144, "pass_at_1": 0.6851441241685144'
+      note: Reasoning effort max (the only configuration listed), mini-swe-agent, 4 runs, 451 scored attempts.
+ling-2-6-1t:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019102254/https://artificialanalysis.ai/models/ling-2-6-1t
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 17
+      source: aa
+      at: Artificial Analysis model page /models/ling-2-6-1t, Wayback snapshot 2026-10-19
+      quote: Ling-2.6-1T scores 17 on the Artificial Analysis Intelligence Index
+      note: 'Score of Ling-2.6-1T, post-trained from this base. Variant: Ling-2.6-1T. Index v4.3.2.'
+ling-3-0-flash:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019102435/https://artificialanalysis.ai/models/ling-3-0-flash
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 20
+      source: aa
+      at: Artificial Analysis model page /models/ling-3-0-flash, Wayback snapshot 2026-10-19
+      quote: Ling 3.0 Flash scores 20 on the Artificial Analysis Intelligence Index
+      note: 'Score of Ling-3.0-flash, post-trained from this base. Variant: Ling 3.0 Flash. Index v4.3.2.'
+ling31-flash:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019102618/https://artificialanalysis.ai/models/ling-3-1-flash
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 41
+      source: aa
+      at: Artificial Analysis model page /models/ling-3-1-flash, Wayback snapshot 2026-10-19
+      quote: Ling 3.1 Flash scores 41 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Ling 3.1 Flash. Index v4.3.2.'
+longcat-2:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019102808/https://artificialanalysis.ai/models/longcat-2-0
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 19
+      source: aa
+      at: Artificial Analysis model page /models/longcat-2-0, Wayback snapshot 2026-10-19
+      quote: LongCat 2.0 scores 19 on the Artificial Analysis Intelligence Index
+      note: 'Variant: LongCat 2.0. Index v4.3.2.'
+mimo-v2-6-flash:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019102942/https://artificialanalysis.ai/models/mimo-v2-6-flash
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 38
+      source: aa
+      at: Artificial Analysis model page /models/mimo-v2-6-flash, Wayback snapshot 2026-10-19
+      quote: MiMo-V2.6-Flash scores 38 on the Artificial Analysis Intelligence Index
+      note: 'Variant: MiMo-V2.6-Flash. Index v4.3.2.'
+mimo-v2-6-pro:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019092917/https://artificialanalysis.ai/models/mimo-v2-6-pro
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 46
+      source: aa
+      at: Artificial Analysis model page /models/mimo-v2-6-pro, Wayback snapshot 2026-10-19
+      quote: MiMo-V2.6-Pro scores 46 on the Artificial Analysis Intelligence Index
+      note: 'Variant: MiMo-V2.6-Pro. Index v4.3.2.'
+mimo-v2-flash-base:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019103144/https://artificialanalysis.ai/models/mimo-v2-flash-reasoning
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 21
+      source: aa
+      at: Artificial Analysis model page /models/mimo-v2-flash-reasoning, Wayback snapshot 2026-10-19
+      quote: MiMo-V2-Flash (Reasoning) scores 21 on the Artificial Analysis Intelligence Index
+      note: 'Score of MiMo-V2-Flash, post-trained from this base. Variant: MiMo-V2-Flash (Reasoning). AA entry for the December 2025 release. Index v4.3.2.'
+mimo25-pro-base:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019103314/https://artificialanalysis.ai/models/mimo-v2-5-pro
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 26
+      source: aa
+      at: Artificial Analysis model page /models/mimo-v2-5-pro, Wayback snapshot 2026-10-19
+      quote: MiMo-V2.5-Pro (Reasoning) scores 26 on the Artificial Analysis Intelligence Index
+      note: 'Score of MiMo-V2.5-Pro, post-trained from this base. Variant: MiMo-V2.5-Pro (Reasoning). Index v4.3.2.'
+minimax-m1:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019111044/https://artificialanalysis.ai/models/minimax-m1-80k
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 12
+      source: aa
+      at: Artificial Analysis model page /models/minimax-m1-80k, Wayback snapshot 2026-10-19
+      quote: MiniMax M1 80k scores 12 on the Artificial Analysis Intelligence Index
+      note: 'Variant: MiniMax M1 80k. Index v4.3.2.'
+minimax-m2-7:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019103459/https://artificialanalysis.ai/models/minimax-m2-7
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 23
+      source: aa
+      at: Artificial Analysis model page /models/minimax-m2-7, Wayback snapshot 2026-10-19
+      quote: MiniMax-M2.7 scores 23 on the Artificial Analysis Intelligence Index
+      note: 'Variant: MiniMax-M2.7. Index v4.3.2.'
+minimax-m3:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019092918/https://artificialanalysis.ai/models/minimax-m3
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 29
+      source: aa
+      at: Artificial Analysis model page /models/minimax-m3, Wayback snapshot 2026-10-19
+      quote: MiniMax-M3 scores 29 on the Artificial Analysis Intelligence Index
+      note: 'Variant: MiniMax-M3. Index v4.3.2.'
+mistral-large-3:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019103721/https://artificialanalysis.ai/models/mistral-large-3
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 9
+      source: aa
+      at: Artificial Analysis model page /models/mistral-large-3, Wayback snapshot 2026-10-19
+      quote: Mistral Large 3 scores 9 on the Artificial Analysis Intelligence Index
+      note: 'Score of Mistral-Large-3-675B-Instruct-2512, post-trained from this base. Variant: Mistral Large 3. Index v4.3.2.'
+mistral-medium-3-5:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019103907/https://artificialanalysis.ai/models/mistral-medium-3-5
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 14
+      source: aa
+      at: Artificial Analysis model page /models/mistral-medium-3-5, Wayback snapshot 2026-10-19
+      quote: Mistral Medium 3.5 scores 14 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Mistral Medium 3.5. Index v4.3.2.'
+mistral-small-4:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019104103/https://artificialanalysis.ai/models/mistral-small-4
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 11
+      source: aa
+      at: Artificial Analysis model page /models/mistral-small-4, Wayback snapshot 2026-10-19
+      quote: Mistral Small 4 (Reasoning) scores 11 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Mistral Small 4 (Reasoning). Index v4.3.2.'
+motif-3:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019104255/https://artificialanalysis.ai/models/motif-3
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 34
+      source: aa
+      at: Artificial Analysis model page /models/motif-3, Wayback snapshot 2026-10-19
+      quote: Motif 3 scores 34 on the Artificial Analysis Intelligence Index
+      note: 'Score of Motif-3, post-trained from this base. Variant: Motif 3. Index v4.3.2.'
+muse-spark-open:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019092913/https://artificialanalysis.ai/models/muse-spark-open
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 39
+      source: aa
+      at: Artificial Analysis model page /models/muse-spark-open, Wayback snapshot 2026-10-19
+      quote: Muse Spark Open (Xhigh) scores 39 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Muse Spark Open (Xhigh). Index v4.3.2.'
+nemotron-3-ultra:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019104511/https://artificialanalysis.ai/models/nvidia-nemotron-3-ultra-550b-a55b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 23
+      source: aa
+      at: Artificial Analysis model page /models/nvidia-nemotron-3-ultra-550b-a55b, Wayback snapshot 2026-10-19
+      quote: Nemotron 3 Ultra 550B A55B (Reasoning) scores 23 on the Artificial Analysis Intelligence Index
+      note: 'Score of NVIDIA-Nemotron-3-Ultra-550B-A55B, post-trained from this base. Variant: Nemotron 3 Ultra 550B A55B (Reasoning). Index v4.3.2.'
+nemotron3-super:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019104702/https://artificialanalysis.ai/models/nvidia-nemotron-3-super-120b-a12b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 13
+      source: aa
+      at: Artificial Analysis model page /models/nvidia-nemotron-3-super-120b-a12b, Wayback snapshot 2026-10-19
+      quote: Nemotron 3 Super 120B A12B (Reasoning) scores 13 on the Artificial Analysis Intelligence Index
+      note: 'Score of NVIDIA-Nemotron-3-Super-120B-A12B, post-trained from this base. Variant: Nemotron 3 Super 120B A12B (Reasoning). Index v4.3.2.'
+olmo-3-32b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019104913/https://artificialanalysis.ai/models/olmo-3-32b-think
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 6
+      source: aa
+      at: Artificial Analysis model page /models/olmo-3-32b-think, Wayback snapshot 2026-10-19
+      quote: Olmo 3 32B Think scores 6 on the Artificial Analysis Intelligence Index
+      note: 'Score of Olmo-3-32B-Think, post-trained from this base. Variant: Olmo 3 32B Think. Index v4.3.2.'
+qwen3-next:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105058/https://artificialanalysis.ai/models/qwen3-next-80b-a3b-instruct
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 10
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-next-80b-a3b-instruct, Wayback snapshot 2026-10-19
+      quote: Qwen3 Next 80B A3B Instruct scores 10 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3 Next 80B A3B Instruct. Index v4.3.2.'
+qwen35-122b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105242/https://artificialanalysis.ai/models/qwen3-5-122b-a10b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 16
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-5-122b-a10b, Wayback snapshot 2026-10-19
+      quote: Qwen3.5 122B A10B (Reasoning) scores 16 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3.5 122B A10B (Reasoning). Index v4.3.2.'
+qwen35-27b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105412/https://artificialanalysis.ai/models/qwen3-5-27b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 23
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-5-27b, Wayback snapshot 2026-10-19
+      quote: Qwen3.5 27B (Reasoning) scores 23 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3.5 27B (Reasoning). Index v4.3.2.'
+qwen35-35b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105531/https://artificialanalysis.ai/models/qwen3-5-35b-a3b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 19
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-5-35b-a3b, Wayback snapshot 2026-10-19
+      quote: Qwen3.5 35B A3B (Reasoning) scores 19 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3.5 35B A3B (Reasoning). Index v4.3.2.'
+qwen35-397b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105706/https://artificialanalysis.ai/models/qwen3-5-397b-a17b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 18
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-5-397b-a17b, Wayback snapshot 2026-10-19
+      quote: Qwen3.5 397B A17B (Reasoning) scores 18 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3.5 397B A17B (Reasoning). Index v4.3.2.'
+qwen38-24t:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105741/https://artificialanalysis.ai/models/qwen3-8-2-4t-a95b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 40
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-8-2-4t-a95b, Wayback snapshot 2026-10-19
+      quote: Qwen3.8 2.4T A95B scores 40 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3.8 2.4T A95B. Index v4.3.2.'
+qwen38-27b:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105913/https://artificialanalysis.ai/models/qwen3-8-27b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 34
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-8-27b, Wayback snapshot 2026-10-19
+      quote: Qwen3.8 27B (Xhigh) scores 34 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3.8 27B (Xhigh). Index v4.3.2.'
+qwen38-flash-next:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019105948/https://artificialanalysis.ai/models/qwen3-8-flash-next
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 40
+      source: aa
+      at: Artificial Analysis model page /models/qwen3-8-flash-next, Wayback snapshot 2026-10-19
+      quote: Qwen3.8-Flash-Next scores 40 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Qwen3.8-Flash-Next. Index v4.3.2.'
+solar-open-2:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019110119/https://artificialanalysis.ai/models/solar-open2-250b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 25
+      source: aa
+      at: Artificial Analysis model page /models/solar-open2-250b, Wayback snapshot 2026-10-19
+      quote: Solar Open2 250B scores 25 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Solar Open2 250B. Index v4.3.2.'
+step-3-5-flash:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019110223/https://artificialanalysis.ai/models/step-3-5-flash-0202
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 17
+      source: aa
+      at: Artificial Analysis model page /models/step-3-5-flash-0202, Wayback snapshot 2026-10-19
+      quote: Step 3.5 Flash scores 17 on the Artificial Analysis Intelligence Index
+      note: 'Score of Step-3.5-Flash, post-trained from this base. Variant: Step 3.5 Flash. AA entry for the original February 2026 release (Step 3.5 Flash 2603 has its own entry). Index v4.3.2.'
+step-5-preview:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019110359/https://artificialanalysis.ai/models/step-5
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 44
+      source: aa
+      at: Artificial Analysis model page /models/step-5, Wayback snapshot 2026-10-19
+      quote: Step 5 Preview scores 44 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Step 5 Preview. Index v4.3.2.'
+trinity-large:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261019110527/https://artificialanalysis.ai/models/trinity-large-thinking
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 11
+      source: aa
+      at: Artificial Analysis model page /models/trinity-large-thinking, Wayback snapshot 2026-10-19
+      quote: Trinity Large Thinking scores 11 on the Artificial Analysis Intelligence Index
+      note: 'Score of Trinity-Large-Thinking, post-trained from this base. Variant: Trinity Large Thinking. Index v4.3.2.'

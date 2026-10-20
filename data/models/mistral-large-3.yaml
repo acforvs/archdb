@@ -1,0 +1,192 @@
+name: Mistral-Large-3-675B-Base-2512
+org: Mistral AI
+kind: base
+
+sources:
+  card: {url: https://huggingface.co/mistralai/Mistral-Large-3-675B-Base-2512/resolve/3123f82420d99a7fc9313b2d69f9a0ab6cb6ab4d/README.md, kind: model-card}
+  params: {url: https://huggingface.co/mistralai/Mistral-Large-3-675B-Base-2512/resolve/3123f82420d99a7fc9313b2d69f9a0ab6cb6ab4d/params.json, kind: config}
+  index: {url: https://huggingface.co/mistralai/Mistral-Large-3-675B-Base-2512/resolve/3123f82420d99a7fc9313b2d69f9a0ab6cb6ab4d/consolidated.safetensors.index.json, kind: config}
+  blog: {url: https://web.archive.org/web/20261011202338/https://mistral.ai/news/mistral-3/, kind: blog}
+  data_summary: {url: "https://web.archive.org/web/20261019100726id_/https://legal.mistral.ai/documents/Mistral%20Large%203%20-%20Public%20Summary%20of%20Training%20Content.docx.pdf", kind: paper}
+  vllm_mistral_large_3: {url: https://raw.githubusercontent.com/vllm-project/vllm/d8c6210eeaa7f3b474e50cf74926f77a8dc79adf/vllm/model_executor/models/mistral_large_3.py, kind: code}
+  vllm_mistral_config: {url: https://raw.githubusercontent.com/vllm-project/vllm/d8c6210eeaa7f3b474e50cf74926f77a8dc79adf/vllm/transformers_utils/configs/mistral.py, kind: code}
+  vllm_deepseek_v2: {url: https://raw.githubusercontent.com/vllm-project/vllm/d8c6210eeaa7f3b474e50cf74926f77a8dc79adf/vllm/model_executor/models/deepseek_v2.py, kind: code}
+  vllm_mla: {url: https://raw.githubusercontent.com/vllm-project/vllm/d8c6210eeaa7f3b474e50cf74926f77a8dc79adf/vllm/model_executor/layers/mla.py, kind: code}
+
+# Modeling code: vLLM PR #29757 (commit d8c6210), authored by a Mistral AI research engineer, adds
+# MistralLarge3ForCausalLM as a DeepseekV3ForCausalLM subclass plus the params.json adapter; no transformers code exists.
+not_disclosed: [moe.balancing, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision, params.active_non_embedding]
+
+config_unused:
+  n_kv_heads: "MLA; no separate KV heads (equals n_heads)"
+  expert_parallel: "parallelism setting"
+  expert_model_parallel: "parallelism setting"
+  max_position_embeddings: "serving limit (294,912); /max_seq_len 262,144 is the advertised context"
+
+facts:
+  meta.released:
+    value: "2025-12-02"
+    source: blog
+    at: "Introducing Mistral 3; header"
+    quote: "Introducing Mistral 3 December 2, 2025"
+    note: "Same post: \"We release both the base and instruction fine-tuned versions of Mistral Large 3\"."
+  meta.license:
+    value: apache-2.0
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license: apache-2.0"
+
+  params.active:
+    value: 41_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "with 41B active parameters and 675B total parameters"
+  params.note:
+    value: "Headline counts include the 2.5B vision encoder; the language model alone is 673B total, 39B active."
+    source: card
+    at: "README.md; Key Features"
+    quote: "A Granular MoE Language Model with 673B params and 39B active"
+  params.total:
+    value: 675_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "with 41B active parameters and 675B total parameters"
+
+  shape.d_model: {value: 7168, source: params, at: "/dim"}
+  shape.layers: {value: 61, source: params, at: "/n_layers"}
+  shape.tied_embeddings: {value: false, source: params, at: "/tied_embeddings"}
+  shape.vocab: {value: 131_072, source: params, at: "/vocab_size"}
+
+  attn.global_layers:
+    value: 61
+    source: params
+    at: "/n_layers"
+    note: "Every block has the same MLA attention tensors; params.json defines no sliding window."
+  attn.head_dim:
+    value: 192
+    source: params
+    at: "/qk_nope_head_dim + /qk_rope_head_dim"
+    note: "params.json /head_dim is also 192."
+  attn.position:
+    value: "partial RoPE (MLA decoupled, 64 of 192 QK dims)"
+    source: vllm_mla
+    at: "vllm layers/mla.py; MultiHeadLatentAttentionWrapper.forward_native"
+    quote: "q[..., self.qk_nope_head_dim :], k_pe = self.rotary_emb("
+    note: "Rotary applied to the qk_rope_head_dim (64) slice only; the 128 nope dims are unrotated."
+  attn.qk_norm:
+    value: false
+    source: vllm_mla
+    at: "vllm layers/mla.py; MultiHeadLatentAttentionWrapper.forward_native"
+    quote: "kv_c_normed = self.kv_a_layernorm(kv_c)"
+    note: "RMSNorm only on the Q and KV latents (q_a_norm, kv_a_norm); per-head Q/K are not normalized."
+  attn.scale:
+    value: "queries × (1 + 0.1·ln(1 + ⌊pos/8192⌋)) (Llama-4 style)"
+    source: vllm_deepseek_v2
+    at: "vllm models/deepseek_v2.py; _get_llama_4_scaling"
+    quote: "scaling = 1 + scaling_beta * torch.log( 1 + torch.floor(positions / original_max_position_embeddings)"
+    note: "beta and length from params.json /llama_4_scaling (0.1, 8,192); added for Mistral Large 3 in the same PR."
+  attn.bias:
+    value: false
+    source: index
+    at: "/weight_map | has bias"
+    note: "No bias tensor anywhere in the checkpoint."
+
+  attn.heads: {value: 128, source: params, at: "/n_heads"}
+  attn.kind:
+    value: MLA
+    source: vllm_mistral_large_3
+    at: "vllm models/mistral_large_3.py; MistralLarge3ForCausalLM"
+    quote: "class MistralLarge3ForCausalLM(DeepseekV3ForCausalLM):"
+    note: "Checkpoint attention.wkv_a_with_mqa is remapped to DeepSeek-V3 kv_a_proj_with_mqa (512 latent + 64 RoPE key)."
+  attn.kv_lora_rank: {value: 512, source: params, at: "/kv_lora_rank"}
+  attn.q_lora_rank: {value: 1536, source: params, at: "/q_lora_rank"}
+  attn.rope_dim: {value: 64, source: params, at: "/qk_rope_head_dim"}
+  attn.rope_theta: {value: 10000, source: params, at: "/rope_theta"}
+  attn.v_head_dim: {value: 128, source: params, at: "/v_head_dim"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: vllm_deepseek_v2
+    at: "vllm models/deepseek_v2.py; DeepseekV2MLP.__init__"
+    quote: "Only silu is supported for now."
+    note: "SiluAndMul over gate (w1) and up (w3) in dense and expert FFNs; params.json sets no activation and the Mistral adapter defaults it to silu."
+  ffn.dim:
+    value: 16384
+    source: params
+    at: "/hidden_dim"
+    note: "Used by the 3 leading dense blocks; checkpoint layers.0.feed_forward.w1 is [16384, 7168]."
+
+  moe.dense_layers:
+    value: 3
+    source: params
+    at: "/moe/first_k_dense_replace"
+    note: "/moe/route_every_n 1 (moe_layer_freq): every later block is MoE."
+  moe.router:
+    value: softmax
+    source: vllm_mistral_config
+    at: "vllm transformers_utils/configs/mistral.py; _remap_moe_args"
+    quote: "config[\"scoring_func\"] = \"softmax\""
+    note: "Same function sets topk_method None, so no score-correction bias."
+  moe.norm_topk:
+    value: true
+    source: vllm_mistral_config
+    at: "vllm transformers_utils/configs/mistral.py; _remap_moe_args"
+    quote: "config[\"norm_topk_prob\"] = True"
+  moe.expert_dim: {value: 4096, source: params, at: "/moe/expert_hidden_dim"}
+  moe.experts: {value: 128, source: params, at: "/moe/num_experts"}
+  moe.routed_scale: {value: 1.0, source: params, at: "/moe/routed_scale"}
+  moe.shared: {value: 1, source: params, at: "/moe/num_shared_experts"}
+  moe.shared_dim:
+    value: 4096
+    source: params
+    at: "/moe/expert_hidden_dim"
+    basis: inferred
+    note: "One shared expert of expert width; checkpoint layers.3.shared_experts.w1 is [4096, 7168]."
+  moe.top_k:
+    value: 4
+    source: params
+    at: "/moe/num_experts_per_tok"
+    note: "/moe/num_expert_groups and /moe/num_expert_groups_per_tok are 1: no group-limited routing."
+
+  norm.eps: {value: 1.0e-6, source: params, at: "/norm_eps"}
+  norm.type:
+    value: RMSNorm
+    source: vllm_deepseek_v2
+    at: "vllm models/deepseek_v2.py; DeepseekV2DecoderLayer.__init__"
+    quote: "self.input_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.placement:
+    value: pre
+    source: vllm_deepseek_v2
+    at: "vllm models/deepseek_v2.py; DeepseekV2DecoderLayer.forward"
+    quote: "hidden_states, residual = self.input_layernorm(hidden_states, residual)"
+    note: "Checkpoint attention_norm and ffn_norm map to input_layernorm and post_attention_layernorm, applied before attention and FFN."
+
+  ctx.extension:
+    value: "YaRN factor 36 over original 8,192 (release params.json)"
+    source: params
+    at: "params.json; yarn"
+    quote: "\"yarn\": { \"original_max_position_embeddings\": 8192, \"factor\": 36,"
+    note: "Training-time context stages are not disclosed. Same dict: beta 32, alpha 1, apply_scale false; params.json also sets llama_4_scaling (beta 0.1, original 8,192)."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Key Features"
+    quote: "Supports a 256k context window."
+    note: "params.json /max_seq_len is 262144."
+
+  train.hardware:
+    value: "3000 H200 GPUs"
+    source: card
+    at: "README.md; intro"
+    quote: "trained from scratch with 3000 H200s"
+  train.cutoff:
+    value: "July 2025"
+    source: data_summary
+    at: "§1.3 Latest date of data acquisition/collection"
+    quote: "The latest date of data collection was July 2025."
+  train.data:
+    value: "multilingual text and images: Common Crawl and other public datasets, licensed and third-party datasets, synthetic data, user interaction data (subject to opt-out)"
+    source: data_summary
+    at: "§2.1 Publicly available datasets"
+    quote: "The datasets used to train the model include Common Crawl."
+    note: "§1.3 ticks \"More than 10 trillions tokens\" for the text training data; §2.4-2.5 cover user and synthetic data."
