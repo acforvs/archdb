@@ -8,12 +8,16 @@ uv run archdb serve          # http://127.0.0.1:8000
 ```
 
 `npm --prefix web run dev` serves the site with hot reload. The explorer, model pages, and exports
-can be hosted as static files. Short links use the two Netlify Functions in `web/netlify/functions/`.
+can be hosted as static files. Short links use the Netlify Functions in `web/netlify/functions/`.
 
 “Share” saves the current settings and copies a short URL. These links redirect to the full view
 URL. The `shared-views-v1` site-wide [Netlify Blobs](https://docs.netlify.com/build/data-and-storage/netlify-blobs/)
-store persists across deploys; identical views reuse a link. Creation is limited to 30 requests per
-minute per IP. Existing links and static hosting work without this service; the share dialog can
+store persists across deploys; identical views reuse a link. Share first checks a lookup keyed by
+the full configuration hash. Successful lookups use Netlify's durable CDN cache, shared by visitors;
+missing lookups are not cached. Only configurations not found in storage need a creation request.
+Each browser tab also remembers up to 200 results. Cache misses, including after invalidation or
+expiry, still invoke a function. Creation is limited to 30 requests per minute per IP.
+Existing links and static hosting work without this service; the share dialog can
 also copy a full URL. To test short links locally, run `netlify dev --dir site` after building.
 
 `archdb build` also generates model pages under `/models/`, PNG link previews under `/social/`,

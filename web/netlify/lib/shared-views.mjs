@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
-import { DEFAULTS, parseView, serializeView } from "../../src/view.ts";
+import { DEFAULTS, SHARE_HASH_PREFIX, parseView, serializeView } from "../../src/view.ts";
 
 const MAX_QUERY = 16384;
 export const CODE = /^[A-Za-z0-9_-]{10,43}$/;
+const LENGTHS = [10, 12, 16, 24, 43];
+const digestOf = (query) => createHash("sha256").update(SHARE_HASH_PREFIX + query).digest("base64url");
 const json = (value, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
 
 export function normalizeQuery(query) {
@@ -24,8 +26,8 @@ export function normalizeQuery(query) {
 }
 
 export async function saveView(query, store) {
-  const digest = createHash("sha256").update("archdb-view-v1\n" + query).digest("base64url");
-  for (const length of [10, 12, 16, 24, 43]) {
+  const digest = digestOf(query);
+  for (const length of LENGTHS) {
     const code = digest.slice(0, length);
     const existing = await store.get(code, { type: "json" });
     if (existing?.query === query) return code;
@@ -34,6 +36,29 @@ export async function saveView(query, store) {
     if (modified || (await store.get(code, { type: "json" }))?.query === query) return code;
   }
   throw new Error("Could not allocate a link");
+}
+
+export async function lookupView(request, store) {
+  if (!["GET", "HEAD"].includes(request.method)) return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+  const digest = new URL(request.url).pathname.split("/").pop();
+  if (!/^[A-Za-z0-9_-]{43}$/.test(digest ?? "")) return json({ error: "Not found" }, 404);
+  try {
+    for (const length of LENGTHS) {
+      const code = digest.slice(0, length);
+      const saved = await store.get(code, { type: "json" });
+      if (!saved) break;
+      if (typeof saved.query === "string" && digestOf(saved.query) === digest) {
+        return Response.json({ path: "/" + code }, { headers: {
+          "Cache-Control": "public, max-age=3600",
+          "Netlify-CDN-Cache-Control": "public, durable, max-age=31536000",
+          "X-Robots-Tag": "noindex",
+        } });
+      }
+    }
+    return json({ error: "Not found" }, 404);
+  } catch {
+    return json({ error: "Could not look up this view. Try again." }, 503);
+  }
 }
 
 export async function createView(request, store) {

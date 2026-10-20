@@ -33,6 +33,15 @@ export const DEFAULTS: View = {
   xlog: true, ylog: false, ctx: 131072, q: "", model: "", focus: "", all: false, cols: "", side: false,
   f: "", sel: "", only: false, kvdt: "bf16", pareto: "x-y+", by: "country", feat: "swa", disc: false,
 };
+export const SHARE_HASH_PREFIX = "archdb-view-v1\n";
+
+export async function viewDigest(query: string): Promise<string> {
+  const bytes = new TextEncoder().encode(SHARE_HASH_PREFIX + query);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 export function parseView(query: string): View {
   const p = new URLSearchParams(query);
   const v: Record<string, unknown> = { ...DEFAULTS };
@@ -46,7 +55,9 @@ export function parseView(query: string): View {
 
 export function serializeView(v: View, includeDefaults = false): string {
   const p = new URLSearchParams();
-  for (const [k, val] of Object.entries(v))
-    if (includeDefaults || val !== DEFAULTS[k as keyof View]) p.set(k, typeof val === "boolean" ? (val ? "1" : "0") : String(val));
+  for (const k of Object.keys(DEFAULTS) as (keyof View)[]) {
+    const val = v[k];
+    if (includeDefaults || val !== DEFAULTS[k]) p.set(k, typeof val === "boolean" ? (val ? "1" : "0") : String(val));
+  }
   return p.toString();
 }

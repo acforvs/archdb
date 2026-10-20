@@ -15,7 +15,7 @@ const mime = {
 
 before(async () => {
   if (!baseURL) {
-    const { createView, openView } = await import("../netlify/lib/shared-views.mjs");
+    const { createView, lookupView, openView } = await import("../netlify/lib/shared-views.mjs");
     const views = new Map();
     const store = {
       async get(key) { return views.get(key) ?? null; },
@@ -31,14 +31,14 @@ before(async () => {
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));
       };
-      if (pathname === "/api/views") {
+      if (pathname === "/api/views" || pathname.startsWith("/api/views/")) {
         const chunks = [];
         for await (const chunk of req) chunks.push(chunk);
         const request = new Request(`http://${req.headers.host}${req.url}`, {
           method: req.method, headers: req.headers,
           ...(["GET", "HEAD"].includes(req.method) ? {} : { body: Buffer.concat(chunks) }),
         });
-        await reply(await createView(request, store));
+        await reply(await (pathname === "/api/views" ? createView : lookupView)(request, store));
         return;
       }
       const path = resolve(site, "." + pathname + (pathname.endsWith("/") ? "index.html" : ""));
@@ -320,6 +320,10 @@ test("Share creates a reusable short link that restores a view in a fresh browse
   const query = "preset=Custom&sort=scaling.batch_ratio&x=train.tokens&y=train.batch_tokens&ylog=1&cols=train.tokens%2Cscaling.batch_ratio%2Ctrain.batch_tokens%2Ctrain.batch%2Cparams.counted_active_non_embedding%2Cscaling.tpp_active&pareto=&by=half&feat=mtp";
   const page = await browser.newPage({ viewport: { width: 1600, height: 1050 } });
   let context;
+  const requests = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/views")) requests.push(request);
+  });
   try {
     await page.goto(baseURL + "/#" + query);
     await page.getByRole("button", { name: "Share", exact: true }).click();
@@ -329,18 +333,30 @@ test("Share creates a reusable short link that restores a view in a fresh browse
     assert.equal(new URL(short).origin, new URL(baseURL).origin);
     assert.match(new URL(short).pathname, /^\/[A-Za-z0-9_-]{10,43}$/);
     assert.ok(short.length < 80);
+    const initialRequests = requests.length;
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Share", exact: true }).click();
     await field.waitFor();
     assert.equal(await field.inputValue(), short);
+    assert.equal(requests.length, initialRequests, "This tab should remember the existing link");
     context = await browser.newContext();
     const fresh = await context.newPage();
+    const freshRequests = [];
+    fresh.on("request", (request) => {
+      if (new URL(request.url()).pathname.startsWith("/api/views")) freshRequests.push(request);
+    });
     await fresh.goto(short);
     await fresh.locator("table.grid tbody tr").first().waitFor();
     const restored = new URLSearchParams(new URL(fresh.url()).hash.slice(1));
     for (const [key, value] of new URLSearchParams(query)) assert.equal(restored.get(key), value, key);
     assert.equal(await fresh.getByRole("radio", { name: /^Custom/ }).getAttribute("aria-checked"), "true");
     assert.match(await fresh.locator('th[aria-sort="descending"]').innerText(), /Batch/);
+    await fresh.getByRole("button", { name: "Share", exact: true }).click();
+    const reused = fresh.getByRole("textbox", { name: "Share link", exact: true });
+    await reused.waitFor();
+    assert.equal(await reused.inputValue(), short);
+    assert.equal(freshRequests.length, 1);
+    assert.equal(freshRequests[0].method(), "GET", "A new visitor should reuse the lookup without a creation request");
     assert.equal((await fresh.request.get(new URL("/no-such-short-view", baseURL).href)).status(), 404);
   } finally { await context?.close(); await page.close(); }
 });
@@ -350,7 +366,7 @@ test("Share can copy the full URL if saving or clipboard access fails", async ()
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", { value: { writeText: async () => { throw new Error("Denied"); } } });
   });
-  await page.route("**/api/views", (route) => route.fulfill({ status: 503, body: "Unavailable" }));
+  await page.route("**/api/views**", (route) => route.fulfill({ status: 503, body: "Unavailable" }));
   try {
     await page.goto(baseURL + "/#preset=MoE&q=deepseek");
     await page.getByRole("button", { name: "Share", exact: true }).click();

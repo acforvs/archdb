@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createView, normalizeQuery, openView, saveView } from "../netlify/lib/shared-views.mjs";
-import { parseView } from "../src/view.ts";
+import { createView, lookupView, normalizeQuery, openView, saveView } from "../netlify/lib/shared-views.mjs";
+import { parseView, serializeView, viewDigest } from "../src/view.ts";
 
 class Store {
   rows = new Map();
@@ -72,4 +72,50 @@ test("missing links return 404 and storage failures allow retrying", async () =>
   const failing = { get() { throw new Error("Storage unavailable"); } };
   assert.equal((await createView(post({ query }), failing)).status, 503);
   assert.equal((await openView(new Request("https://archdb.example/ABCDEFGHIJ"), failing)).status, 503);
+});
+
+test("the browser digest matches existing link IDs regardless of object key order", async () => {
+  const store = new Store();
+  const normalized = normalizeQuery(query);
+  const reversed = Object.fromEntries(Object.entries(parseView(query)).reverse());
+  assert.equal(serializeView(reversed, true), normalized);
+  const digest = await viewDigest(normalized);
+  assert.equal(digest.slice(0, 10), "Ve-anxDzYv");
+  assert.equal(await saveView(normalized, store), digest.slice(0, 10));
+});
+
+test("lookup reuses previously generated records with a cacheable, read-only response", async () => {
+  const store = new Store();
+  const normalized = normalizeQuery(query);
+  const request = new Request("https://archdb.example/api/views/" + await viewDigest(normalized));
+  const missing = await lookupView(request, store);
+  assert.equal(missing.status, 404);
+  assert.equal(missing.headers.get("Cache-Control"), "no-store");
+  const code = await saveView(normalized, store);
+  const found = await lookupView(request, { get: store.get.bind(store) });
+  assert.equal(found.status, 200);
+  assert.deepEqual(await found.json(), { path: "/" + code });
+  assert.match(found.headers.get("Netlify-CDN-Cache-Control"), /public, durable/);
+  assert.match(found.headers.get("Cache-Control"), /max-age=3600/);
+});
+
+test("lookup checks the full digest and resolves extended IDs after collisions", async () => {
+  const store = new Store();
+  const normalized = normalizeQuery(query);
+  const digest = await viewDigest(normalized);
+  store.rows.set(digest.slice(0, 10), { version: 1, query: normalizeQuery("q=qwen") });
+  const request = new Request("https://archdb.example/api/views/" + digest);
+  assert.equal((await lookupView(request, store)).status, 404);
+  const code = await saveView(normalized, store);
+  assert.equal(code.length, 12);
+  assert.deepEqual(await (await lookupView(request, store)).json(), { path: "/" + code });
+});
+
+test("lookup rejects invalid requests and never caches storage errors", async () => {
+  const url = "https://archdb.example/api/views/" + await viewDigest(normalizeQuery(query));
+  assert.equal((await lookupView(new Request(url, { method: "POST" }), new Store())).status, 405);
+  assert.equal((await lookupView(new Request("https://archdb.example/api/views/nope"), new Store())).status, 404);
+  const response = await lookupView(new Request(url), { get() { throw new Error("Unavailable"); } });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
 });

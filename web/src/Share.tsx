@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { serializeView, type View } from "./view";
+import { shortLinkPath } from "./shortLink";
 
 export function Share({ view }: { view: View }) {
   const [open, setOpen] = useState(false);
@@ -44,16 +45,10 @@ export function Share({ view }: { view: View }) {
     setUrl("");
     setCopied(false);
     try {
-      const response = await fetch("/api/views", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: serializeView(view, true) }),
-      });
-      if (!response.ok) throw new Error("Could not create a link. Try again.");
-      const { path } = await response.json();
-      if (typeof path !== "string" || !/^\/[A-Za-z0-9_-]{10,43}$/.test(path)) throw new Error("Could not create a link. Try again.");
+      const path = await shortLinkPath(view);
       const link = new URL(path, location.origin).href;
       setUrl(link);
-      await copy(link);
+      void copy(link);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create a link. Try again.");
     } finally { setBusy(false); }
