@@ -155,6 +155,10 @@ NUMERIC_ITEM_KEYS = {
     "elements",
     "tokens_per_entry",
     "window",
+    "bits",
+    "scale_count",
+    "scale_bits",
+    "padding_bytes",
 }
 BOUND = re.compile(r"^[~<>≥≤]\s*[\d.]+\s*[KMBT]?$")
 DATE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")
@@ -235,6 +239,65 @@ def validate(models: list[Model], fields: dict[str, dict], orgs: dict | None = N
             errors += _check_type(where, key, fact["value"], spec)
         for sid in set(m.sources) - used:
             errors.append(f"{where} source {sid} is never cited")
+        errors += _check_kv(where, m.facts)
+    return errors
+
+
+def _check_kv(where: str, facts: dict) -> list[str]:
+    errors = []
+    group_fact, precision_fact = facts.get("attn.kv_groups"), facts.get("attn.kv_precision")
+    groups = group_fact.get("value", []) if isinstance(group_fact, dict) else []
+    precision = precision_fact.get("value", []) if isinstance(precision_fact, dict) else []
+    if not isinstance(groups, list) or not isinstance(precision, list):
+        return errors  # Type errors are reported by _check_type.
+    names = {}
+    for g in groups:
+        if not isinstance(g, dict):
+            continue
+        name = g.get("name")
+        if not isinstance(name, str) or not name or name in names:
+            errors.append(f"{where} attn.kv_groups needs unique, nonempty group names")
+            continue
+        names[name] = g
+        for k in ("layers", "elements", "tokens_per_entry", "window"):
+            v = g.get(k, 1 if k == "tokens_per_entry" else None)
+            if k == "window" and v is None:
+                continue
+            if type(v) is not int or v <= 0:
+                errors.append(f"{where} attn.kv_groups {name!r}: {k} must be a positive integer")
+    covered, component_names = {}, set()
+    for p in precision:
+        if not isinstance(p, dict):
+            continue
+        name, group = p.get("name"), p.get("group")
+        if not isinstance(name, str) or not name or name in component_names:
+            errors.append(f"{where} attn.kv_precision needs unique, nonempty component names")
+        else:
+            component_names.add(name)
+        if not isinstance(group, str) or group not in names:
+            errors.append(f"{where} attn.kv_precision {name!r}: unknown cache group {group!r}")
+        elements = p.get("elements")
+        if type(elements) is not int or elements <= 0:
+            errors.append(f"{where} attn.kv_precision {name!r}: elements must be a positive integer")
+        elif isinstance(group, str):
+            covered[group] = covered.get(group, 0) + elements
+        if not isinstance(p.get("format"), str) or not p["format"]:
+            errors.append(f"{where} attn.kv_precision {name!r}: format is required")
+        if type(p.get("bits")) is not int or p["bits"] not in (4, 8, 16, 32):
+            errors.append(f"{where} attn.kv_precision {name!r}: bits must be 4, 8, 16 or 32")
+        for k in ("scale_count", "padding_bytes"):
+            v = p.get(k, 0)
+            if type(v) is not int or v < 0:
+                errors.append(f"{where} attn.kv_precision {name!r}: {k} must be a nonnegative integer")
+        scale_count, scale_bits = p.get("scale_count", 0), p.get("scale_bits", 0)
+        if scale_count and (type(scale_bits) is not int or scale_bits not in (8, 16, 32)):
+            errors.append(f"{where} attn.kv_precision {name!r}: scales need scale_bits of 8, 16 or 32")
+        if scale_bits and not scale_count:
+            errors.append(f"{where} attn.kv_precision {name!r}: scale_bits needs scale_count")
+    for name, elements in covered.items():
+        expected = names.get(name, {}).get("elements")
+        if isinstance(expected, int) and elements > expected:
+            errors.append(f"{where} attn.kv_precision {name!r}: components exceed the group's elements")
     return errors
 
 

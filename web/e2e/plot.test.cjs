@@ -82,6 +82,68 @@ async function withPlot(hash, check) {
   } finally { await page.close(); }
 }
 
+test("KV storage settings distinguish uniform payload from sourced formats and preserve numeric order", async () => {
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1050 } });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    const hash = new URLSearchParams({
+      preset: "Custom", cols: "kv.growth_per_token,kv.bytes_per_token", q: "DeepSeek",
+      sort: "kv.growth_per_token", dir: "1", all: "1",
+    });
+    await page.goto(`${baseURL}/#${hash}`);
+    const row = (name) => page.locator("table.grid tbody tr").filter({ has: page.getByRole("button", { name, exact: true }) });
+    const v41 = row("DeepSeek-V4.1-Flash");
+    await v41.waitFor();
+    assert.equal(await v41.locator("td").first().innerText(), "3.13 KiB");
+    const storage = page.getByRole("combobox", { name: "KV-cache dtype" });
+    await storage.selectOption("fp4");
+    await page.waitForFunction(() => document.querySelector(".grid tbody tr td")?.textContent === "800 B");
+    assert.equal(await v41.locator("td").first().innerText(), "800 B");
+    await storage.selectOption("sourced");
+    await page.waitForFunction(() => document.querySelector(".grid tbody tr td")?.textContent === "890 B");
+    assert.equal(await v41.locator("td").first().innerText(), "890 B");
+    assert.equal(await v41.locator("td").nth(1).innerText(), "911 B");
+    const names = await page.locator("table.grid tbody tr .model-cell button").allTextContents();
+    assert.deepEqual(names.slice(0, 4), ["DeepSeek-V4.1-Flash", "DeepSeek-V4-Flash-Base", "DeepSeek-V4-Pro", "DeepSeek-V3.2"]);
+    assert.equal(await row("DeepSeek-V3-Base").locator("td").first().innerText(), "not sourced");
+    assert.match(await page.locator(".kv-note").innerText(), /4 of 5 models/);
+    await v41.locator("td").first().click();
+    const panel = page.getByRole("complementary", { name: "DeepSeek-V4.1-Flash sources" });
+    await panel.waitFor();
+    assert.equal(await panel.locator(".fact.focus .fact-value").innerText(), "890 B");
+    assert.match(await panel.locator(".fact.focus .fact-src").first().innerText(), /scales/);
+    assert.ok((await panel.locator(".cache-entry").allTextContents()).some((text) => text.includes("288 bytes/entry")));
+    await panel.getByRole("button", { name: "Close", exact: true }).click();
+    await page.evaluate(() => {
+      const p = new URLSearchParams(location.hash.slice(1));
+      p.set("f", "kv.growth_per_token<=1K");
+      location.hash = p.toString();
+    });
+    await page.waitForFunction(() => document.querySelectorAll(".grid tbody tr").length === 1, null, { timeout: 5000 });
+    assert.equal(await page.locator(".grid tbody tr .model-cell button").innerText(), "DeepSeek-V4.1-Flash");
+    assert.deepEqual(errors, []);
+  } finally { await page.close(); }
+});
+
+test("the global-KV plot uses sourced values and opens its evidence", async () => {
+  await withPlot("tab=plot&x=kv.growth_per_token&kvdt=sourced&q=DeepSeek", async (page) => {
+    assert.equal(await page.locator("circle.hit").count(), 4);
+    assert.match(await page.locator(".kv-note").innerText(), /global KV excludes/);
+    const points = page.locator("circle.hit");
+    for (let i = 0; i < await points.count(); i++) {
+      await points.nth(i).hover();
+      if (await page.locator(".preview-head b").innerText() === "DeepSeek-V4.1-Flash") {
+        assert.match(await page.locator(".preview").innerText(), /890 B/);
+        await points.nth(i).click({ noWaitAfter: true });
+        await page.getByRole("complementary", { name: "DeepSeek-V4.1-Flash sources" }).waitFor();
+        return;
+      }
+    }
+    assert.fail("V4.1 must have a point at its sourced global-KV value");
+  });
+});
+
 for (const [name, hash] of [
   ["capability vs active parameters", "tab=plot&preset=MoE&sort=shape.aspect&x=params.counted_active_non_embedding&cols=shape.aspect%2Cparams.active%2Cparams.total"],
   ["capability vs KV", "tab=plot"],

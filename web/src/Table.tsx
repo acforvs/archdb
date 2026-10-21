@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { KV_CONTEXT_KEYS, PRESETS, cell, numeric, siblingScore, type CellOpts, type DB, type Model } from "./data";
+import { KV_CONTEXT_KEYS, PRESETS, cell, kvLabel, numeric, siblingScore, type CellOpts, type DB, type Model } from "./data";
 import { Compare } from "./Compare";
 
 export function visibleColumns(db: DB, view: View): string[] {
@@ -98,7 +98,7 @@ export function Table({ db, models, view, set }: {
                   {arrow(view, k)}
                   {k.startsWith("kv.") && (
                     <span className="sub">
-                      {view.kvdt.toUpperCase()}
+                      {kvLabel(view.kvdt)}
                       {KV_CONTEXT_KEYS.includes(k) ? ` · ${fmtContext(view.ctx)}` : " · long context"}
                     </span>
                   )}
@@ -150,7 +150,7 @@ export function Table({ db, models, view, set }: {
                       onMouseEnter={(e) => !empty && setHover({ m, k, x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHover(null)}
                     >
-                      {unmodeled ? "not modeled" : undisclosed ? "n/d" : format(k, db.fields[k], v)}
+                      {unmodeled ? view.kvdt === "sourced" && k.startsWith("kv.") ? "not sourced" : "not modeled" : undisclosed ? "n/d" : format(k, db.fields[k], v)}
                       {!empty && siblingScore(m, k) && (
                         <sup className="mark" aria-label="post-trained sibling">‡</sup>
                       )}

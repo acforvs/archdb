@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
-import { KV_DTYPES, PRESETS, numericFields, type DB } from "./data";
+import { KV_STORAGE_LABELS, PRESETS, numericFields, type DB } from "./data";
 import { context as fmtContext } from "./format";
 import { Table, visibleColumns } from "./Table";
 import { Plot, PARETO } from "./Plot";
@@ -19,6 +19,8 @@ const CONTEXTS = [8192, 32768, 131072, 262144, 1048576];
 
 function readHash(db: DB): View {
   const view = parseView(location.hash.slice(1));
+  if (!Number.isSafeInteger(view.ctx) || view.ctx <= 0) view.ctx = DEFAULTS.ctx;
+  if (!Object.hasOwn(KV_STORAGE_LABELS, view.kvdt)) view.kvdt = DEFAULTS.kvdt;
   const known = (key: string) => Object.hasOwn(db.fields, key);
   view.cols = view.cols.split(",").filter(known).join(",");
   view.f = serializeRules(parseRules(view.f).filter((r) => known(r.key) || Object.hasOwn(ATTRS, r.key)));
@@ -177,10 +179,10 @@ export function App({ db }: { db: DB }) {
           </>
         )}
         {kvShown && (
-          <span className="context" title="KV-cache element type and context length for the KV columns">
+          <span className="context" title="Uniform precision counts payload only. Sourced storage uses each component's documented format, scales and padding.">
             KV cache
             <select value={view.kvdt} onChange={(e) => set({ kvdt: e.target.value })} aria-label="KV-cache dtype">
-              {Object.keys(KV_DTYPES).map((d) => <option key={d} value={d}>{d.toUpperCase()}</option>)}
+              {Object.entries(KV_STORAGE_LABELS).map(([d, label]) => <option key={d} value={d}>{label}</option>)}
             </select>
             at
             <select value={view.ctx} onChange={(e) => set({ ctx: Number(e.target.value) })} aria-label="Context length">
@@ -189,6 +191,14 @@ export function App({ db }: { db: DB }) {
           </span>
         )}
       </div>
+      {kvShown && (
+        <p className="kv-note">
+          {view.kvdt === "sourced"
+            ? `Sourced formats include quantization scales and documented padding. Complete recipes: ${scoped.filter((m) => m.kv?.sourced).length} of ${scoped.length} models.`
+            : "Uniform precision counts payload only; quantization overhead is excluded."}
+          {" "}KV bytes / token includes bounded SWA caches at this context; global KV excludes them.
+        </p>
+      )}
       </div>
 
       <main>

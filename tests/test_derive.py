@@ -144,16 +144,19 @@ def test_second_window_group():
 
 
 def test_exported_kv_components_reproduce_kv_at_context():
-    """The website recomputes KV at other contexts from `_kv`; it must agree with derive() for every record."""
+    """Only complete compressed entries enter the retained payload."""
     from archdb.data import load_models
 
     for m in load_models():
-        for context in (4096, 131_072, 1_048_576):
+        for context in (7, 4096, 131_072, 1_048_576):
             d = derive(m.facts, context=context)
             kv = d.get("_kv")
             if kv is None:
                 continue
-            site = kv["per_token"] * context + sum(b * min(context, w) for b, w in kv["windows"])
+            site = sum(
+                g["bytes_per_entry"] * min(context // g["tokens_per_entry"], g.get("window", context))
+                for g in kv["groups"]
+            )
             assert site == d["kv.bytes_at_context"]["value"], (m.id, context)
 
 

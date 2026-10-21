@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { KV_CONTEXT_KEYS, cell, numeric, siblingScore, type DB, type Model } from "./data";
+import { KV_CONTEXT_KEYS, cell, kvLabel, numeric, siblingScore, type DB, type Model } from "./data";
 import { format, si } from "./format";
 import type { View } from "./App";
 
@@ -158,7 +158,7 @@ export function Plot({ db, models, view, open }: {
 }
 
 function axisTitle(db: DB, view: View, k: string, log: boolean) {
-  const dt = view.kvdt.toUpperCase();
+  const dt = kvLabel(view.kvdt);
   const extra = KV_CONTEXT_KEYS.includes(k) ? ` (${dt}, ${view.ctx.toLocaleString("en-US")} tokens)` : k.startsWith("kv.") ? ` (${dt})` : "";
   return `${db.fields[k].label}${extra}${log ? " · log scale" : ""}`;
 }

@@ -79,3 +79,38 @@ def test_stage_numbers_must_be_numbers_or_bounds():
     assert not any(
         "must be a number" in e for e in validate([model(**{"train.stages": stage})], FIELDS, orgs={"O": {}})
     )
+
+
+def test_cache_geometry_requires_whole_positive_counts():
+    from archdb.data import _check_kv
+
+    for key, value in [("layers", -1), ("elements", True), ("tokens_per_entry", 0), ("window", 1.5)]:
+        group = {"name": "main", "layers": 1, "elements": 512, key: value}
+        assert _check_kv("test:", {"attn.kv_groups": {"value": [group]}})
+
+
+def test_cache_precision_checks_references_and_component_coverage():
+    from archdb.data import _check_kv
+
+    group = {"name": "main", "layers": 1, "elements": 512}
+    component = {
+        "name": "latent",
+        "group": "main",
+        "elements": 512,
+        "bits": 4,
+        "format": "E2M1",
+        "scale_count": 32,
+        "scale_bits": 8,
+    }
+    f = {"attn.kv_groups": {"value": [group]}, "attn.kv_precision": {"value": [component]}}
+    assert _check_kv("test:", f) == []
+    for key, value in [
+        ("name", ""),
+        ("group", "typo"),
+        ("elements", 513),
+        ("bits", 5),
+        ("scale_bits", 0),
+        ("padding_bytes", -1),
+    ]:
+        f["attn.kv_precision"]["value"] = [{**component, key: value}]
+        assert _check_kv("test:", f)

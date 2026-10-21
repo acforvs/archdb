@@ -31,7 +31,7 @@ export function context(v: number): string {
 export function format(key: string, field: Field | undefined, v: Value | undefined, full = false): string {
   if (v === null || v === undefined) return "–";
   if (typeof v === "boolean") return v ? "yes" : "no";
-  if (Array.isArray(v)) return `${v.length} stages`;
+  if (Array.isArray(v)) return `${v.length} ${key.startsWith("attn.kv_") ? "components" : "stages"}`;
   if (typeof v === "string") return !full && v.length > 44 ? `${v.slice(0, 42)}…` : v;
   const unit = field?.unit;
   if (key === "moe.active_fraction") return `${(v * 100).toFixed(1)}%`;

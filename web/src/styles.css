@@ -55,6 +55,10 @@
 .search { width: 190px; }
 .search:focus, select:focus { outline: 2px solid var(--accent-line); outline-offset: 0; }
 .context { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12.5px; }
+.kv-note { max-width: 1600px; margin: 0 auto; padding: 0 28px 10px; color: var(--muted); font-size: 12px; }
+.cache-entries { margin-top: 8px; }
+.cache-entry { padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 12px; }
+.cache-entry b { display: block; margin-bottom: 3px; }
 .axes { display: flex; gap: 18px; flex-wrap: wrap; }
 .axis-picker { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12.5px; }
 .axis-picker label { display: inline-flex; gap: 4px; align-items: center; }

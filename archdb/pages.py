@@ -201,7 +201,7 @@ def list_value(items: list, model: dict, parent: dict) -> str:
             for key, value in item.items()
             if key not in {"name", "quote", "note", "source"}
         )
-        proof = dict(parent, **{k: item[k] for k in ("quote", "note", "source") if k in item})
+        proof = dict(parent, **{k: item[k] for k in ("quote", "note", "source", "at") if k in item})
         rows.append(
             f"<li><h4>{escape(item.get('name', ''))}</h4><dl>{values}</dl>{evidence(proof, model)}</li>"
         )
@@ -217,7 +217,8 @@ def model_body(model: dict, data: dict) -> str:
         body += f"<p>{escape(model['note'])}</p>"
     body += f'<p><a class="button" href="/#{escape(query)}">Open in the comparison table</a></p>'
     body += '<p class="context-note">KV calculations use one sequence at 131,072 tokens and 16-bit cache elements. '
-    body += "They include bounded sliding-window caches. Click a source to inspect the evidence.</p>"
+    body += "They include bounded sliding-window caches. This is retained cache payload, not peak prefill memory. "
+    body += "The comparison table also offers sourced mixed-precision layouts, including quantization scales.</p>"
     sections, links = [], []
     for group, label in data["groups"].items():
         rows = []

@@ -3,6 +3,8 @@ org: DeepSeek
 kind: reasoning
 
 sources:
+  inference-kernel: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/inference/kernel.py, kind: code}
+  flashmla-cache: {url: https://raw.githubusercontent.com/deepseek-ai/FlashMLA/07a1089857b63e74e3133630c02b083b75e8d4b2/README.md, kind: code}
   config: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/config.json, kind: config}
   inference-model: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/inference/model.py, kind: code}
   report: {url: https://arxiv.org/pdf/2606.19348v1, kind: paper}
@@ -93,6 +95,73 @@ facts:
         quote: "self.kv_cache[:bsz, start_pos % win] = kv.squeeze(1)"
     source: inference-model
     at: "inference/model.py; Attention.__init__, Attention.forward, Indexer.__init__"
+  attn.kv_precision:
+    value:
+    - name: CSA main KV NoPE
+      group: CSA main KV
+      elements: 448
+      bits: 8
+      format: FP8 E4M3; E8M0 scales per 64 channels
+      scale_count: 7
+      scale_bits: 8
+      padding_bytes: 1
+      at: 'README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte'
+      quote: The scale row is 8 Bytes
+    - name: CSA main KV RoPE
+      group: CSA main KV
+      elements: 64
+      bits: 16
+      format: BF16
+      at: 'README.md; V4 layout: 128 RoPE bytes'
+      quote: the 64 `bfloat16` RoPE values (not quantized)
+    - name: HCA main KV NoPE
+      group: HCA main KV
+      elements: 448
+      bits: 8
+      format: FP8 E4M3; E8M0 scales per 64 channels
+      scale_count: 7
+      scale_bits: 8
+      padding_bytes: 1
+      at: 'README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte'
+      quote: The scale row is 8 Bytes
+    - name: HCA main KV RoPE
+      group: HCA main KV
+      elements: 64
+      bits: 16
+      format: BF16
+      at: 'README.md; V4 layout: 128 RoPE bytes'
+      quote: the 64 `bfloat16` RoPE values (not quantized)
+    - name: SWA window NoPE
+      group: SWA window
+      elements: 448
+      bits: 8
+      format: FP8 E4M3; E8M0 scales per 64 channels
+      scale_count: 7
+      scale_bits: 8
+      padding_bytes: 1
+      at: 'README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte'
+      quote: The scale row is 8 Bytes
+    - name: SWA window RoPE
+      group: SWA window
+      elements: 64
+      bits: 16
+      format: BF16
+      at: 'README.md; V4 layout: 128 RoPE bytes'
+      quote: the 64 `bfloat16` RoPE values (not quantized)
+    - name: CSA indexer key
+      group: CSA indexer K
+      elements: 128
+      bits: 4
+      format: MXFP4 E2M1; E8M0 scales per 32 channels
+      scale_count: 4
+      scale_bits: 8
+      source: inference-kernel
+      at: inference/kernel.py; fp4_act_quant, default block_size 32
+      quote: s = z.new_empty(*z.size()[:-1], N // block_size, dtype=torch.float8_e8m0fnu)
+    source: flashmla-cache
+    at: README.md; MLA Decoding / FP8 KV Cache; per-entry storage layouts
+    note: Serving layout from the official FlashMLA kernels and post-training FP4 indexer QAT; main KV keeps the RoPE
+      tail in BF16. Each main/SWA entry is 584 bytes, each indexer entry 68 bytes.
   attn.kv_heads:
     value: 1
     source: config

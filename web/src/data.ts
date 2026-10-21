@@ -14,6 +14,17 @@ export interface Stage {
   note?: string;
   quote?: string;
   source?: string;
+  at?: string;
+  layers?: number;
+  elements?: number;
+  tokens_per_entry?: number;
+  window?: number;
+  group?: string;
+  bits?: number;
+  format?: string;
+  scale_count?: number;
+  scale_bits?: number;
+  padding_bytes?: number;
 }
 
 export interface Fact {
@@ -28,6 +39,24 @@ export interface Fact {
 export interface Derived {
   value: number | null;
   formula: string;
+  formula_version?: string;
+}
+
+interface CacheGroup {
+  name: string;
+  /** Bytes for one entry position across all owners of this group. */
+  bytes_per_entry: number;
+  tokens_per_entry: number;
+  window?: number;
+}
+
+interface Cache {
+  per_token: number;
+  windows: [number, number][];
+  groups: CacheGroup[];
+  formula: string;
+  formula_version: string;
+  sourced?: Cache;
 }
 
 export interface Model {
@@ -42,8 +71,8 @@ export interface Model {
   facts: Record<string, Fact>;
   not_disclosed: string[];
   derived: Record<string, Derived>;
-  /** BF16 bytes added per token, plus [bytes per window entry, window] for sliding-window caches. */
-  kv: { per_token: number; windows: [number, number][] } | null;
+  /** Uniform BF16 payload; optional sourced storage includes per-component scales and padding. */
+  kv: Cache | null;
 }
 
 export interface Field {
@@ -65,16 +94,23 @@ export interface DB {
 /** A value shown in a cell: an authored fact, a computed one, or a value the sources do not disclose. */
 export type Cell =
   | ({ kind: "fact" } & Fact)
-  | { kind: "derived"; value: number | null; formula: string }
+  | ({ kind: "derived" } & Derived)
   | { kind: "undisclosed"; value: null };
 
-/** Settings that change computed values: context length and KV-cache bytes per element. */
+/** Context length and storage recipe used by KV metrics. */
 export interface CellOpts {
   ctx: number;
   kvdt: string;
 }
 
-export const KV_DTYPES: Record<string, number> = { bf16: 2, fp8: 1 };
+export const KV_DTYPES: Record<string, number> = { bf16: 2, fp8: 1, fp4: 0.5 };
+export const KV_STORAGE_LABELS: Record<string, string> = {
+  bf16: "Uniform BF16", fp8: "Uniform FP8", fp4: "Uniform FP4", sourced: "Sourced storage",
+};
+
+export function kvLabel(dtype: string): string {
+  return KV_STORAGE_LABELS[dtype] ?? KV_STORAGE_LABELS.bf16;
+}
 
 /** KV fields that depend on the selected context and are recomputed in the browser. */
 export const KV_CONTEXT_KEYS = [
@@ -82,35 +118,41 @@ export const KV_CONTEXT_KEYS = [
 ];
 
 export function cell(m: Model, key: string, o: CellOpts): Cell | undefined {
-  const kvScale = (KV_DTYPES[o.kvdt] ?? 2) / 2;
-  if (KV_CONTEXT_KEYS.includes(key)) {
+  if (key === "kv.growth_per_token" || KV_CONTEXT_KEYS.includes(key)) {
     const d = m.derived[key];
     if (!d) return undefined;
     if (!m.kv) return { kind: "derived", value: null, formula: d.formula };
-    const dt = o.kvdt.toUpperCase();
-    const total = (m.kv.per_token * o.ctx + m.kv.windows.reduce((s, [b, w]) => s + b * Math.min(o.ctx, w), 0)) * kvScale;
+    const cache = o.kvdt === "sourced" ? m.kv.sourced : m.kv;
+    if (!cache) return { kind: "derived", value: null, formula: "No complete sourced cache-storage recipe. Uniform-precision values are available." };
+    const kvScale = o.kvdt === "sourced" ? 1 : (KV_DTYPES[o.kvdt] ?? 2) / 2;
+    const total = cache.groups.reduce((sum, g) =>
+      sum + g.bytes_per_entry * Math.min(Math.floor(o.ctx / g.tokens_per_entry), g.window ?? o.ctx), 0) * kvScale;
     const active = m.facts["params.active"]?.value;
     const perB = typeof active === "number" ? active / 1e9 : null;
-    const totalFormula =
-      `${(m.kv.per_token * kvScale).toLocaleString("en-US")} B/token × ${o.ctx.toLocaleString("en-US")}` +
-      m.kv.windows.map(([b, w]) => ` + ${(b * kvScale).toLocaleString("en-US")} B × min(context, ${w})`).join("") +
-      ` (${dt})`;
-    if (key === "kv.bytes_at_context") return { kind: "derived", value: total, formula: totalFormula };
+    const note = o.kvdt === "sourced" ? `Sourced formats, scales and padding: ${cache.formula}` : `${kvLabel(o.kvdt)} payload; quantization overhead excluded`;
+    const totalFormula = cache.groups.map((g) => {
+      let entries = g.tokens_per_entry === 1 ? String(o.ctx) : `floor(${o.ctx} / ${g.tokens_per_entry})`;
+      if (g.window !== undefined) entries = `min(${entries}, ${g.window})`;
+      return `${g.bytes_per_entry * kvScale} B × ${entries} (${g.name})`;
+    }).join(" + ");
+    const derived = (value: number | null, formula: string): Cell => ({
+      kind: "derived", value, formula: `${formula}; ${note}`, formula_version: cache.formula_version,
+    });
+    if (key === "kv.growth_per_token")
+      return derived(cache.per_token * kvScale, cache.groups.filter((g) => g.window === undefined)
+        .map((g) => `${g.bytes_per_entry * kvScale} B / ${g.tokens_per_entry} tokens (${g.name})`).join(" + ") || "0 (no global KV)");
+    if (key === "kv.bytes_at_context") return derived(total, totalFormula);
     if (key === "kv.bytes_per_token")
-      return { kind: "derived", value: total / o.ctx, formula: `(${totalFormula}) / ${o.ctx.toLocaleString("en-US")}` };
+      return derived(total / o.ctx, `(${totalFormula}) / ${o.ctx}`);
     if (perB === null) return { kind: "derived", value: null, formula: d.formula };
     if (key === "kv.bytes_at_context_per_active")
-      return { kind: "derived", value: total / perB, formula: `(${totalFormula}) / ${perB}B active` };
-    return { kind: "derived", value: total / o.ctx / perB, formula: `(${totalFormula}) / ${o.ctx.toLocaleString("en-US")} / ${perB}B active` };
+      return derived(total / perB, `(${totalFormula}) / ${perB}B active`);
+    return derived(total / o.ctx / perB, `(${totalFormula}) / ${o.ctx} / ${perB}B active`);
   }
   const f = m.facts[key];
   if (f) return { kind: "fact", ...f };
   const d = m.derived[key];
-  if (d) {
-    if (key.startsWith("kv.") && d.value !== null && kvScale !== 1)
-      return { kind: "derived", value: d.value * kvScale, formula: `${d.formula}, scaled to ${o.kvdt.toUpperCase()}` };
-    return { kind: "derived", ...d };
-  }
+  if (d) return { kind: "derived", ...d };
   if (m.not_disclosed.includes(key)) return { kind: "undisclosed", value: null };
   return undefined;
 }
@@ -151,9 +193,9 @@ export const PRESETS: Record<string, string[]> = {
     "attn.kind", "attn.layout", "attn.swa_ratio", "attn.linear_ratio", "attn.global_layers", "attn.local_layers",
     "attn.long_window_layers", "attn.linear_layers", "attn.heads", "attn.kv_heads", "attn.head_dim", "attn.v_head_dim",
     "attn.kv_lora_rank", "attn.rope_dim", "attn.window", "attn.local_heads", "attn.local_kv_heads",
-    "attn.local_head_dim", "attn.position", "attn.rope_theta", "attn.local_rope_theta", "attn.rope_fraction",
+    "attn.local_head_dim", "attn.local_v_head_dim", "attn.position", "attn.rope_theta", "attn.local_rope_theta", "attn.rope_fraction",
     "attn.qk_norm", "attn.gate", "attn.scale", "attn.sinks", "attn.sparse", "attn.indexer_dim", "attn.kv_sharing",
-    "attn.linear_kind", "kv.bytes_per_token", "kv.growth_per_token", "kv.bytes_per_token_per_active", "kv.bytes_at_context",
+    "attn.linear_kind", "attn.kv_precision", "kv.bytes_per_token", "kv.growth_per_token", "kv.bytes_per_token_per_active", "kv.bytes_at_context",
     "kv.bytes_at_context_per_active", "params.active_prefill",
   ],
   MoE: [

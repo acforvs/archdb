@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-BYTES_BF16 = 2
-
-# Attention types whose cache is not a plain per-token K/V or MLA latent. Without an explicit
-# attn.kv_groups description their KV size is left unknown rather than approximated.
-REQUIRES_EXPLICIT_KV_GROUPS = ("CSA", "HCA", "CSA2")
+from . import kv
 
 
 def value(facts: dict, key: str):
@@ -17,30 +13,6 @@ def value(facts: dict, key: str):
 def number(facts: dict, key: str):
     v = value(facts, key)
     return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
-
-
-def kv_elements(facts: dict) -> tuple[int | None, int | None, str]:
-    """K/V scalars cached per token per layer for (global, sliding-window) layers, plus the formula used."""
-    kinds = str(value(facts, "attn.kind") or "")
-    if any(k in kinds.replace(",", " ").split() for k in REQUIRES_EXPLICIT_KV_GROUPS):
-        return None, None, "compressed attention (not modeled)"
-    indexer = number(facts, "attn.indexer_dim") or 0
-    indexer_note = " + indexer_dim" if indexer else ""
-    latent, rope = number(facts, "attn.kv_lora_rank"), number(facts, "attn.rope_dim")
-    if latent is not None:
-        if rope is None:
-            return None, None, "MLA without rope_dim"
-        # Sliding-window layers of MLA models run the same attention and cache the same latent.
-        return latent + rope + indexer, latent + rope, "MLA: kv_lora_rank + rope_dim" + indexer_note
-    heads, dk = number(facts, "attn.kv_heads"), number(facts, "attn.head_dim")
-    dv = number(facts, "attn.v_head_dim") or dk
-    if heads is None or dk is None:
-        return None, None, "missing kv_heads or head_dim"
-    global_elems = heads * (dk + dv) + indexer
-    local_heads = number(facts, "attn.local_kv_heads") or heads
-    local_dim = number(facts, "attn.local_head_dim")
-    local_elems = local_heads * (2 * local_dim if local_dim else dk + dv)
-    return global_elems, local_elems, "GQA: kv_heads × (head_dim + v_head_dim)" + indexer_note
 
 
 TOLERANCE = 0.05
@@ -121,7 +93,9 @@ def counted(facts: dict, counts: dict | None) -> dict[str, dict]:
 COUNTED = ("params.counted_total", "params.counted_embedding", "params.counted_active_non_embedding")
 
 
-def derive(facts: dict, context: int = 131_072, counts: dict | None = None) -> dict[str, dict]:
+def derive(
+    facts: dict, context: int = 131_072, counts: dict | None = None, kv_dtype: str = "bf16"
+) -> dict[str, dict]:
     out = counted(facts, counts)
     layers, d_model = number(facts, "shape.layers"), number(facts, "shape.d_model")
     if layers and d_model:
@@ -173,19 +147,35 @@ def derive(facts: dict, context: int = 131_072, counts: dict | None = None) -> d
             "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)",
         }
 
-    kv = kv_cache(facts)
-    if isinstance(kv, str):
-        for key in ("kv.growth_per_token", "kv.bytes_per_token", "kv.bytes_at_context"):
-            out[key] = {"value": None, "formula": kv}
+    uniform = kv.cache(facts)
+    sourced = kv.cache(facts, "sourced")
+    selected = (
+        uniform if kv_dtype == "bf16" else sourced if kv_dtype == "sourced" else kv.cache(facts, kv_dtype)
+    )
+    if not isinstance(uniform, str):
+        out["_kv"] = uniform
+        if not isinstance(sourced, str):
+            out["_kv"]["sourced"] = sourced
+    if isinstance(selected, str):
+        keys = ["kv.growth_per_token", "kv.bytes_per_token", "kv.bytes_at_context"]
+        if active:
+            keys += ["kv.bytes_per_token_per_active", "kv.bytes_at_context_per_active"]
+        for key in keys:
+            out[key] = {"value": None, "formula": selected, "formula_version": kv.FORMULA_VERSION}
         return out
-    growth, windows, formula = kv
-    total = kv_at(growth, windows, context)
-    out["_kv"] = {"per_token": growth, "windows": windows}
-    out["kv.growth_per_token"] = {"value": growth, "formula": formula}
+    total = kv.at(selected, context)
+    out["kv.growth_per_token"] = {
+        "value": selected["per_token"],
+        "formula": " + ".join(
+            f"{g['bytes_per_entry']:g} B / {g['tokens_per_entry']} tokens ({g['name']})"
+            for g in selected["groups"]
+            if "window" not in g
+        )
+        or "0 (no global KV)",
+    }
     out["kv.bytes_at_context"] = {
         "value": total,
-        "formula": f"kv.growth_per_token × {context} tokens"
-        + "".join(f" + {b} B × min(context, {w})" for b, w in windows),
+        "formula": kv.context_formula(selected, context),
     }
     out["kv.bytes_per_token"] = {
         "value": total / context,
@@ -200,42 +190,13 @@ def derive(facts: dict, context: int = 131_072, counts: dict | None = None) -> d
             "value": total / (active / 1e9),
             "formula": f"kv.bytes_at_context ({context} tokens) / (params.active / 1e9)",
         }
+    assumption = (
+        "sourced component formats, scales and padding"
+        if kv_dtype == "sourced"
+        else f"uniform {kv_dtype.upper()}, payload only; quantization overhead excluded"
+    )
+    for key, result in out.items():
+        if key.startswith("kv."):
+            result["formula_version"] = kv.FORMULA_VERSION
+            result["formula"] += f"; {assumption}. {selected['formula']}"
     return out
-
-
-def kv_at(per_token: float, windows: list[list[int]], context: int) -> float:
-    """BF16 KV bytes for one sequence: growing part plus sliding-window parts capped at their window."""
-    return per_token * context + sum(b * min(context, w) for b, w in windows)
-
-
-def kv_cache(facts: dict):
-    """(bytes per token, [[bytes per window entry, window], ...], formula), or a reason string."""
-    groups = value(facts, "attn.kv_groups")
-    if groups:
-        per_token, windows, parts = 0.0, [], []
-        for g in groups:
-            b = g["layers"] * g["elements"] * BYTES_BF16
-            if g.get("window"):
-                windows.append([b, g["window"]])
-            else:
-                per_token += b / g.get("tokens_per_entry", 1)
-                parts.append(f"{g['layers']} × {g['elements']} / {g.get('tokens_per_entry', 1)}")
-        return per_token, windows, "attn.kv_groups: (" + " + ".join(parts) + ") elements × 2 bytes"
-    g_elems, l_elems, formula = kv_elements(facts)
-    n_global = number(facts, "attn.global_layers")
-    if g_elems is None:
-        return formula
-    if n_global is None:
-        return "missing attn.global_layers"
-    per_token = n_global * g_elems * BYTES_BF16
-    formula = f"{n_global} global layers × {g_elems} elements × 2 bytes ({formula})"
-    n_local, window = number(facts, "attn.local_layers") or 0, number(facts, "attn.window")
-    n_long, long_window = number(facts, "attn.long_window_layers") or 0, number(facts, "attn.long_window")
-    windows = []
-    if n_local:
-        if window is None or l_elems is None or (n_long and long_window is None):
-            return "sliding-window layers without window"
-        windows.append([(n_local - n_long) * l_elems * BYTES_BF16, window])
-        if n_long:
-            windows.append([n_long * l_elems * BYTES_BF16, long_window])
-    return per_token, windows, formula

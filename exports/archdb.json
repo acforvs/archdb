@@ -310,8 +310,14 @@
    "type": "int",
    "required": "swa",
    "unit": "elements",
-   "label": "SWA head dim",
-   "definition": "Head dimension (K and V) in sliding-window layers (stated even when equal to attn.head_dim)."
+   "label": "SWA QK head dim",
+   "definition": "Query/key head dimension in sliding-window layers. Value head dimensions may differ; see attn.local_v_head_dim."
+  },
+  "attn.local_v_head_dim": {
+   "type": "int",
+   "unit": "elements",
+   "label": "SWA value head dim",
+   "definition": "Value head dimension in sliding-window layers, when separately specified. KV formulas use this value when present, otherwise the explicit global value dimension, or the local QK dimension when no separate value dimension is given."
   },
   "attn.kv_lora_rank": {
    "type": "int",
@@ -435,11 +441,39 @@
     "elements",
     "tokens_per_entry",
     "window",
+    "source",
+    "at",
     "note",
     "quote"
    ],
    "label": "KV cache groups",
-   "definition": "Explicit KV cache description for designs the standard formula cannot express (compressed or shared caches). Each item: name, layers (layers owning this cache), elements (scalars per cache entry, K and V together), tokens_per_entry (compression ratio, 1 if none), window (entries kept, for sliding windows), quote. When present, KV fields are computed from it."
+   "definition": "Cache owners and entry shapes for compressed or shared attention. Each item specifies layers owning the cache, scalar elements per entry (K and V together), tokens_per_entry (compression ratio, default 1), and optionally window (maximum entries retained). Completed compressed entries are floor(context / tokens_per_entry); incomplete compressor state is excluded. KV sizes use these groups when present."
+  },
+  "attn.kv_precision": {
+   "type": "list",
+   "items": [
+    "name",
+    "group",
+    "elements",
+    "bits",
+    "format",
+    "scale_count",
+    "scale_bits",
+    "padding_bytes",
+    "source",
+    "at",
+    "note",
+    "quote"
+   ],
+   "label": "KV storage formats",
+   "aliases": [
+    "FP4 cache",
+    "FP8 cache",
+    "quantization scales",
+    "mixed precision",
+    "sourced storage"
+   ],
+   "definition": "Sourced storage components of attn.kv_groups. Each component names its group and gives elements, bits per element, format, scale_count, scale_bits and padding_bytes per entry. Different parts of one entry can have different formats. Sourced-storage sizes are available only when every group's elements are covered. These are inference-cache formats; they do not establish pretraining precision."
   },
   "attn.conv": {
    "type": "int",
@@ -946,19 +980,20 @@
     "memory"
    ],
    "derived": true,
-   "definition": "BF16 KV cache per token of a sequence at the selected context, kv.bytes_at_context divided by the context (131,072 tokens in exports). Includes sliding-window caches, so for SWA models it falls as context grows. Applies to prefill and decode alike."
+   "definition": "Retained KV cache divided by context length, including bounded SWA caches and indexer keys. Exports use uniform BF16 at 131,072 tokens. The website can select uniform payload precision (no quantization overhead) or sourced component formats (including scales and documented padding). This is cache payload, not peak prefill memory or persistent prefix storage."
   },
   "kv.growth_per_token": {
    "type": "float",
    "unit": "bytes",
-   "label": "KV growth / token",
+   "label": "Global KV bytes / token",
    "aliases": [
     "kv cache",
     "marginal",
-    "asymptotic"
+    "asymptotic",
+    "growth"
    ],
    "derived": true,
-   "definition": "BF16 KV-cache bytes added per additional token once sliding windows are full, i.e. global layers and sparse-attention indexer keys only. The limit of kv.bytes_per_token at long context."
+   "definition": "Long-context global KV bytes per token, including indexer keys; excludes bounded SWA caches. Compression rates and cross-layer cache reuse are included. Exports use uniform BF16; the website's storage selector also applies here. This is the field to compare with global-KV figures in reports, using the matching storage recipe."
   },
   "kv.bytes_per_token_per_active": {
    "type": "float",
@@ -992,7 +1027,7 @@
     "memory"
    ],
    "derived": true,
-   "definition": "BF16 KV cache for one sequence at the selected context (131,072 tokens in exports), including sliding-window layers capped at their window and indexer keys. Excludes recurrent state, MTP or draft layers and compressor tail state."
+   "definition": "Retained KV cache for one sequence at the selected context, including SWA windows and indexer keys. Exports use uniform BF16 at 131,072 tokens. Excludes recurrent state, compressor tail state, draft/MTP caches, temporary prefill tensors, allocator metadata and persistent prefix snapshots. Does not estimate peak prefill or total serving memory."
   },
   "eval.aa_index": {
    "type": "float",
@@ -1650,29 +1685,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 327680,
-     "formula": "80 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 327680.0,
+     "formula": "327680 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 42949672960,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 42949672960.0,
+     "formula": "327680 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 327680.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 4681.142857142857,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 613566756.5714285,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 327680,
-    "windows": []
+    "per_token": 327680.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 327680.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 80 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -2180,29 +2229,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 85888,
-     "formula": "61 global layers × 704 elements × 2 bytes (MLA: kv_lora_rank + rope_dim + indexer_dim)"
+     "value": 85888.0,
+     "formula": "85888 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 11257511936,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 11257511936.0,
+     "formula": "85888 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 85888.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2602.6666666666665,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 341136725.3333333,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 85888,
-    "windows": []
+    "per_token": 85888.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 85888.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 61 × (704 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -2630,34 +2693,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 36864,
-     "formula": "9 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 36864.0,
+     "formula": "36864 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (2048 × 16/8) B/entry; SWA KV: 43 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 4922015744,
-     "formula": "kv.growth_per_token × 131072 tokens + 176128 B × min(context, 512)"
+     "value": 4922015744.0,
+     "formula": "36864 B × 131072 (Global KV) + 176128 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (2048 × 16/8) B/entry; SWA KV: 43 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 37552.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (2048 × 16/8) B/entry; SWA KV: 43 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1604.786324786325,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (2048 × 16/8) B/entry; SWA KV: 43 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 210342553.16239318,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (2048 × 16/8) B/entry; SWA KV: 43 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 36864,
+    "per_token": 36864.0,
     "windows": [
      [
-      176128,
+      176128.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 36864.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 176128.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 9 × (2048 × 16/8) B/entry; SWA KV: 43 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -2999,34 +3082,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 32768,
-     "formula": "8 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 32768.0,
+     "formula": "32768 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (2048 × 16/8) B/entry; SWA KV: 24 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 4697620480,
-     "formula": "kv.growth_per_token × 131072 tokens + 98304 B × min(context, 4096)"
+     "value": 4697620480.0,
+     "formula": "32768 B × 131072 (Global KV) + 98304 B × min(131072, 4096) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (2048 × 16/8) B/entry; SWA KV: 24 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 35840.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (2048 × 16/8) B/entry; SWA KV: 24 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1433.6,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (2048 × 16/8) B/entry; SWA KV: 24 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 187904819.2,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (2048 × 16/8) B/entry; SWA KV: 24 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 32768,
+    "per_token": 32768.0,
     "windows": [
      [
-      98304,
+      98304.0,
       4096
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 32768.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 98304.0,
+      "tokens_per_entry": 1,
+      "window": 4096
+     }
+    ],
+    "formula": "Global KV: 8 × (2048 × 16/8) B/entry; SWA KV: 24 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -3597,29 +3700,43 @@
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
     },
     "kv.growth_per_token": {
-     "value": 70272,
-     "formula": "61 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 70272.0,
+     "formula": "70272 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 9210691584,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 9210691584.0,
+     "formula": "70272 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 70272.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1899.2432432432433,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 248937610.3783784,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 70272,
-    "windows": []
+    "per_token": 70272.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 70272.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 61 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -3631,6 +3748,10 @@
    "weights": "open",
    "note": "Post-trained release; the card names deepseek-ai/DeepSeek-V3.2-Exp-Base as its base. Recipe facts cover the DSA continued pre-training from a DeepSeek-V3.1-Terminus base checkpoint (already extended to 128K).",
    "sources": {
+    "flashmla-cache": {
+     "url": "https://raw.githubusercontent.com/deepseek-ai/FlashMLA/07a1089857b63e74e3133630c02b083b75e8d4b2/README.md",
+     "kind": "code"
+    },
     "config": {
      "url": "https://huggingface.co/deepseek-ai/DeepSeek-V3.2/resolve/a7e62ac04ecb2c0a54d736dc46601c5606cf10a6/config.json",
      "kind": "config"
@@ -3745,6 +3866,69 @@
      "source": "config",
      "at": "/index_head_dim",
      "note": "One indexer key per token per layer (Indexer.wk projects dim to index_head_dim; k_cache stored FP8 with per-128 scales); /index_n_heads 64 query heads, /index_topk 2048."
+    },
+    "attn.kv_groups": {
+     "value": [
+      {
+       "name": "MLA latent",
+       "layers": 61,
+       "elements": 512,
+       "quote": "self.register_buffer(\"kv_cache\", torch.zeros(args.max_batch_size, args.max_seq_len, self.kv_lora_rank), persistent=False)"
+      },
+      {
+       "name": "RoPE key",
+       "layers": 61,
+       "elements": 64,
+       "quote": "self.register_buffer(\"pe_cache\", torch.zeros(args.max_batch_size, args.max_seq_len, self.qk_rope_head_dim), persistent=False)"
+      },
+      {
+       "name": "DSA indexer key",
+       "layers": 61,
+       "elements": 128,
+       "quote": "self.register_buffer(\"k_cache\", torch.zeros(args.max_batch_size, args.max_seq_len, self.head_dim, dtype=torch.float8_e4m3fn), persistent=False)"
+      }
+     ],
+     "source": "inference-model",
+     "at": "inference/model.py; MLA.__init__ lines 541–542 and Indexer.__init__ lines 453–454"
+    },
+    "attn.kv_precision": {
+     "value": [
+      {
+       "name": "MLA latent",
+       "group": "MLA latent",
+       "elements": 512,
+       "bits": 8,
+       "format": "FP8 E4M3; FP32 scales per 128 channels",
+       "scale_count": 4,
+       "scale_bits": 32,
+       "at": "README.md; V3.2 layout: 512 quantized latent bytes + 16 scale bytes",
+       "quote": "Next 16 bytes: Scale factors, containing 4 `float32` values."
+      },
+      {
+       "name": "RoPE key",
+       "group": "RoPE key",
+       "elements": 64,
+       "bits": 16,
+       "format": "BF16",
+       "at": "README.md; V3.2 unquantized RoPE key",
+       "quote": "Last 128 bytes: The \"RoPE\" part, containing 64 `bfloat16` values."
+      },
+      {
+       "name": "DSA indexer key",
+       "group": "DSA indexer key",
+       "elements": 128,
+       "bits": 8,
+       "format": "FP8 E4M3; one FP32 scale",
+       "scale_count": 1,
+       "scale_bits": 32,
+       "source": "inference-model",
+       "at": "inference/model.py lines 15, 453–454; block_size 128",
+       "quote": "self.register_buffer(\"k_scale_cache\", torch.zeros(args.max_batch_size, args.max_seq_len, self.head_dim // block_size, dtype=torch.float32), persistent=False)"
+      }
+     ],
+     "source": "flashmla-cache",
+     "at": "README.md; MLA Decoding / FP8 KV Cache; per-entry storage layouts",
+     "note": "Serving layout: each layer retains 656 bytes of main MLA KV and 132 bytes of indexer K per token. 61 × (656 + 132) = 48,068 bytes/token, matching DeepSeek-V4.1 report p.1 Figure 1(b). The reference model simulates main-latent FP8 then retains BF16 buffers; this fact describes the packed FlashMLA serving layout."
     },
     "attn.qk_norm": {
      "value": false,
@@ -4019,29 +4203,76 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 85888,
-     "formula": "61 global layers × 704 elements × 2 bytes (MLA: kv_lora_rank + rope_dim + indexer_dim)"
+     "value": 85888.0,
+     "formula": "62464 B / 1 tokens (MLA latent) + 7808 B / 1 tokens (RoPE key) + 15616 B / 1 tokens (DSA indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent: 61 × (512 × 16/8) B/entry; RoPE key: 61 × (64 × 16/8) B/entry; DSA indexer key: 61 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 11257511936,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 11257511936.0,
+     "formula": "62464 B × 131072 (MLA latent) + 7808 B × 131072 (RoPE key) + 15616 B × 131072 (DSA indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent: 61 × (512 × 16/8) B/entry; RoPE key: 61 × (64 × 16/8) B/entry; DSA indexer key: 61 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 85888.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. MLA latent: 61 × (512 × 16/8) B/entry; RoPE key: 61 × (64 × 16/8) B/entry; DSA indexer key: 61 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2321.2972972972975,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent: 61 × (512 × 16/8) B/entry; RoPE key: 61 × (64 × 16/8) B/entry; DSA indexer key: 61 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 304257079.3513514,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent: 61 × (512 × 16/8) B/entry; RoPE key: 61 × (64 × 16/8) B/entry; DSA indexer key: 61 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 85888,
-    "windows": []
+    "per_token": 85888.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "MLA latent",
+      "bytes_per_entry": 62464.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "RoPE key",
+      "bytes_per_entry": 7808.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "DSA indexer key",
+      "bytes_per_entry": 15616.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "MLA latent: 61 × (512 × 16/8) B/entry; RoPE key: 61 × (64 × 16/8) B/entry; DSA indexer key: 61 × (128 × 16/8) B/entry",
+    "formula_version": "kv-2",
+    "sourced": {
+     "per_token": 48068.0,
+     "windows": [],
+     "groups": [
+      {
+       "name": "MLA latent",
+       "bytes_per_entry": 32208.0,
+       "tokens_per_entry": 1
+      },
+      {
+       "name": "RoPE key",
+       "bytes_per_entry": 7808.0,
+       "tokens_per_entry": 1
+      },
+      {
+       "name": "DSA indexer key",
+       "bytes_per_entry": 8052.0,
+       "tokens_per_entry": 1
+      }
+     ],
+     "formula": "MLA latent: 61 × (ceil(512 × 8/8) + 4 × 32/8 scales) B/entry; RoPE key: 61 × (ceil(64 × 16/8)) B/entry; DSA indexer key: 61 × (ceil(128 × 8/8) + 1 × 32/8 scales) B/entry",
+     "formula_version": "kv-2"
+    }
    }
   },
   {
@@ -4053,6 +4284,14 @@
    "weights": "open",
    "note": null,
    "sources": {
+    "inference-kernel": {
+     "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash/resolve/60d8d70770c6776ff598c94bb586a859a38244f1/inference/kernel.py",
+     "kind": "code"
+    },
+    "flashmla-cache": {
+     "url": "https://raw.githubusercontent.com/deepseek-ai/FlashMLA/07a1089857b63e74e3133630c02b083b75e8d4b2/README.md",
+     "kind": "code"
+    },
     "config": {
      "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-Base/resolve/8855555deef230a27a21a8d6f294b7b7497759b6/config.json",
      "kind": "config"
@@ -4223,6 +4462,88 @@
      "source": "report",
      "at": "p.24 §4.2.1",
      "quote": "For the first two layers, we use pure sliding window attention. For the subsequent layers, CSA and HCA are used in an interleaved manner."
+    },
+    "attn.kv_precision": {
+     "value": [
+      {
+       "name": "CSA main KV NoPE",
+       "group": "CSA main KV",
+       "elements": 448,
+       "bits": 8,
+       "format": "FP8 E4M3; E8M0 scales per 64 channels",
+       "scale_count": 7,
+       "scale_bits": 8,
+       "padding_bytes": 1,
+       "at": "README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte",
+       "quote": "The scale row is 8 Bytes"
+      },
+      {
+       "name": "CSA main KV RoPE",
+       "group": "CSA main KV",
+       "elements": 64,
+       "bits": 16,
+       "format": "BF16",
+       "at": "README.md; V4 layout: 128 RoPE bytes",
+       "quote": "the 64 `bfloat16` RoPE values (not quantized)"
+      },
+      {
+       "name": "HCA main KV NoPE",
+       "group": "HCA main KV",
+       "elements": 448,
+       "bits": 8,
+       "format": "FP8 E4M3; E8M0 scales per 64 channels",
+       "scale_count": 7,
+       "scale_bits": 8,
+       "padding_bytes": 1,
+       "at": "README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte",
+       "quote": "The scale row is 8 Bytes"
+      },
+      {
+       "name": "HCA main KV RoPE",
+       "group": "HCA main KV",
+       "elements": 64,
+       "bits": 16,
+       "format": "BF16",
+       "at": "README.md; V4 layout: 128 RoPE bytes",
+       "quote": "the 64 `bfloat16` RoPE values (not quantized)"
+      },
+      {
+       "name": "SWA window NoPE",
+       "group": "SWA window",
+       "elements": 448,
+       "bits": 8,
+       "format": "FP8 E4M3; E8M0 scales per 64 channels",
+       "scale_count": 7,
+       "scale_bits": 8,
+       "padding_bytes": 1,
+       "at": "README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte",
+       "quote": "The scale row is 8 Bytes"
+      },
+      {
+       "name": "SWA window RoPE",
+       "group": "SWA window",
+       "elements": 64,
+       "bits": 16,
+       "format": "BF16",
+       "at": "README.md; V4 layout: 128 RoPE bytes",
+       "quote": "the 64 `bfloat16` RoPE values (not quantized)"
+      },
+      {
+       "name": "CSA indexer key",
+       "group": "CSA indexer K",
+       "elements": 128,
+       "bits": 4,
+       "format": "MXFP4 E2M1; E8M0 scales per 32 channels",
+       "scale_count": 4,
+       "scale_bits": 8,
+       "source": "inference-kernel",
+       "at": "inference/kernel.py; fp4_act_quant, default block_size 32",
+       "quote": "s = z.new_empty(*z.size()[:-1], N // block_size, dtype=torch.float8_e8m0fnu)"
+      }
+     ],
+     "source": "flashmla-cache",
+     "at": "README.md; MLA Decoding / FP8 KV Cache; per-entry storage layouts",
+     "note": "Serving layout from the official FlashMLA kernels and post-training FP4 indexer QAT; main KV keeps the RoPE tail in BF16. Each main/SWA entry is 584 bytes, each indexer entry 68 bytes. This serving recipe is documented for the post-trained V4-Flash sibling; it does not establish FP4 QAT of the base checkpoint."
     },
     "attn.kv_heads": {
      "value": 1,
@@ -4651,33 +4972,97 @@
     },
     "kv.growth_per_token": {
      "value": 6880.0,
-     "formula": "attn.kv_groups: (21 × 512 / 4 + 21 × 128 / 4 + 20 × 512 / 128) elements × 2 bytes"
+     "formula": "21504 B / 4 tokens (CSA main KV) + 5376 B / 4 tokens (CSA indexer K) + 20480 B / 128 tokens (HCA main KV); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 21 × (512 × 16/8) B/entry; CSA indexer K: 21 × (128 × 16/8) B/entry; HCA main KV: 20 × (512 × 16/8) B/entry; SWA window: 43 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
      "value": 907411456.0,
-     "formula": "kv.growth_per_token × 131072 tokens + 44032 B × min(context, 128)"
+     "formula": "21504 B × floor(131072 / 4) (CSA main KV) + 5376 B × floor(131072 / 4) (CSA indexer K) + 20480 B × floor(131072 / 128) (HCA main KV) + 44032 B × min(131072, 128) (SWA window); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 21 × (512 × 16/8) B/entry; CSA indexer K: 21 × (128 × 16/8) B/entry; HCA main KV: 20 × (512 × 16/8) B/entry; SWA window: 43 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 6923.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. CSA main KV: 21 × (512 × 16/8) B/entry; CSA indexer K: 21 × (128 × 16/8) B/entry; HCA main KV: 20 × (512 × 16/8) B/entry; SWA window: 43 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 532.5384615384615,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 21 × (512 × 16/8) B/entry; CSA indexer K: 21 × (128 × 16/8) B/entry; HCA main KV: 20 × (512 × 16/8) B/entry; SWA window: 43 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 69800881.23076923,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 21 × (512 × 16/8) B/entry; CSA indexer K: 21 × (128 × 16/8) B/entry; HCA main KV: 20 × (512 × 16/8) B/entry; SWA window: 43 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
     "per_token": 6880.0,
     "windows": [
      [
-      44032,
+      44032.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "CSA main KV",
+      "bytes_per_entry": 21504.0,
+      "tokens_per_entry": 4
+     },
+     {
+      "name": "CSA indexer K",
+      "bytes_per_entry": 5376.0,
+      "tokens_per_entry": 4
+     },
+     {
+      "name": "HCA main KV",
+      "bytes_per_entry": 20480.0,
+      "tokens_per_entry": 128
+     },
+     {
+      "name": "SWA window",
+      "bytes_per_entry": 44032.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "CSA main KV: 21 × (512 × 16/8) B/entry; CSA indexer K: 21 × (128 × 16/8) B/entry; HCA main KV: 20 × (512 × 16/8) B/entry; SWA window: 43 × (512 × 16/8) B/entry",
+    "formula_version": "kv-2",
+    "sourced": {
+     "per_token": 3514.25,
+     "windows": [
+      [
+       25112.0,
+       128
+      ]
+     ],
+     "groups": [
+      {
+       "name": "CSA main KV",
+       "bytes_per_entry": 12264.0,
+       "tokens_per_entry": 4
+      },
+      {
+       "name": "CSA indexer K",
+       "bytes_per_entry": 1428.0,
+       "tokens_per_entry": 4
+      },
+      {
+       "name": "HCA main KV",
+       "bytes_per_entry": 11680.0,
+       "tokens_per_entry": 128
+      },
+      {
+       "name": "SWA window",
+       "bytes_per_entry": 25112.0,
+       "tokens_per_entry": 1,
+       "window": 128
+      }
+     ],
+     "formula": "CSA main KV: 21 × (ceil(448 × 8/8) + 7 × 8/8 scales + 1 padding + ceil(64 × 16/8)) B/entry; CSA indexer K: 21 × (ceil(128 × 4/8) + 4 × 8/8 scales) B/entry; HCA main KV: 20 × (ceil(448 × 8/8) + 7 × 8/8 scales + 1 padding + ceil(64 × 16/8)) B/entry; SWA window: 43 × (ceil(448 × 8/8) + 7 × 8/8 scales + 1 padding + ceil(64 × 16/8)) B/entry",
+     "formula_version": "kv-2"
+    }
    }
   },
   {
@@ -4689,6 +5074,14 @@
    "weights": "open",
    "note": null,
    "sources": {
+    "inference-kernel": {
+     "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/inference/kernel.py",
+     "kind": "code"
+    },
+    "flashmla-cache": {
+     "url": "https://raw.githubusercontent.com/deepseek-ai/FlashMLA/07a1089857b63e74e3133630c02b083b75e8d4b2/README.md",
+     "kind": "code"
+    },
     "config": {
      "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/resolve/b5968e9190ef611bbf34a7229255be88a0e937c1/config.json",
      "kind": "config"
@@ -4843,6 +5236,88 @@
      ],
      "source": "inference-model",
      "at": "inference/model.py; Attention.__init__, Attention.forward, Indexer.__init__"
+    },
+    "attn.kv_precision": {
+     "value": [
+      {
+       "name": "CSA main KV NoPE",
+       "group": "CSA main KV",
+       "elements": 448,
+       "bits": 8,
+       "format": "FP8 E4M3; E8M0 scales per 64 channels",
+       "scale_count": 7,
+       "scale_bits": 8,
+       "padding_bytes": 1,
+       "at": "README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte",
+       "quote": "The scale row is 8 Bytes"
+      },
+      {
+       "name": "CSA main KV RoPE",
+       "group": "CSA main KV",
+       "elements": 64,
+       "bits": 16,
+       "format": "BF16",
+       "at": "README.md; V4 layout: 128 RoPE bytes",
+       "quote": "the 64 `bfloat16` RoPE values (not quantized)"
+      },
+      {
+       "name": "HCA main KV NoPE",
+       "group": "HCA main KV",
+       "elements": 448,
+       "bits": 8,
+       "format": "FP8 E4M3; E8M0 scales per 64 channels",
+       "scale_count": 7,
+       "scale_bits": 8,
+       "padding_bytes": 1,
+       "at": "README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte",
+       "quote": "The scale row is 8 Bytes"
+      },
+      {
+       "name": "HCA main KV RoPE",
+       "group": "HCA main KV",
+       "elements": 64,
+       "bits": 16,
+       "format": "BF16",
+       "at": "README.md; V4 layout: 128 RoPE bytes",
+       "quote": "the 64 `bfloat16` RoPE values (not quantized)"
+      },
+      {
+       "name": "SWA window NoPE",
+       "group": "SWA window",
+       "elements": 448,
+       "bits": 8,
+       "format": "FP8 E4M3; E8M0 scales per 64 channels",
+       "scale_count": 7,
+       "scale_bits": 8,
+       "padding_bytes": 1,
+       "at": "README.md; V4 layout: 448 NoPE bytes, 7 scale bytes and 1 padding byte",
+       "quote": "The scale row is 8 Bytes"
+      },
+      {
+       "name": "SWA window RoPE",
+       "group": "SWA window",
+       "elements": 64,
+       "bits": 16,
+       "format": "BF16",
+       "at": "README.md; V4 layout: 128 RoPE bytes",
+       "quote": "the 64 `bfloat16` RoPE values (not quantized)"
+      },
+      {
+       "name": "CSA indexer key",
+       "group": "CSA indexer K",
+       "elements": 128,
+       "bits": 4,
+       "format": "MXFP4 E2M1; E8M0 scales per 32 channels",
+       "scale_count": 4,
+       "scale_bits": 8,
+       "source": "inference-kernel",
+       "at": "inference/kernel.py; fp4_act_quant, default block_size 32",
+       "quote": "s = z.new_empty(*z.size()[:-1], N // block_size, dtype=torch.float8_e8m0fnu)"
+      }
+     ],
+     "source": "flashmla-cache",
+     "at": "README.md; MLA Decoding / FP8 KV Cache; per-entry storage layouts",
+     "note": "Serving layout from the official FlashMLA kernels and post-training FP4 indexer QAT; main KV keeps the RoPE tail in BF16. Each main/SWA entry is 584 bytes, each indexer entry 68 bytes."
     },
     "attn.kv_heads": {
      "value": 1,
@@ -5260,33 +5735,97 @@
     },
     "kv.growth_per_token": {
      "value": 9848.0,
-     "formula": "attn.kv_groups: (30 × 512 / 4 + 30 × 128 / 4 + 31 × 512 / 128) elements × 2 bytes"
+     "formula": "30720 B / 4 tokens (CSA main KV) + 7680 B / 4 tokens (CSA indexer K) + 31744 B / 128 tokens (HCA main KV); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 30 × (512 × 16/8) B/entry; CSA indexer K: 30 × (128 × 16/8) B/entry; HCA main KV: 31 × (512 × 16/8) B/entry; SWA window: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
      "value": 1298792448.0,
-     "formula": "kv.growth_per_token × 131072 tokens + 62464 B × min(context, 128)"
+     "formula": "30720 B × floor(131072 / 4) (CSA main KV) + 7680 B × floor(131072 / 4) (CSA indexer K) + 31744 B × floor(131072 / 128) (HCA main KV) + 62464 B × min(131072, 128) (SWA window); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 30 × (512 × 16/8) B/entry; CSA indexer K: 30 × (128 × 16/8) B/entry; HCA main KV: 31 × (512 × 16/8) B/entry; SWA window: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 9909.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. CSA main KV: 30 × (512 × 16/8) B/entry; CSA indexer K: 30 × (128 × 16/8) B/entry; HCA main KV: 31 × (512 × 16/8) B/entry; SWA window: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 202.22448979591837,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 30 × (512 × 16/8) B/entry; CSA indexer K: 30 × (128 × 16/8) B/entry; HCA main KV: 31 × (512 × 16/8) B/entry; SWA window: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 26505968.326530613,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. CSA main KV: 30 × (512 × 16/8) B/entry; CSA indexer K: 30 × (128 × 16/8) B/entry; HCA main KV: 31 × (512 × 16/8) B/entry; SWA window: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
     "per_token": 9848.0,
     "windows": [
      [
-      62464,
+      62464.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "CSA main KV",
+      "bytes_per_entry": 30720.0,
+      "tokens_per_entry": 4
+     },
+     {
+      "name": "CSA indexer K",
+      "bytes_per_entry": 7680.0,
+      "tokens_per_entry": 4
+     },
+     {
+      "name": "HCA main KV",
+      "bytes_per_entry": 31744.0,
+      "tokens_per_entry": 128
+     },
+     {
+      "name": "SWA window",
+      "bytes_per_entry": 62464.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "CSA main KV: 30 × (512 × 16/8) B/entry; CSA indexer K: 30 × (128 × 16/8) B/entry; HCA main KV: 31 × (512 × 16/8) B/entry; SWA window: 61 × (512 × 16/8) B/entry",
+    "formula_version": "kv-2",
+    "sourced": {
+     "per_token": 5031.4375,
+     "windows": [
+      [
+       35624.0,
+       128
+      ]
+     ],
+     "groups": [
+      {
+       "name": "CSA main KV",
+       "bytes_per_entry": 17520.0,
+       "tokens_per_entry": 4
+      },
+      {
+       "name": "CSA indexer K",
+       "bytes_per_entry": 2040.0,
+       "tokens_per_entry": 4
+      },
+      {
+       "name": "HCA main KV",
+       "bytes_per_entry": 18104.0,
+       "tokens_per_entry": 128
+      },
+      {
+       "name": "SWA window",
+       "bytes_per_entry": 35624.0,
+       "tokens_per_entry": 1,
+       "window": 128
+      }
+     ],
+     "formula": "CSA main KV: 30 × (ceil(448 × 8/8) + 7 × 8/8 scales + 1 padding + ceil(64 × 16/8)) B/entry; CSA indexer K: 30 × (ceil(128 × 4/8) + 4 × 8/8 scales) B/entry; HCA main KV: 31 × (ceil(448 × 8/8) + 7 × 8/8 scales + 1 padding + ceil(64 × 16/8)) B/entry; SWA window: 61 × (ceil(448 × 8/8) + 7 × 8/8 scales + 1 padding + ceil(64 × 16/8)) B/entry",
+     "formula_version": "kv-2"
+    }
    }
   },
   {
@@ -5298,6 +5837,10 @@
    "weights": "open",
    "note": "No base checkpoint is public; facts describe the released post-trained checkpoint. Recipe facts are from the technical report.",
    "sources": {
+    "flashmla-cache": {
+     "url": "https://raw.githubusercontent.com/deepseek-ai/FlashMLA/07a1089857b63e74e3133630c02b083b75e8d4b2/README.md",
+     "kind": "code"
+    },
     "config": {
      "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/314113f8a7dadb388215396ba5fbee2c610a04d6/config.json",
      "kind": "config"
@@ -5501,6 +6044,70 @@
      "source": "report",
      "at": "p.7 Figure 3",
      "quote": "The first two encoder layers use sliding window attention (SWA); the rest use Compressed Sparse Attention 2 (CSA2)"
+    },
+    "attn.kv_precision": {
+     "value": [
+      {
+       "name": "encoder main KV (m=2)",
+       "group": "encoder main KV (m=2)",
+       "elements": 512,
+       "bits": 4,
+       "format": "FP4 E2M1; E4M3 scales per 16 channels",
+       "scale_count": 32,
+       "scale_bits": 8,
+       "at": "README.md; V4.1 fp4 layout: 256 data bytes + 32 scale bytes",
+       "quote": "The scale row is 32 Bytes of `float8_e4m3`"
+      },
+      {
+       "name": "decoder main KV (m=1)",
+       "group": "decoder main KV (m=1)",
+       "elements": 512,
+       "bits": 4,
+       "format": "FP4 E2M1; E4M3 scales per 16 channels",
+       "scale_count": 32,
+       "scale_bits": 8,
+       "at": "README.md; V4.1 fp4 layout: 256 data bytes + 32 scale bytes",
+       "quote": "The scale row is 32 Bytes of `float8_e4m3`"
+      },
+      {
+       "name": "encoder indexer K (m=2)",
+       "group": "encoder indexer K (m=2)",
+       "elements": 128,
+       "bits": 4,
+       "format": "MXFP4 E2M1; E8M0 scales per 32 channels",
+       "scale_count": 4,
+       "scale_bits": 8,
+       "source": "inference-model",
+       "at": "inference/model.py lines 28–30, 546; fp4_act_quant(k, fp4_block_size, True)",
+       "quote": "fp4_block_size = 32"
+      },
+      {
+       "name": "decoder indexer K (m=1)",
+       "group": "decoder indexer K (m=1)",
+       "elements": 128,
+       "bits": 4,
+       "format": "MXFP4 E2M1; E8M0 scales per 32 channels",
+       "scale_count": 4,
+       "scale_bits": 8,
+       "source": "inference-model",
+       "at": "inference/model.py lines 28–30, 546; fp4_act_quant(k, fp4_block_size, True)",
+       "quote": "fp4_block_size = 32"
+      },
+      {
+       "name": "SWA window",
+       "group": "SWA window",
+       "elements": 512,
+       "bits": 8,
+       "format": "FP8 E4M3; E8M0 scales per 32 channels",
+       "scale_count": 16,
+       "scale_bits": 8,
+       "at": "README.md; V4.1 FP8 layout: 512 data bytes + 16 scale bytes",
+       "quote": "The scale row is 16 Bytes of `float8_e8m0`"
+      }
+     ],
+     "source": "flashmla-cache",
+     "at": "README.md; MLA Decoding / FP8 KV Cache; per-entry storage layouts",
+     "note": "Post-training/serving recipe, not pretraining precision. Main KV: 288 bytes/entry; indexer K: 68; SWA: 528. Global growth = (3/2 + 1) × (288 + 68) = 890 bytes/token, matching report p.1 Figure 1(b). The finite SWA rings are additional runtime cache, not part of that global figure. FP4 main-cache QAT is introduced in post-training (§2.4.4)."
     },
     "attn.kv_heads": {
      "value": 1,
@@ -5879,33 +6486,107 @@
     },
     "kv.growth_per_token": {
      "value": 3200.0,
-     "formula": "attn.kv_groups: (3 × 512 / 2 + 3 × 128 / 2 + 1 × 512 / 1 + 1 × 128 / 1) elements × 2 bytes"
+     "formula": "3072 B / 2 tokens (encoder main KV (m=2)) + 768 B / 2 tokens (encoder indexer K (m=2)) + 1024 B / 1 tokens (decoder main KV (m=1)) + 256 B / 1 tokens (decoder indexer K (m=1)); uniform BF16, payload only; quantization overhead excluded. encoder main KV (m=2): 3 × (512 × 16/8) B/entry; encoder indexer K (m=2): 3 × (128 × 16/8) B/entry; decoder main KV (m=1): 1 × (512 × 16/8) B/entry; decoder indexer K (m=1): 1 × (128 × 16/8) B/entry; SWA window: 40 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
      "value": 424673280.0,
-     "formula": "kv.growth_per_token × 131072 tokens + 40960 B × min(context, 128)"
+     "formula": "3072 B × floor(131072 / 2) (encoder main KV (m=2)) + 768 B × floor(131072 / 2) (encoder indexer K (m=2)) + 1024 B × 131072 (decoder main KV (m=1)) + 256 B × 131072 (decoder indexer K (m=1)) + 40960 B × min(131072, 128) (SWA window); uniform BF16, payload only; quantization overhead excluded. encoder main KV (m=2): 3 × (512 × 16/8) B/entry; encoder indexer K (m=2): 3 × (128 × 16/8) B/entry; decoder main KV (m=1): 1 × (512 × 16/8) B/entry; decoder indexer K (m=1): 1 × (128 × 16/8) B/entry; SWA window: 40 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 3240.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. encoder main KV (m=2): 3 × (512 × 16/8) B/entry; encoder indexer K (m=2): 3 × (128 × 16/8) B/entry; decoder main KV (m=1): 1 × (512 × 16/8) B/entry; decoder indexer K (m=1): 1 × (128 × 16/8) B/entry; SWA window: 40 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 202.5,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. encoder main KV (m=2): 3 × (512 × 16/8) B/entry; encoder indexer K (m=2): 3 × (128 × 16/8) B/entry; decoder main KV (m=1): 1 × (512 × 16/8) B/entry; decoder indexer K (m=1): 1 × (128 × 16/8) B/entry; SWA window: 40 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 26542080.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. encoder main KV (m=2): 3 × (512 × 16/8) B/entry; encoder indexer K (m=2): 3 × (128 × 16/8) B/entry; decoder main KV (m=1): 1 × (512 × 16/8) B/entry; decoder indexer K (m=1): 1 × (128 × 16/8) B/entry; SWA window: 40 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
     "per_token": 3200.0,
     "windows": [
      [
-      40960,
+      40960.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "encoder main KV (m=2)",
+      "bytes_per_entry": 3072.0,
+      "tokens_per_entry": 2
+     },
+     {
+      "name": "encoder indexer K (m=2)",
+      "bytes_per_entry": 768.0,
+      "tokens_per_entry": 2
+     },
+     {
+      "name": "decoder main KV (m=1)",
+      "bytes_per_entry": 1024.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "decoder indexer K (m=1)",
+      "bytes_per_entry": 256.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA window",
+      "bytes_per_entry": 40960.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "encoder main KV (m=2): 3 × (512 × 16/8) B/entry; encoder indexer K (m=2): 3 × (128 × 16/8) B/entry; decoder main KV (m=1): 1 × (512 × 16/8) B/entry; decoder indexer K (m=1): 1 × (128 × 16/8) B/entry; SWA window: 40 × (512 × 16/8) B/entry",
+    "formula_version": "kv-2",
+    "sourced": {
+     "per_token": 890.0,
+     "windows": [
+      [
+       21120.0,
+       128
+      ]
+     ],
+     "groups": [
+      {
+       "name": "encoder main KV (m=2)",
+       "bytes_per_entry": 864.0,
+       "tokens_per_entry": 2
+      },
+      {
+       "name": "encoder indexer K (m=2)",
+       "bytes_per_entry": 204.0,
+       "tokens_per_entry": 2
+      },
+      {
+       "name": "decoder main KV (m=1)",
+       "bytes_per_entry": 288.0,
+       "tokens_per_entry": 1
+      },
+      {
+       "name": "decoder indexer K (m=1)",
+       "bytes_per_entry": 68.0,
+       "tokens_per_entry": 1
+      },
+      {
+       "name": "SWA window",
+       "bytes_per_entry": 21120.0,
+       "tokens_per_entry": 1,
+       "window": 128
+      }
+     ],
+     "formula": "encoder main KV (m=2): 3 × (ceil(512 × 4/8) + 32 × 8/8 scales) B/entry; encoder indexer K (m=2): 3 × (ceil(128 × 4/8) + 4 × 8/8 scales) B/entry; decoder main KV (m=1): 1 × (ceil(512 × 4/8) + 32 × 8/8 scales) B/entry; decoder indexer K (m=1): 1 × (ceil(128 × 4/8) + 4 × 8/8 scales) B/entry; SWA window: 40 × (ceil(512 × 8/8) + 16 × 8/8 scales) B/entry",
+     "formula_version": "kv-2"
+    }
    }
   },
   {
@@ -6308,34 +6989,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 20480,
-     "formula": "5 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 20480.0,
+     "formula": "20480 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 5 × (2048 × 16/8) B/entry; SWA KV: 25 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 2894069760,
-     "formula": "kv.growth_per_token × 131072 tokens + 204800 B × min(context, 1024)"
+     "value": 2894069760.0,
+     "formula": "20480 B × 131072 (Global KV) + 204800 B × min(131072, 1024) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 5 × (2048 × 16/8) B/entry; SWA KV: 25 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 22080.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 5 × (2048 × 16/8) B/entry; SWA KV: 25 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 5810.526315789474,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 5 × (2048 × 16/8) B/entry; SWA KV: 25 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 761597305.263158,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 5 × (2048 × 16/8) B/entry; SWA KV: 25 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 20480,
+    "per_token": 20480.0,
     "windows": [
      [
-      204800,
+      204800.0,
       1024
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 20480.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 204800.0,
+      "tokens_per_entry": 1,
+      "window": 1024
+     }
+    ],
+    "formula": "Global KV: 5 × (2048 × 16/8) B/entry; SWA KV: 25 × (4096 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -6687,34 +7388,54 @@
      "formula": "attn.local_layers / attn.global_layers"
     },
     "kv.growth_per_token": {
-     "value": 81920,
-     "formula": "10 global layers × 4096 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 81920.0,
+     "formula": "81920 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (4096 × 16/8) B/entry; SWA KV: 50 × (8192 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 11576279040,
-     "formula": "kv.growth_per_token × 131072 tokens + 819200 B × min(context, 1024)"
+     "value": 11576279040.0,
+     "formula": "81920 B × 131072 (Global KV) + 819200 B × min(131072, 1024) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (4096 × 16/8) B/entry; SWA KV: 50 × (8192 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 88320.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (4096 × 16/8) B/entry; SWA KV: 50 × (8192 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2876.8729641693812,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (4096 × 16/8) B/entry; SWA KV: 50 × (8192 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 377077493.15960914,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (4096 × 16/8) B/entry; SWA KV: 50 × (8192 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 81920,
+    "per_token": 81920.0,
     "windows": [
      [
-      819200,
+      819200.0,
       1024
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 81920.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 819200.0,
+      "tokens_per_entry": 1,
+      "window": 1024
+     }
+    ],
+    "formula": "Global KV: 10 × (4096 × 16/8) B/entry; SWA KV: 50 × (8192 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -7173,28 +7894,47 @@
     },
     "kv.growth_per_token": {
      "value": 11968.0,
-     "formula": "attn.kv_groups: (11 × 512 / 1 + 11 × 128 / 4) elements × 2 bytes"
+     "formula": "11264 B / 1 tokens (MLA latent) + 2816 B / 4 tokens (IndexPool indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent: 11 × (512 × 16/8) B/entry; IndexPool indexer key: 11 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
      "value": 1568669696.0,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "formula": "11264 B × 131072 (MLA latent) + 2816 B × floor(131072 / 4) (IndexPool indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent: 11 × (512 × 16/8) B/entry; IndexPool indexer key: 11 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 11968.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. MLA latent: 11 × (512 × 16/8) B/entry; IndexPool indexer key: 11 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 664.8888888888889,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent: 11 × (512 × 16/8) B/entry; IndexPool indexer key: 11 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 87148316.44444445,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent: 11 × (512 × 16/8) B/entry; IndexPool indexer key: 11 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
     "per_token": 11968.0,
-    "windows": []
+    "windows": [],
+    "groups": [
+     {
+      "name": "MLA latent",
+      "bytes_per_entry": 11264.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "IndexPool indexer key",
+      "bytes_per_entry": 2816.0,
+      "tokens_per_entry": 4
+     }
+    ],
+    "formula": "MLA latent: 11 × (512 × 16/8) B/entry; IndexPool indexer key: 11 × (128 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -7614,28 +8354,47 @@
     },
     "kv.growth_per_token": {
      "value": 95232.0,
-     "formula": "attn.kv_groups: (78 × 576 / 1 + 21 × 128 / 1) elements × 2 bytes"
+     "formula": "89856 B / 1 tokens (MLA latent + RoPE key) + 5376 B / 1 tokens (DSA indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
      "value": 12482248704.0,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "formula": "89856 B × 131072 (MLA latent + RoPE key) + 5376 B × 131072 (DSA indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 95232.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2380.8,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 312056217.6,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
     "per_token": 95232.0,
-    "windows": []
+    "windows": [],
+    "groups": [
+     {
+      "name": "MLA latent + RoPE key",
+      "bytes_per_entry": 89856.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "DSA indexer key",
+      "bytes_per_entry": 5376.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -8022,34 +8781,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 36864,
-     "formula": "18 global layers × 1024 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 36864.0,
+     "formula": "36864 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 18 × (1024 × 16/8) B/entry; SWA KV: 18 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 4836556800,
-     "formula": "kv.growth_per_token × 131072 tokens + 36864 B × min(context, 128)"
+     "value": 4836556800.0,
+     "formula": "36864 B × 131072 (Global KV) + 36864 B × min(131072, 128) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 18 × (1024 × 16/8) B/entry; SWA KV: 18 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 36900.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 18 × (1024 × 16/8) B/entry; SWA KV: 18 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 7192.982456140351,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 18 × (1024 × 16/8) B/entry; SWA KV: 18 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 942798596.4912281,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 18 × (1024 × 16/8) B/entry; SWA KV: 18 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 36864,
+    "per_token": 36864.0,
     "windows": [
      [
-      36864,
+      36864.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 36864.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 36864.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "Global KV: 18 × (1024 × 16/8) B/entry; SWA KV: 18 × (1024 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -8419,29 +9198,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 262144,
-     "formula": "64 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 262144.0,
+     "formula": "262144 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 64 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 34359738368,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 34359738368.0,
+     "formula": "262144 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 64 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 262144.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 64 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 9081.496068634542,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 64 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 1190329852.7080667,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 64 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 262144,
-    "windows": []
+    "per_token": 262144.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 262144.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 64 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -8784,29 +9577,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 327680,
-     "formula": "80 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 327680.0,
+     "formula": "327680 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 42949672960,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 42949672960.0,
+     "formula": "327680 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 327680.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 15603.809523809523,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 2045222521.9047618,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 80 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 327680,
-    "windows": []
+    "per_token": 327680.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 327680.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 80 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -9184,28 +9991,47 @@
     },
     "kv.growth_per_token": {
      "value": 95232.0,
-     "formula": "attn.kv_groups: (78 × 576 / 1 + 21 × 128 / 1) elements × 2 bytes"
+     "formula": "89856 B / 1 tokens (MLA latent + RoPE key) + 5376 B / 1 tokens (DSA indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
      "value": 12482248704.0,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "formula": "89856 B × 131072 (MLA latent + RoPE key) + 5376 B × 131072 (DSA indexer key); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 95232.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1943.5102040816328,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 254739769.46938777,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
     "per_token": 95232.0,
-    "windows": []
+    "windows": [],
+    "groups": [
+     {
+      "name": "MLA latent + RoPE key",
+      "bytes_per_entry": 89856.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "DSA indexer key",
+      "bytes_per_entry": 5376.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "MLA latent + RoPE key: 78 × (576 × 16/8) B/entry; DSA indexer key: 21 × (128 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -9605,34 +10431,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 28672,
-     "formula": "7 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 28672.0,
+     "formula": "28672 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (2048 × 16/8) B/entry; SWA KV: 35 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3831496704,
-     "formula": "kv.growth_per_token × 131072 tokens + 143360 B × min(context, 512)"
+     "value": 3831496704.0,
+     "formula": "28672 B × 131072 (Global KV) + 143360 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (2048 × 16/8) B/entry; SWA KV: 35 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 29232.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (2048 × 16/8) B/entry; SWA KV: 35 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2436.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (2048 × 16/8) B/entry; SWA KV: 35 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 319291392.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (2048 × 16/8) B/entry; SWA KV: 35 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 28672,
+    "per_token": 28672.0,
     "windows": [
      [
-      143360,
+      143360.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 28672.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 143360.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 7 × (2048 × 16/8) B/entry; SWA KV: 35 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -10056,34 +10902,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 45056,
-     "formula": "11 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 45056.0,
+     "formula": "45056 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 11 × (2048 × 16/8) B/entry; SWA KV: 55 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 6136266752,
-     "formula": "kv.growth_per_token × 131072 tokens + 450560 B × min(context, 512)"
+     "value": 6136266752.0,
+     "formula": "45056 B × 131072 (Global KV) + 450560 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 11 × (2048 × 16/8) B/entry; SWA KV: 55 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 46816.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 11 × (2048 × 16/8) B/entry; SWA KV: 55 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1141.8536585365853,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 11 × (2048 × 16/8) B/entry; SWA KV: 55 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 149665042.7317073,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 11 × (2048 × 16/8) B/entry; SWA KV: 55 × (4096 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 45056,
+    "per_token": 45056.0,
     "windows": [
      [
-      450560,
+      450560.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 45056.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 450560.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 11 × (2048 × 16/8) B/entry; SWA KV: 55 × (4096 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -10584,38 +11450,64 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 81920,
-     "formula": "20 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 81920.0,
+     "formula": "81920 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 20 × (2048 × 16/8) B/entry; SWA KV: 57 × (2048 × 16/8) B/entry; Long-window KV: 1 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 10784079872,
-     "formula": "kv.growth_per_token × 131072 tokens + 233472 B × min(context, 128) + 4096 B × min(context, 4096)"
+     "value": 10784079872.0,
+     "formula": "81920 B × 131072 (Global KV) + 233472 B × min(131072, 128) (SWA KV) + 4096 B × min(131072, 4096) (Long-window KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 20 × (2048 × 16/8) B/entry; SWA KV: 57 × (2048 × 16/8) B/entry; Long-window KV: 1 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 82276.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 20 × (2048 × 16/8) B/entry; SWA KV: 57 × (2048 × 16/8) B/entry; Long-window KV: 1 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2223.675675675676,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 20 × (2048 × 16/8) B/entry; SWA KV: 57 × (2048 × 16/8) B/entry; Long-window KV: 1 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 291461618.1621622,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 20 × (2048 × 16/8) B/entry; SWA KV: 57 × (2048 × 16/8) B/entry; Long-window KV: 1 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 81920,
+    "per_token": 81920.0,
     "windows": [
      [
-      233472,
+      233472.0,
       128
      ],
      [
-      4096,
+      4096.0,
       4096
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 81920.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 233472.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     },
+     {
+      "name": "Long-window KV",
+      "bytes_per_entry": 4096.0,
+      "tokens_per_entry": 1,
+      "window": 4096
+     }
+    ],
+    "formula": "Global KV: 20 × (2048 × 16/8) B/entry; SWA KV: 57 × (2048 × 16/8) B/entry; Long-window KV: 1 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -11103,29 +11995,43 @@
      "formula": "train.tokens / params.total"
     },
     "kv.growth_per_token": {
-     "value": 196608,
-     "formula": "48 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 196608.0,
+     "formula": "196608 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 25769803776,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 25769803776.0,
+     "formula": "196608 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 196608.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 49152.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 6442450944.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 196608,
-    "windows": []
+    "per_token": 196608.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 196608.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 48 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -11549,29 +12455,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 249856,
-     "formula": "61 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 249856.0,
+     "formula": "249856 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 32749125632,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 32749125632.0,
+     "formula": "249856 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 249856.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 10863.304347826086,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 1423875027.4782608,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 249856,
-    "windows": []
+    "per_token": 249856.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 249856.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 61 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -11982,29 +12902,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 70272,
-     "formula": "61 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 70272.0,
+     "formula": "70272 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 9210691584,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 9210691584.0,
+     "formula": "70272 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 70272.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2196.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 287834112.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 70272,
-    "windows": []
+    "per_token": 70272.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 70272.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 61 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -12498,29 +13432,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 70272,
-     "formula": "61 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 70272.0,
+     "formula": "70272 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 9210691584,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 9210691584.0,
+     "formula": "70272 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 70272.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2155.5828220858893,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 282536551.6564417,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 70272,
-    "windows": []
+    "per_token": 70272.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 70272.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 61 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -13046,29 +13994,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 27648,
-     "formula": "24 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 27648.0,
+     "formula": "27648 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 24 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3623878656,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 3623878656.0,
+     "formula": "27648 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 24 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 27648.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 24 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 265.33589251439537,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 24 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 34778106.10364683,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 24 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 27648,
-    "windows": []
+    "per_token": 27648.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 27648.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 24 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -13443,29 +14405,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 286720,
-     "formula": "70 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 286720.0,
+     "formula": "286720 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 70 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 37580963840,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 37580963840.0,
+     "formula": "286720 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 70 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 286720.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 70 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 12252.991452991453,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 70 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 1606024095.7264957,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 70 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 286720,
-    "windows": []
+    "per_token": 286720.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 286720.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 70 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -13840,34 +14816,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 49152,
-     "formula": "12 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 49152.0,
+     "formula": "49152 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 36 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 6517948416,
-     "formula": "kv.growth_per_token × 131072 tokens + 147456 B × min(context, 512)"
+     "value": 6517948416.0,
+     "formula": "49152 B × 131072 (Global KV) + 147456 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 36 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 49728.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 36 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 6216.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 36 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 814743552.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 36 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 49152,
+    "per_token": 49152.0,
     "windows": [
      [
-      147456,
+      147456.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 49152.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 147456.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 36 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -14223,34 +15219,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 40960,
-     "formula": "10 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 40960.0,
+     "formula": "40960 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 5431623680,
-     "formula": "kv.growth_per_token × 131072 tokens + 122880 B × min(context, 512)"
+     "value": 5431623680.0,
+     "formula": "40960 B × 131072 (Global KV) + 122880 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 41440.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 13813.333333333334,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 1810541226.6666667,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 40960,
+    "per_token": 40960.0,
     "windows": [
      [
-      122880,
+      122880.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 40960.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 122880.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -14761,34 +15777,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 40960,
-     "formula": "10 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 40960.0,
+     "formula": "40960 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 5431623680,
-     "formula": "kv.growth_per_token × 131072 tokens + 122880 B × min(context, 512)"
+     "value": 5431623680.0,
+     "formula": "40960 B × 131072 (Global KV) + 122880 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 41440.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 13813.333333333334,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 1810541226.6666667,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 40960,
+    "per_token": 40960.0,
     "windows": [
      [
-      122880,
+      122880.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 40960.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 122880.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 10 × (2048 × 16/8) B/entry; SWA KV: 30 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -15313,29 +16349,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 11520,
-     "formula": "10 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 11520.0,
+     "formula": "11520 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 1509949440,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 1509949440.0,
+     "formula": "11520 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 11520.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 182.85714285714286,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 23967451.42857143,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 11520,
-    "windows": []
+    "per_token": 11520.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 11520.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 10 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -15825,29 +16875,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 8064,
-     "formula": "7 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 8064.0,
+     "formula": "8064 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 1056964608,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 1056964608.0,
+     "formula": "8064 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 8064.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1581.1764705882354,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 207247962.3529412,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 7 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 8064,
-    "windows": []
+    "per_token": 8064.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 8064.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 7 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -16240,29 +17304,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 10368,
-     "formula": "9 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 10368.0,
+     "formula": "10368 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 1358954496,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 1358954496.0,
+     "formula": "10368 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 10368.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 414.72,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 54358179.84,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 10368,
-    "windows": []
+    "per_token": 10368.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 10368.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 9 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -16617,29 +17695,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 107008,
-     "formula": "76 global layers × 704 elements × 2 bytes (MLA: kv_lora_rank + rope_dim + indexer_dim)"
+     "value": 107008.0,
+     "formula": "107008 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 76 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 14025752576,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 14025752576.0,
+     "formula": "107008 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 76 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 107008.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 76 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2229.3333333333335,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 76 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 292203178.6666667,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 76 × (704 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 107008,
-    "windows": []
+    "per_token": 107008.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 107008.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 76 × (704 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -17139,34 +18231,54 @@
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
     },
     "kv.growth_per_token": {
-     "value": 53248,
-     "formula": "13 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 53248.0,
+     "formula": "53248 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 13 × (2048 × 16/8) B/entry; SWA KV: 65 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 7115636736,
-     "formula": "kv.growth_per_token × 131072 tokens + 266240 B × min(context, 512)"
+     "value": 7115636736.0,
+     "formula": "53248 B × 131072 (Global KV) + 266240 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 13 × (2048 × 16/8) B/entry; SWA KV: 65 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 54288.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 13 × (2048 × 16/8) B/entry; SWA KV: 65 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1564.4956772334292,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 13 × (2048 × 16/8) B/entry; SWA KV: 65 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 205061577.40634003,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 13 × (2048 × 16/8) B/entry; SWA KV: 65 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 53248,
+    "per_token": 53248.0,
     "windows": [
      [
-      266240,
+      266240.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 53248.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 266240.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 13 × (2048 × 16/8) B/entry; SWA KV: 65 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -17301,6 +18413,11 @@
      "source": "config",
      "at": "/swa_head_dim",
      "note": "QK dim; V dim is swa_v_head_dim 128."
+    },
+    "attn.local_v_head_dim": {
+     "value": 128,
+     "source": "config",
+     "at": "/swa_v_head_dim"
     },
     "attn.local_rope_theta": {
      "value": 10000,
@@ -17606,34 +18723,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 23040,
-     "formula": "9 global layers × 1280 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 23040.0,
+     "formula": "23040 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3050569728,
-     "formula": "kv.growth_per_token × 131072 tokens + 239616 B × min(context, 128)"
+     "value": 3045457920.0,
+     "formula": "23040 B × 131072 (Global KV) + 199680 B × min(131072, 128) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
-     "value": 23274.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "value": 23235.0,
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
-     "value": 1551.6,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "value": 1549.0,
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
-     "value": 203371315.2,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "value": 203030528.0,
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 23040,
+    "per_token": 23040.0,
     "windows": [
      [
-      239616,
+      199680.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 23040.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 199680.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -17769,6 +18906,11 @@
      "source": "config",
      "at": "/swa_head_dim",
      "note": "QK dim; V dim is swa_v_head_dim 128."
+    },
+    "attn.local_v_head_dim": {
+     "value": 128,
+     "source": "config",
+     "at": "/swa_v_head_dim"
     },
     "attn.local_rope_theta": {
      "value": 10000,
@@ -18079,34 +19221,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 51200,
-     "formula": "10 global layers × 2560 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 51200.0,
+     "formula": "51200 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 6758072320,
-     "formula": "kv.growth_per_token × 131072 tokens + 368640 B × min(context, 128)"
+     "value": 6750208000.0,
+     "formula": "51200 B × 131072 (Global KV) + 307200 B × min(131072, 128) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
-     "value": 51560.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "value": 51500.0,
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
-     "value": 1227.6190476190477,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "value": 1226.1904761904761,
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
-     "value": 160906483.80952382,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "value": 160719238.0952381,
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 51200,
+    "per_token": 51200.0,
     "windows": [
      [
-      368640,
+      307200.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 51200.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 307200.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -18255,6 +19417,11 @@
      "source": "config",
      "at": "/swa_head_dim",
      "note": "QK dim; V dim is swa_v_head_dim 128."
+    },
+    "attn.local_v_head_dim": {
+     "value": 128,
+     "source": "config",
+     "at": "/swa_v_head_dim"
     },
     "attn.local_rope_theta": {
      "value": 10000,
@@ -18674,34 +19841,54 @@
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
     },
     "kv.growth_per_token": {
-     "value": 23040,
-     "formula": "9 global layers × 1280 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 23040.0,
+     "formula": "23040 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3050569728,
-     "formula": "kv.growth_per_token × 131072 tokens + 239616 B × min(context, 128)"
+     "value": 3045457920.0,
+     "formula": "23040 B × 131072 (Global KV) + 199680 B × min(131072, 128) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
-     "value": 23274.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "value": 23235.0,
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
-     "value": 1551.6,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "value": 1549.0,
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
-     "value": 203371315.2,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "value": 203030528.0,
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 23040,
+    "per_token": 23040.0,
     "windows": [
      [
-      239616,
+      199680.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 23040.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 199680.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "Global KV: 9 × (1280 × 16/8) B/entry; SWA KV: 39 × (2560 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -18833,6 +20020,11 @@
      "source": "config",
      "at": "/swa_head_dim",
      "note": "QK dim; V dim is swa_v_head_dim 128."
+    },
+    "attn.local_v_head_dim": {
+     "value": 128,
+     "source": "config",
+     "at": "/swa_v_head_dim"
     },
     "attn.local_rope_theta": {
      "value": 10000,
@@ -19103,34 +20295,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 51200,
-     "formula": "10 global layers × 2560 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 51200.0,
+     "formula": "51200 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 6758072320,
-     "formula": "kv.growth_per_token × 131072 tokens + 368640 B × min(context, 128)"
+     "value": 6750208000.0,
+     "formula": "51200 B × 131072 (Global KV) + 307200 B × min(131072, 128) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
-     "value": 51560.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "value": 51500.0,
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
-     "value": 1227.6190476190477,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "value": 1226.1904761904761,
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
-     "value": 160906483.80952382,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "value": 160719238.0952381,
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 51200,
+    "per_token": 51200.0,
     "windows": [
      [
-      368640,
+      307200.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 51200.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 307200.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "Global KV: 10 × (2560 × 16/8) B/entry; SWA KV: 60 × (2560 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -19632,29 +20844,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 40960,
-     "formula": "10 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 40960.0,
+     "formula": "40960 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 5368709120,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 5368709120.0,
+     "formula": "40960 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 40960.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 892.3747276688454,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 116965340.3050109,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 40960,
-    "windows": []
+    "per_token": 40960.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 40960.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 10 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -20063,29 +21289,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 253952,
-     "formula": "62 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 253952.0,
+     "formula": "253952 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 62 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 33285996544,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 33285996544.0,
+     "formula": "253952 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 62 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 253952.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 62 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 25913.4693877551,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 62 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 3396530259.5918365,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 62 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 253952,
-    "windows": []
+    "per_token": 253952.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 253952.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 62 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -20438,29 +21678,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 138240,
-     "formula": "60 global layers × 1152 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim) + indexer_dim)"
+     "value": 138240.0,
+     "formula": "138240 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 60 × (1152 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 18119393280,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 18119393280.0,
+     "formula": "138240 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 60 × (1152 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 138240.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 60 × (1152 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 6010.434782608696,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 60 × (1152 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 787799707.826087,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 60 × (1152 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 138240,
-    "windows": []
+    "per_token": 138240.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 138240.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 60 × (1152 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -20809,29 +22063,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 70272,
-     "formula": "61 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 70272.0,
+     "formula": "70272 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 9210691584,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 9210691584.0,
+     "formula": "70272 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 70272.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1713.9512195121952,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 224651014.24390244,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 70272,
-    "windows": []
+    "per_token": 70272.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 70272.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 61 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -21068,29 +22336,43 @@
      "formula": "ffn.dim / d_model"
     },
     "kv.growth_per_token": {
-     "value": 360448,
-     "formula": "88 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 360448.0,
+     "formula": "360448 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 88 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 47244640256,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 47244640256.0,
+     "formula": "360448 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 88 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 360448.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 88 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2816.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 88 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 369098752.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 88 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 360448,
-    "windows": []
+    "per_token": 360448.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 360448.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 88 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -21426,29 +22708,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 23040,
-     "formula": "36 global layers × 320 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 23040.0,
+     "formula": "23040 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 36 × (320 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3019898880,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 3019898880.0,
+     "formula": "23040 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 36 × (320 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 23040.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 36 × (320 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 3544.6153846153848,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 36 × (320 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 464599827.6923077,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 36 × (320 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 23040,
-    "windows": []
+    "per_token": 23040.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 23040.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 36 × (320 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -22042,34 +23338,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 16128,
-     "formula": "14 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
+     "value": 16128.0,
+     "formula": "16128 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 14 × (576 × 16/8) B/entry; SWA KV: 39 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 2119680000,
-     "formula": "kv.growth_per_token × 131072 tokens + 44928 B × min(context, 128)"
+     "value": 2119680000.0,
+     "formula": "16128 B × 131072 (Global KV) + 44928 B × min(131072, 128) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 14 × (576 × 16/8) B/entry; SWA KV: 39 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 16171.875,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 14 × (576 × 16/8) B/entry; SWA KV: 39 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1225.1420454545455,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 14 × (576 × 16/8) B/entry; SWA KV: 39 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 160581818.1818182,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 14 × (576 × 16/8) B/entry; SWA KV: 39 × (576 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 16128,
+    "per_token": 16128.0,
     "windows": [
      [
-      44928,
+      44928.0,
       128
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 16128.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 44928.0,
+      "tokens_per_entry": 1,
+      "window": 128
+     }
+    ],
+    "formula": "Global KV: 14 × (576 × 16/8) B/entry; SWA KV: 39 × (576 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -22489,34 +23805,54 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 65536,
-     "formula": "16 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 65536.0,
+     "formula": "65536 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 46 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 8975810560,
-     "formula": "kv.growth_per_token × 131072 tokens + 188416 B × min(context, 2048)"
+     "value": 8975810560.0,
+     "formula": "65536 B × 131072 (Global KV) + 188416 B × min(131072, 2048) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 46 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 68480.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 46 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1630.4761904761904,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 46 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 213709775.23809522,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 46 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 65536,
+    "per_token": 65536.0,
     "windows": [
      [
-      188416,
+      188416.0,
       2048
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 65536.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 188416.0,
+      "tokens_per_entry": 1,
+      "window": 2048
+     }
+    ],
+    "formula": "Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 46 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -23068,29 +24404,43 @@
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
     },
     "kv.growth_per_token": {
-     "value": 12288,
-     "formula": "12 global layers × 512 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 12288.0,
+     "formula": "12288 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 1610612736,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 1610612736.0,
+     "formula": "12288 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 12288.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 223.4181818181818,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 29283867.927272726,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 12288,
-    "windows": []
+    "per_token": 12288.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 12288.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 12 × (512 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -23637,29 +24987,43 @@
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
     },
     "kv.growth_per_token": {
-     "value": 8192,
-     "formula": "8 global layers × 512 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 8192.0,
+     "formula": "8192 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 1073741824,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 1073741824.0,
+     "formula": "8192 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 8192.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 645.0393700787401,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 84546600.31496063,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 8 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 8192,
-    "windows": []
+    "per_token": 8192.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 8192.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 8 × (512 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -24134,34 +25498,54 @@
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
     },
     "kv.growth_per_token": {
-     "value": 65536,
-     "formula": "16 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 65536.0,
+     "formula": "65536 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 9395240960,
-     "formula": "kv.growth_per_token × 131072 tokens + 196608 B × min(context, 4096)"
+     "value": 9395240960.0,
+     "formula": "65536 B × 131072 (Global KV) + 196608 B × min(131072, 4096) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 71680.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2240.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 293601280.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 48 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 65536,
+    "per_token": 65536.0,
     "windows": [
      [
-      196608,
+      196608.0,
       4096
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 65536.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 196608.0,
+      "tokens_per_entry": 1,
+      "window": 4096
+     }
+    ],
+    "formula": "Global KV: 16 × (2048 × 16/8) B/entry; SWA KV: 48 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -24581,29 +25965,43 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 24576,
-     "formula": "12 global layers × 1024 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 24576.0,
+     "formula": "24576 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3221225472,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 3221225472.0,
+     "formula": "24576 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 24576.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 8192.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 1073741824.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 24576,
-    "windows": []
+    "per_token": 24576.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 24576.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 12 × (1024 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -24992,29 +26390,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 24576,
-     "formula": "12 global layers × 1024 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 24576.0,
+     "formula": "24576 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3221225472,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 3221225472.0,
+     "formula": "24576 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 24576.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2457.6,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 322122547.2,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 24576,
-    "windows": []
+    "per_token": 24576.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 24576.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 12 × (1024 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -25352,29 +26764,43 @@
      "formula": "attn.linear_layers / attn.global_layers"
     },
     "kv.growth_per_token": {
-     "value": 65536,
-     "formula": "16 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 65536.0,
+     "formula": "65536 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 8589934592,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 8589934592.0,
+     "formula": "65536 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 65536.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2427.259259259259,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 318145725.6296296,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 65536,
-    "windows": []
+    "per_token": 65536.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 65536.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 16 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -25763,29 +27189,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 20480,
-     "formula": "10 global layers × 1024 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 20480.0,
+     "formula": "20480 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 2684354560,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 2684354560.0,
+     "formula": "20480 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 20480.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 6826.666666666667,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 894784853.3333334,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 10 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 20480,
-    "windows": []
+    "per_token": 20480.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 20480.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 10 × (1024 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -26181,29 +27621,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 30720,
-     "formula": "15 global layers × 1024 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 30720.0,
+     "formula": "30720 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 4026531840,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 4026531840.0,
+     "formula": "30720 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 30720.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1807.0588235294117,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 236854814.11764705,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 30720,
-    "windows": []
+    "per_token": 30720.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 30720.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 15 × (1024 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -26576,29 +28030,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 94208,
-     "formula": "23 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 94208.0,
+     "formula": "94208 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 23 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 12348030976,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 12348030976.0,
+     "formula": "94208 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 23 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 94208.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 23 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 991.6631578947369,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 23 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 129979273.43157895,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 23 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 94208,
-    "windows": []
+    "per_token": 94208.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 94208.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 23 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -26920,29 +28388,43 @@
      "formula": "attn.linear_layers / attn.global_layers"
     },
     "kv.growth_per_token": {
-     "value": 65536,
-     "formula": "16 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 65536.0,
+     "formula": "65536 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 8589934592,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 8589934592.0,
+     "formula": "65536 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 65536.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2427.259259259259,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 318145725.6296296,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 16 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 65536,
-    "windows": []
+    "per_token": 65536.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 65536.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 16 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -27442,29 +28924,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 24576,
-     "formula": "12 global layers × 1024 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 24576.0,
+     "formula": "24576 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 3221225472,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 3221225472.0,
+     "formula": "24576 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 24576.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 4096.0,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 536870912.0,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (1024 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 24576,
-    "windows": []
+    "per_token": 24576.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 24576.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 12 × (1024 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -27877,29 +29373,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 49152,
-     "formula": "12 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 49152.0,
+     "formula": "49152 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 6442450944,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 6442450944.0,
+     "formula": "49152 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 49152.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 3276.8,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 429496729.6,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 49152,
-    "windows": []
+    "per_token": 49152.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 49152.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 12 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -28499,34 +30009,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 49152,
-     "formula": "12 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 49152.0,
+     "formula": "49152 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 33 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 6511656960,
-     "formula": "kv.growth_per_token × 131072 tokens + 135168 B × min(context, 512)"
+     "value": 6511656960.0,
+     "formula": "49152 B × 131072 (Global KV) + 135168 B × min(131072, 512) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 33 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 49680.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 33 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 4516.363636363636,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 33 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 591968814.5454545,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 33 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 49152,
+    "per_token": 49152.0,
     "windows": [
      [
-      135168,
+      135168.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 49152.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 135168.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "Global KV: 12 × (2048 × 16/8) B/entry; SWA KV: 33 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -28872,29 +30402,43 @@
      "formula": "params.active / params.total"
     },
     "kv.growth_per_token": {
-     "value": 62464,
-     "formula": "61 global layers × 512 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 62464.0,
+     "formula": "62464 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 8187281408,
-     "formula": "kv.growth_per_token × 131072 tokens"
+     "value": 8187281408.0,
+     "formula": "62464 B × 131072 (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 62464.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 1643.7894736842106,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 215454773.89473686,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 61 × (512 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 62464,
-    "windows": []
+    "per_token": 62464.0,
+    "windows": [],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 62464.0,
+      "tokens_per_entry": 1
+     }
+    ],
+    "formula": "Global KV: 61 × (512 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -29348,33 +30892,58 @@
     },
     "kv.growth_per_token": {
      "value": 72128.0,
-     "formula": "attn.kv_groups: (23 × 1536 / 1 + 23 × 256 / 8) elements × 2 bytes"
+     "formula": "70656 B / 1 tokens (DSA K/V) + 11776 B / 8 tokens (DSA indexer region summaries); uniform BF16, payload only; quantization overhead excluded. DSA K/V: 23 × (1536 × 16/8) B/entry; DSA indexer region summaries: 23 × (256 × 16/8) B/entry; SWA K/V: 69 × (1536 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
      "value": 9562488832.0,
-     "formula": "kv.growth_per_token × 131072 tokens + 211968 B × min(context, 512)"
+     "formula": "70656 B × 131072 (DSA K/V) + 11776 B × floor(131072 / 8) (DSA indexer region summaries) + 211968 B × min(131072, 512) (SWA K/V); uniform BF16, payload only; quantization overhead excluded. DSA K/V: 23 × (1536 × 16/8) B/entry; DSA indexer region summaries: 23 × (256 × 16/8) B/entry; SWA K/V: 69 × (1536 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 72956.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. DSA K/V: 23 × (1536 × 16/8) B/entry; DSA indexer region summaries: 23 × (256 × 16/8) B/entry; SWA K/V: 69 × (1536 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 2702.074074074074,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. DSA K/V: 23 × (1536 × 16/8) B/entry; DSA indexer region summaries: 23 × (256 × 16/8) B/entry; SWA K/V: 69 × (1536 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 354166253.037037,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. DSA K/V: 23 × (1536 × 16/8) B/entry; DSA indexer region summaries: 23 × (256 × 16/8) B/entry; SWA K/V: 69 × (1536 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
     "per_token": 72128.0,
     "windows": [
      [
-      211968,
+      211968.0,
       512
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "DSA K/V",
+      "bytes_per_entry": 70656.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "DSA indexer region summaries",
+      "bytes_per_entry": 11776.0,
+      "tokens_per_entry": 8
+     },
+     {
+      "name": "SWA K/V",
+      "bytes_per_entry": 211968.0,
+      "tokens_per_entry": 1,
+      "window": 512
+     }
+    ],
+    "formula": "DSA K/V: 23 × (1536 × 16/8) B/entry; DSA indexer region summaries: 23 × (256 × 16/8) B/entry; SWA K/V: 69 × (1536 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   },
   {
@@ -29909,34 +31478,54 @@
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
     "kv.growth_per_token": {
-     "value": 61440,
-     "formula": "15 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
+     "value": 61440.0,
+     "formula": "61440 B / 1 tokens (Global KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (2048 × 16/8) B/entry; SWA KV: 45 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context": {
-     "value": 8808038400,
-     "formula": "kv.growth_per_token × 131072 tokens + 184320 B × min(context, 4096)"
+     "value": 8808038400.0,
+     "formula": "61440 B × 131072 (Global KV) + 184320 B × min(131072, 4096) (SWA KV); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (2048 × 16/8) B/entry; SWA KV: 45 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token": {
      "value": 67200.0,
-     "formula": "kv.bytes_at_context / 131072 tokens"
+     "formula": "kv.bytes_at_context / 131072 tokens; uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (2048 × 16/8) B/entry; SWA KV: 45 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_per_token_per_active": {
      "value": 5169.2307692307695,
-     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_per_token (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (2048 × 16/8) B/entry; SWA KV: 45 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     },
     "kv.bytes_at_context_per_active": {
      "value": 677541415.3846154,
-     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9)"
+     "formula": "kv.bytes_at_context (131072 tokens) / (params.active / 1e9); uniform BF16, payload only; quantization overhead excluded. Global KV: 15 × (2048 × 16/8) B/entry; SWA KV: 45 × (2048 × 16/8) B/entry",
+     "formula_version": "kv-2"
     }
    },
    "kv": {
-    "per_token": 61440,
+    "per_token": 61440.0,
     "windows": [
      [
-      184320,
+      184320.0,
       4096
      ]
-    ]
+    ],
+    "groups": [
+     {
+      "name": "Global KV",
+      "bytes_per_entry": 61440.0,
+      "tokens_per_entry": 1
+     },
+     {
+      "name": "SWA KV",
+      "bytes_per_entry": 184320.0,
+      "tokens_per_entry": 1,
+      "window": 4096
+     }
+    ],
+    "formula": "Global KV: 15 × (2048 × 16/8) B/entry; SWA KV: 45 × (2048 × 16/8) B/entry",
+    "formula_version": "kv-2"
    }
   }
  ]

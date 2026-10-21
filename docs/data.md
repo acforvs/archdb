@@ -16,11 +16,12 @@ values: ratios (`shape.aspect`, `attn.swa_ratio`, `moe.latent_ratio`, `moe.spars
 parameter, the peak-LR AdamW timescale estimate τ = B/(ηλD), and KV cache sizes. For τ, normalization
 by the full run follows [Power Lines](https://arxiv.org/html/2505.13738v2#S2.SS2); replacing total steps
 S with D/B assumes constant batch size.
-KV sizes assume BF16 (the website also shows FP8) and count global layers, sliding
-windows capped at their window, and sparse-attention indexer keys. `kv.bytes_per_token` is the total
-cache at a context divided by that context, so sliding-window caches are included;
-`kv.growth_per_token` is the long-context limit (global layers only). Context-dependent values in the
-exports are evaluated at 131,072 tokens.
+Exported KV sizes use uniform BF16 at 131,072 tokens. They count global caches, bounded sliding
+windows and sparse-attention indexer keys. `kv.bytes_per_token` includes the windows;
+`kv.growth_per_token` is global KV only. The website also offers uniform FP8/FP4 payload comparisons
+and **Sourced storage**, which uses component formats, scales and documented padding. A sourced
+value is left unknown until the entire cache recipe is covered. See [KV calculations](kv-cache.md)
+for formulas, assumptions and checks against the DeepSeek reports.
 
 Parameter counts by part (`params.counted_*`) are read from the released checkpoints' safetensors
 headers (tensor names and shapes, fetched with range requests) by `uv run archdb count-params` and

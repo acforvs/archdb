@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { cell, hfView, type CellOpts, type DB, type Model, type Stage } from "./data";
+import { cell, hfView, type CellOpts, type DB, type Fact, type Model, type Stage } from "./data";
 import { format, lr, si } from "./format";
 import type { View } from "./App";
 
@@ -98,9 +98,21 @@ function FactRow({ db, model, k, o, focus }: { db: DB; model: Model; k: string; 
         <span className="fact-label" title={field.definition}>{field.label}</span>
         {Array.isArray(c.value) ? null : <span className="fact-value">{format(k, field, c.value, true)}</span>}
       </div>
-      {Array.isArray(c.value) && <Stages stages={c.value} />}
+      {Array.isArray(c.value) && (k === "attn.kv_groups" || k === "attn.kv_precision") && c.kind === "fact"
+        ? <CacheEntries entries={c.value} model={model} parent={c} precision={k === "attn.kv_precision"} />
+        : Array.isArray(c.value) && <Stages stages={c.value} />}
       {c.kind === "derived" ? (
-        <div className="fact-src">computed · {c.formula}</div>
+        <>
+          <div className="fact-src">computed{c.formula_version && ` · ${c.formula_version}`} · {c.formula}</div>
+          {k.startsWith("kv.") && (
+            <div className="fact-src">
+              {["attn.kv_groups", ...(o.kvdt === "sourced" ? ["attn.kv_precision"] : [])].filter((key) => model.facts[key]).map((key) => {
+                const fact = model.facts[key];
+                return <a key={key} href={hfView(model.sources[fact.source].url)} target="_blank" rel="noreferrer">{db.fields[key].label} · {fact.at} </a>;
+              })}
+            </div>
+          )}
+        </>
       ) : (
         <>
           {c.quote && <blockquote>{c.quote}</blockquote>}
@@ -113,6 +125,44 @@ function FactRow({ db, model, k, o, focus }: { db: DB; model: Model; k: string; 
           {c.note && <div className="fact-note">{c.note}</div>}
         </>
       )}
+    </div>
+  );
+}
+
+function CacheEntries({ entries, model, parent, precision }: { entries: Stage[]; model: Model; parent: Fact; precision: boolean }) {
+  return (
+    <div className="cache-entries">
+      {entries.map((entry) => {
+        const source = entry.source ?? parent.source;
+        const bytes = Math.ceil((entry.elements ?? 0) * (entry.bits ?? 0) / 8)
+          + (entry.scale_count ?? 0) * (entry.scale_bits ?? 0) / 8 + (entry.padding_bytes ?? 0);
+        return (
+          <div className="cache-entry" key={entry.name}>
+            <b>{entry.name}</b>
+            {precision ? (
+              <>
+                <div>{entry.format}</div>
+                <div className="fact-note">
+                  {entry.elements} × {entry.bits} bits
+                  {entry.scale_count ? ` + ${entry.scale_count} × ${entry.scale_bits}-bit scales` : ""}
+                  {entry.padding_bytes ? ` + ${entry.padding_bytes} padding byte(s)` : ""}
+                  {` = ${bytes} bytes/entry`}
+                </div>
+              </>
+            ) : (
+              <div>{entry.layers} cache owners × {entry.elements} scalars/entry; {entry.window
+                ? `keeps the last ${entry.window} entries`
+                : `one entry per ${entry.tokens_per_entry ?? 1} token(s)`}.</div>
+            )}
+            {entry.note && <div className="fact-note">{entry.note}</div>}
+            <div className="fact-src">
+              <a href={hfView(model.sources[source].url)} target="_blank" rel="noreferrer">{source}</a>
+              {" · "}{entry.at ?? parent.at}
+            </div>
+            {entry.quote && <blockquote>{entry.quote}</blockquote>}
+          </div>
+        );
+      })}
     </div>
   );
 }

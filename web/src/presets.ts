@@ -4,6 +4,7 @@ import type { View } from "./App";
  * is clearly better on both axes. */
 export const PLOT_PRESETS: Record<string, Partial<View>> = {
   "Capability vs KV / token": { x: "kv.bytes_per_token", y: "eval.aa_index", xlog: true, ylog: false, pareto: "x-y+" },
+  "Capability vs global KV": { x: "kv.growth_per_token", y: "eval.aa_index", xlog: true, ylog: false, pareto: "x-y+" },
   "Capability vs active params": {
     x: "params.counted_active_non_embedding", y: "eval.aa_index", xlog: true, ylog: false, pareto: "x-y+",
   },

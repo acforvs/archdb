@@ -4,6 +4,7 @@ kind: reasoning
 note: "No base checkpoint is public; facts describe the released post-trained checkpoint. Recipe facts are from the technical report."
 
 sources:
+  flashmla-cache: {url: https://raw.githubusercontent.com/deepseek-ai/FlashMLA/07a1089857b63e74e3133630c02b083b75e8d4b2/README.md, kind: code}
   config: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/314113f8a7dadb388215396ba5fbee2c610a04d6/config.json, kind: config}
   inference-model: {url: https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/314113f8a7dadb388215396ba5fbee2c610a04d6/inference/model.py, kind: code}
   report: {url: https://arxiv.org/pdf/2609.19969v1, kind: paper}
@@ -139,6 +140,61 @@ facts:
     source: report
     at: "p.7 Figure 3"
     quote: "The first two encoder layers use sliding window attention (SWA); the rest use Compressed Sparse Attention 2 (CSA2)"
+  attn.kv_precision:
+    value:
+    - name: encoder main KV (m=2)
+      group: encoder main KV (m=2)
+      elements: 512
+      bits: 4
+      format: FP4 E2M1; E4M3 scales per 16 channels
+      scale_count: 32
+      scale_bits: 8
+      at: 'README.md; V4.1 fp4 layout: 256 data bytes + 32 scale bytes'
+      quote: The scale row is 32 Bytes of `float8_e4m3`
+    - name: decoder main KV (m=1)
+      group: decoder main KV (m=1)
+      elements: 512
+      bits: 4
+      format: FP4 E2M1; E4M3 scales per 16 channels
+      scale_count: 32
+      scale_bits: 8
+      at: 'README.md; V4.1 fp4 layout: 256 data bytes + 32 scale bytes'
+      quote: The scale row is 32 Bytes of `float8_e4m3`
+    - name: encoder indexer K (m=2)
+      group: encoder indexer K (m=2)
+      elements: 128
+      bits: 4
+      format: MXFP4 E2M1; E8M0 scales per 32 channels
+      scale_count: 4
+      scale_bits: 8
+      source: inference-model
+      at: inference/model.py lines 28–30, 546; fp4_act_quant(k, fp4_block_size, True)
+      quote: fp4_block_size = 32
+    - name: decoder indexer K (m=1)
+      group: decoder indexer K (m=1)
+      elements: 128
+      bits: 4
+      format: MXFP4 E2M1; E8M0 scales per 32 channels
+      scale_count: 4
+      scale_bits: 8
+      source: inference-model
+      at: inference/model.py lines 28–30, 546; fp4_act_quant(k, fp4_block_size, True)
+      quote: fp4_block_size = 32
+    - name: SWA window
+      group: SWA window
+      elements: 512
+      bits: 8
+      format: FP8 E4M3; E8M0 scales per 32 channels
+      scale_count: 16
+      scale_bits: 8
+      at: 'README.md; V4.1 FP8 layout: 512 data bytes + 16 scale bytes'
+      quote: The scale row is 16 Bytes of `float8_e8m0`
+    source: flashmla-cache
+    at: README.md; MLA Decoding / FP8 KV Cache; per-entry storage layouts
+    note: 'Post-training/serving recipe, not pretraining precision. Main KV: 288 bytes/entry; indexer K: 68; SWA:
+      528. Global growth = (3/2 + 1) × (288 + 68) = 890 bytes/token, matching report p.1 Figure 1(b). The finite SWA
+      rings are additional runtime cache, not part of that global figure. FP4 main-cache QAT is introduced in post-training
+      (§2.4.4).'
   attn.kv_heads: {value: 1, source: config, at: "/text_config/num_key_value_heads"}
   attn.layout:
     value: "2 SWA + 18 CSA2 m=2 (encoder: 3 × [1 Full, 5 Reuse]) + 20 CSA2 m=1 (decoder: [1 Full, 3 Reuse], then 4 × [1 Reindex, 3 Reuse])"

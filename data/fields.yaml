@@ -255,8 +255,13 @@ fields:
     type: int
     required: swa
     unit: elements
-    label: SWA head dim
-    definition: Head dimension (K and V) in sliding-window layers (stated even when equal to attn.head_dim).
+    label: SWA QK head dim
+    definition: Query/key head dimension in sliding-window layers. Value head dimensions may differ; see attn.local_v_head_dim.
+  attn.local_v_head_dim:
+    type: int
+    unit: elements
+    label: SWA value head dim
+    definition: Value head dimension in sliding-window layers, when separately specified. KV formulas use this value when present, otherwise the explicit global value dimension, or the local QK dimension when no separate value dimension is given.
   attn.kv_lora_rank:
     type: int
     required: mla
@@ -354,9 +359,15 @@ fields:
     definition: Layers that reuse another layer's KV cache instead of computing their own (YOCO-style, cross-layer attention), and which layers own caches.
   attn.kv_groups:
     type: list
-    items: [name, layers, elements, tokens_per_entry, window, note, quote]
+    items: [name, layers, elements, tokens_per_entry, window, source, at, note, quote]
     label: KV cache groups
-    definition: "Explicit KV cache description for designs the standard formula cannot express (compressed or shared caches). Each item: name, layers (layers owning this cache), elements (scalars per cache entry, K and V together), tokens_per_entry (compression ratio, 1 if none), window (entries kept, for sliding windows), quote. When present, KV fields are computed from it."
+    definition: "Cache owners and entry shapes for compressed or shared attention. Each item specifies layers owning the cache, scalar elements per entry (K and V together), tokens_per_entry (compression ratio, default 1), and optionally window (maximum entries retained). Completed compressed entries are floor(context / tokens_per_entry); incomplete compressor state is excluded. KV sizes use these groups when present."
+  attn.kv_precision:
+    type: list
+    items: [name, group, elements, bits, format, scale_count, scale_bits, padding_bytes, source, at, note, quote]
+    label: KV storage formats
+    aliases: [FP4 cache, FP8 cache, quantization scales, mixed precision, sourced storage]
+    definition: "Sourced storage components of attn.kv_groups. Each component names its group and gives elements, bits per element, format, scale_count, scale_bits and padding_bytes per entry. Different parts of one entry can have different formats. Sourced-storage sizes are available only when every group's elements are covered. These are inference-cache formats; they do not establish pretraining precision."
   attn.conv:
     type: int
     unit: elements
@@ -743,14 +754,14 @@ fields:
     label: KV bytes / token
     aliases: [kv cache, memory]
     derived: true
-    definition: BF16 KV cache per token of a sequence at the selected context, kv.bytes_at_context divided by the context (131,072 tokens in exports). Includes sliding-window caches, so for SWA models it falls as context grows. Applies to prefill and decode alike.
+    definition: "Retained KV cache divided by context length, including bounded SWA caches and indexer keys. Exports use uniform BF16 at 131,072 tokens. The website can select uniform payload precision (no quantization overhead) or sourced component formats (including scales and documented padding). This is cache payload, not peak prefill memory or persistent prefix storage."
   kv.growth_per_token:
     type: float
     unit: bytes
-    label: KV growth / token
-    aliases: [kv cache, marginal, asymptotic]
+    label: Global KV bytes / token
+    aliases: [kv cache, marginal, asymptotic, growth]
     derived: true
-    definition: BF16 KV-cache bytes added per additional token once sliding windows are full, i.e. global layers and sparse-attention indexer keys only. The limit of kv.bytes_per_token at long context.
+    definition: "Long-context global KV bytes per token, including indexer keys; excludes bounded SWA caches. Compression rates and cross-layer cache reuse are included. Exports use uniform BF16; the website's storage selector also applies here. This is the field to compare with global-KV figures in reports, using the matching storage recipe."
   kv.bytes_per_token_per_active:
     type: float
     unit: bytes
@@ -771,7 +782,7 @@ fields:
     label: KV at context
     aliases: [kv cache, memory]
     derived: true
-    definition: BF16 KV cache for one sequence at the selected context (131,072 tokens in exports), including sliding-window layers capped at their window and indexer keys. Excludes recurrent state, MTP or draft layers and compressor tail state.
+    definition: "Retained KV cache for one sequence at the selected context, including SWA windows and indexer keys. Exports use uniform BF16 at 131,072 tokens. Excludes recurrent state, compressor tail state, draft/MTP caches, temporary prefill tensors, allocator metadata and persistent prefix snapshots. Does not estimate peak prefill or total serving memory."
 
   # --- eval ------------------------------------------------------------------
   # Scores of the released post-trained model from independent evaluators, not publisher-reported.
