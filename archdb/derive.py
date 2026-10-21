@@ -166,11 +166,6 @@ def derive(facts: dict, context: int = 131_072, counts: dict | None = None) -> d
     )
     if tokens and active_ne:
         out["scaling.tpp_active"] = {"value": tokens / active_ne, "formula": f"train.tokens / {ne_key}"}
-    if tokens and batch:
-        out["scaling.batch_ratio"] = {
-            "value": batch / tokens**0.47,
-            "formula": "train.batch_tokens / train.tokens^0.47",
-        }
     lr, wd = number(facts, "train.lr_peak"), number(facts, "train.weight_decay")
     if tokens and batch and lr and wd and str(value(facts, "train.optimizer") or "").startswith("AdamW"):
         out["scaling.adamw_tau"] = {

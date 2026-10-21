@@ -171,7 +171,7 @@ def test_recipe_ratios():
     d = derive(f)
     assert d["scaling.tpp"]["value"] == 20
     assert d["scaling.tpp_active"]["value"] == 400
-    assert d["scaling.batch_ratio"]["value"] == 1.6e7 / 2e13**0.47
+    assert "scaling.batch_ratio" not in d
     assert abs(d["scaling.adamw_tau"]["value"] - 1.6e7 / (2e-4 * 0.1 * 2e13)) < 1e-12
 
 

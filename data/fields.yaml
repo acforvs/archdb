@@ -728,13 +728,6 @@ fields:
     aliases: [TPP, chinchilla, overtraining]
     derived: true
     definition: train.tokens divided by params.counted_active_non_embedding, or by the stated params.active_non_embedding when there is no validated checkpoint count.
-  scaling.batch_ratio:
-    type: float
-    unit: ratio
-    label: Batch / critical-batch scaling (B / D^0.47)
-    aliases: [power lines, critical batch, batch scaling]
-    derived: true
-    definition: "train.batch_tokens divided by train.tokens^0.47, proportional to B / Bcrit(D). Critical batch size grows about as D^0.47 (Zhang et al. 2024; Power Lines fits D^0.462), so equal values mean the same batch relative to the critical batch for the training horizon; larger means a larger batch than that scaling suggests."
   scaling.adamw_tau:
     type: float
     unit: ratio

@@ -16,17 +16,6 @@ export const PARETO: Record<string, string> = {
 
 interface Point { m: Model; x: number; y: number }
 
-/** Reference power laws drawn through the median model, keyed by "x|y". */
-const GUIDES: Record<string, { exp: number; label: string; note: string }> = {
-  "train.tokens|train.batch_tokens": {
-    exp: 0.47,
-    label: "B ∝ D^0.47 through the median model",
-    note: "Grey line: B ∝ D^0.47 (Power Lines) through the median model; points above it use a larger batch for their token budget.",
-  },
-};
-
-
-
 /** Points not dominated by any other point under the chosen directions, ordered along x. */
 function paretoFront(pts: Point[], mode: string): Set<Point> {
   if (!mode) return new Set();
@@ -77,24 +66,13 @@ export function Plot({ db, models, view, open }: {
     isDate(k) ? yearMonth(v) : db.fields[k]?.unit !== "bytes" && Math.abs(v) >= 1e6 ? si(v) : format(k, db.fields[k], v);
   const fx = fmtAxis(view.x);
   const fy = fmtAxis(view.y);
-  const guide = GUIDES[`${view.x}|${view.y}`];
-  const guideLine = useMemo(() => {
-    if (!guide || pts.length < 2) return [];
-    const ks = pts.map((p) => p.y / p.x ** guide.exp).sort((a, b) => a - b);
-    const k = ks[Math.floor(ks.length / 2)];
-    const [lo, hi] = [Math.min(...pts.map((p) => p.x)), Math.max(...pts.map((p) => p.x))];
-    return Array.from({ length: 41 }, (_, i) => {
-      const x = xlog ? lo * (hi / lo) ** (i / 40) : lo + ((hi - lo) * i) / 40;
-      return { x, y: k * x ** guide.exp };
-    });
-  }, [guide, pts, xlog]);
   const selected = new Set(view.sel.split(","));
   // With a front, label the front, the next layer behind it, the extremes and ticked models; otherwise all that fit.
   const second = useMemo(() => paretoFront(pts.filter((p) => !front.has(p)), view.pareto), [pts, front, view.pareto]);
   const labelled = !front.size ? pts : pts.filter((p) =>
     front.has(p) || second.has(p) || selected.has(p.m.id) || [Math.min, Math.max].some((f) =>
       p.x === f(...pts.map((q) => q.x)) || p.y === f(...pts.map((q) => q.y))));
-  const avoid = [frontLine.map((p) => [sx(p.x), sy(p.y)]), guideLine.map((p) => [sx(p.x), sy(p.y)])];
+  const avoid = [frontLine.map((p) => [sx(p.x), sy(p.y)])];
   // Points drawn within a few pixels of each other share one label and one hover card.
   const stacks = new Map<Point, Point[]>();
   for (const p of pts)
@@ -125,13 +103,6 @@ export function Plot({ db, models, view, open }: {
         <text className="axis-title" transform={`translate(18 ${(M.t + h - M.b) / 2}) rotate(-90)`} textAnchor="middle">
           {axisTitle(db, view, view.y, ylog)}
         </text>
-        <clipPath id="plot-area"><rect x={M.l} y={M.t} width={w - M.l - M.r} height={h - M.t - M.b} /></clipPath>
-        {guideLine.length > 0 && (
-          <g className="guide" clipPath="url(#plot-area)">
-            <polyline points={guideLine.map((p) => `${sx(p.x)},${sy(p.y)}`).join(" ")} />
-            <text x={sx(guideLine[0].x) + 4} y={sy(guideLine[0].y) + 16}>{guide.label}</text>
-          </g>
-        )}
         {frontLine.length > 1 && (
           <polyline className="front" points={frontLine.map((p) => `${sx(p.x)},${sy(p.y)}`).join(" ")} />
         )}
@@ -179,7 +150,6 @@ export function Plot({ db, models, view, open }: {
         {missing > 0 && ` ${missing} lack one of the two values and are omitted, not drawn at zero.`}
         {front.size > 0 && ` ${front.size} on the Pareto front (${PARETO[view.pareto]}).`}
         {[view.x, view.y].some((k) => k.startsWith("eval.")) && " Hollow points are base checkpoints plotted with their post-trained sibling's score."}
-        {guide && ` ${guide.note}`}
         {labelled.length < pts.length && " Labels show the front, the layer behind it, the extremes and ticked models; hover the others."}
         {" "}Click a point for its sources.
       </p>

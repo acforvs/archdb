@@ -178,7 +178,7 @@ export const PRESETS: Record<string, string[]> = {
   Scaling: [
     "params.total", "params.active", "params.counted_active_non_embedding", "train.tokens", "train.lr_peak",
     "train.batch_tokens", "train.weight_decay", "train.init", "scaling.tpp", "scaling.tpp_active", "scaling.adamw_tau",
-    "scaling.batch_ratio", "scaling.parametrization", "scaling.hp_rule", "scaling.ladder", "norm.output_scale",
+    "scaling.parametrization", "scaling.hp_rule", "scaling.ladder", "norm.output_scale",
     "norm.embedding",
   ],
   "Data & compute": [

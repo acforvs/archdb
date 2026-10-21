@@ -10,15 +10,27 @@ import { Panel } from "./Panel";
 import { ColumnPicker } from "./ColumnPicker";
 import { FieldSelect } from "./FieldSelect";
 import { Filters } from "./Filters";
-import { scopeModels } from "./filterRules";
+import { ATTRS, parseRules, scopeModels, serializeRules } from "./filterRules";
 import { DEFAULTS, parseView, serializeView, type View } from "./view";
 import { Share } from "./Share";
 export type { View } from "./view";
 
 const CONTEXTS = [8192, 32768, 131072, 262144, 1048576];
 
-function readHash(): View {
-  return parseView(location.hash.slice(1));
+function readHash(db: DB): View {
+  const view = parseView(location.hash.slice(1));
+  const known = (key: string) => Object.hasOwn(db.fields, key);
+  view.cols = view.cols.split(",").filter(known).join(",");
+  view.f = serializeRules(parseRules(view.f).filter((r) => known(r.key) || Object.hasOwn(ATTRS, r.key)));
+  if (!known(view.focus)) view.focus = "";
+  const numeric = new Set(numericFields(db));
+  if (!numeric.has(view.x)) view.x = DEFAULTS.x;
+  if (!numeric.has(view.y)) view.y = DEFAULTS.y;
+  if (view.sort !== "name" && !known(view.sort)) {
+    view.sort = visibleColumns(db, view).includes(DEFAULTS.sort) ? DEFAULTS.sort : "name";
+    view.dir = view.sort === "name" ? 1 : DEFAULTS.dir;
+  }
+  return view;
 }
 
 function writeHash(view: View) {
@@ -27,7 +39,7 @@ function writeHash(view: View) {
 }
 
 export function App({ db }: { db: DB }) {
-  const [view, setView] = useState<View>(readHash);
+  const [view, setView] = useState<View>(() => readHash(db));
   const set = (patch: Partial<View>) => setView((v) => ({ ...v, ...patch }));
   const changeColumns = (preset: string) => {
     const columns = visibleColumns(db, { ...view, preset });
@@ -39,10 +51,10 @@ export function App({ db }: { db: DB }) {
     }
   };
   useEffect(() => {
-    const update = () => setView(readHash());
+    const update = () => setView(readHash(db));
     addEventListener("hashchange", update);
     return () => removeEventListener("hashchange", update);
-  }, []);
+  }, [db]);
   useEffect(() => writeHash(view), [view]);
 
   const numeric = useMemo(() => numericFields(db), [db]);

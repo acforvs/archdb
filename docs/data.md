@@ -13,8 +13,10 @@ Everything is in [`exports/`](../exports), regenerated from the records by `uv r
 Field keys are `group.name`, for example `attn.kv_heads`, `train.lr_peak`, `moe.top_k`. Definitions
 are in [`data/fields.yaml`](../data/fields.yaml). Fields marked `derived` are computed from other
 values: ratios (`shape.aspect`, `attn.swa_ratio`, `moe.latent_ratio`, `moe.sparsity`), tokens per
-parameter, the AdamW timescale τ = B/(ηλD) and B/D^0.47 from Power Lines (arXiv 2505.13738), and KV
-cache sizes. KV sizes assume BF16 (the website also shows FP8) and count global layers, sliding
+parameter, the peak-LR AdamW timescale estimate τ = B/(ηλD), and KV cache sizes. For τ, normalization
+by the full run follows [Power Lines](https://arxiv.org/html/2505.13738v2#S2.SS2); replacing total steps
+S with D/B assumes constant batch size.
+KV sizes assume BF16 (the website also shows FP8) and count global layers, sliding
 windows capped at their window, and sparse-attention indexer keys. `kv.bytes_per_token` is the total
 cache at a context divided by that context, so sliding-window caches are included;
 `kv.growth_per_token` is the long-context limit (global layers only). Context-dependent values in the

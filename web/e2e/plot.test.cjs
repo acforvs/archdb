@@ -319,7 +319,7 @@ test("theme follows system changes until a preference is chosen, even without st
 });
 
 test("Share creates a reusable short link that restores a view in a fresh browser", async () => {
-  const query = "preset=Custom&sort=scaling.batch_ratio&x=train.tokens&y=train.batch_tokens&ylog=1&cols=train.tokens%2Cscaling.batch_ratio%2Ctrain.batch_tokens%2Ctrain.batch%2Cparams.counted_active_non_embedding%2Cscaling.tpp_active&pareto=&by=half&feat=mtp";
+  const query = "preset=Custom&sort=train.batch_tokens&x=train.tokens&y=train.batch_tokens&ylog=1&cols=train.tokens%2Ctrain.batch_tokens%2Ctrain.batch%2Cparams.counted_active_non_embedding%2Cscaling.tpp_active&pareto=&by=half&feat=mtp";
   const page = await browser.newPage({ viewport: { width: 1600, height: 1050 } });
   let context;
   const requests = [];
@@ -387,7 +387,7 @@ test("Share can copy the full URL if saving or clipboard access fails", async ()
 test("switching column presets replaces hidden sorts and preserves visible sorts", async () => {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1050 } });
   const hash = new URLSearchParams({
-    preset: "Custom", sort: "scaling.batch_ratio", dir: "1", cols: "train.tokens,scaling.batch_ratio",
+    preset: "Custom", sort: "train.batch_tokens", dir: "1", cols: "train.tokens,train.batch_tokens",
     q: "deepseek", ctx: "32768", sel: "deepseek-v3",
   });
   try {
@@ -412,4 +412,54 @@ test("switching column presets replaces hidden sorts and preserves visible sorts
     assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get("sort"), "name");
     assert.equal(await page.locator(".count-note").innerText().then(t => t.includes("sorted by")), false);
   } finally { await page.close(); }
+});
+
+test("old shared views discard retired columns, filters, focus and sorts", async () => {
+  const page = await browser.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const legacy = new URLSearchParams({
+    preset: "Custom", sort: "scaling.batch_ratio", dir: "-1",
+    cols: "train.tokens,scaling.batch_ratio,train.batch_tokens",
+    f: "scaling.batch_ratio>=10;params.active>=10B", q: "deepseek", ctx: "32768",
+    model: "deepseek-v3", focus: "scaling.batch_ratio", sel: "deepseek-v3",
+  });
+  try {
+    const saved = await page.request.post(baseURL + "/api/views", { data: { query: legacy.toString() } });
+    assert.equal(saved.status(), 200);
+    const { path } = await saved.json();
+    await page.goto(baseURL + path);
+    await page.locator("table.grid tbody tr").first().waitFor();
+    await page.getByRole("complementary", { name: "DeepSeek-V3-Base sources" }).waitFor();
+    const restored = new URLSearchParams(new URL(page.url()).hash.slice(1));
+    assert.equal(restored.get("cols"), "train.tokens,train.batch_tokens");
+    assert.equal(restored.get("sort"), "name");
+    assert.equal(restored.get("dir"), "1");
+    assert.equal(restored.get("f"), "params.active>=10B");
+    assert.equal(restored.has("focus"), false);
+    for (const key of ["preset", "q", "ctx", "model", "sel"]) assert.equal(restored.get(key), legacy.get(key));
+    assert.equal(await page.locator(".fact.focus").count(), 0);
+    assert.match(await page.locator('th[aria-sort="ascending"]').innerText(), /Model/);
+    assert.deepEqual(errors, []);
+    const data = await (await page.request.get(baseURL + "/data.json")).json();
+    assert.equal(Object.hasOwn(data.fields, "scaling.batch_ratio"), false);
+    assert.ok(data.models.every((m) => !Object.hasOwn(m.derived, "scaling.batch_ratio")));
+  } finally { await page.close(); }
+});
+
+for (const axis of ["x", "y"]) {
+  test(`old plot URLs replace a retired ${axis} axis`, async () => {
+    const hash = new URLSearchParams({ tab: "plot", [axis]: "scaling.batch_ratio" });
+    await withPlot(hash.toString(), async (page) => {
+      assert.equal(new URL(page.url()).hash.includes("scaling.batch_ratio"), false);
+      assert.equal(await page.locator(".plot-card svg").count(), 1);
+    });
+  });
+}
+
+test("the batch versus tokens plot has no inferred critical-batch guide", async () => {
+  await withPlot("tab=plot&x=train.tokens&y=train.batch_tokens&ylog=1&pareto=", async (page) => {
+    assert.equal(await page.locator(".plot-card .guide").count(), 0);
+    assert.equal((await page.locator(".plot-card").innerText()).includes("0.47"), false);
+  });
 });

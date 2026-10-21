@@ -925,18 +925,6 @@
    "derived": true,
    "definition": "train.tokens divided by params.counted_active_non_embedding, or by the stated params.active_non_embedding when there is no validated checkpoint count."
   },
-  "scaling.batch_ratio": {
-   "type": "float",
-   "unit": "ratio",
-   "label": "Batch / critical-batch scaling (B / D^0.47)",
-   "aliases": [
-    "power lines",
-    "critical batch",
-    "batch scaling"
-   ],
-   "derived": true,
-   "definition": "train.batch_tokens divided by train.tokens^0.47, proportional to B / Bcrit(D). Critical batch size grows about as D^0.47 (Zhang et al. 2024; Power Lines fits D^0.462), so equal values mean the same batch relative to the critical batch for the training horizon; larger means a larger batch than that scaling suggests."
-  },
   "scaling.adamw_tau": {
    "type": "float",
    "unit": "ratio",
@@ -1661,10 +1649,6 @@
      "value": 251.73850420212423,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 10.084188124383141,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "kv.growth_per_token": {
      "value": 327680,
      "formula": "80 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
@@ -2194,10 +2178,6 @@
     "scaling.tpp_active": {
      "value": 241.01085473387454,
      "formula": "train.tokens / params.counted_active_non_embedding"
-    },
-    "scaling.batch_ratio": {
-     "value": 57.18569144699974,
-     "formula": "train.batch_tokens / train.tokens^0.47"
     },
     "kv.growth_per_token": {
      "value": 85888,
@@ -3612,10 +3592,6 @@
      "value": 414.5781429942601,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 40.61889993676153,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "scaling.adamw_tau": {
      "value": 0.19322653562653558,
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
@@ -4673,10 +4649,6 @@
      "value": 2411.013199928686,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 33.925515992861925,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "kv.growth_per_token": {
      "value": 6880.0,
      "formula": "attn.kv_groups: (21 × 512 / 4 + 21 × 128 / 4 + 20 × 512 / 128) elements × 2 bytes"
@@ -5285,10 +5257,6 @@
     "scaling.tpp_active": {
      "value": 675.4719734100944,
      "formula": "train.tokens / params.counted_active_non_embedding"
-    },
-    "scaling.batch_ratio": {
-     "value": 41.80906377468861,
-     "formula": "train.batch_tokens / train.tokens^0.47"
     },
     "kv.growth_per_token": {
      "value": 9848.0,
@@ -5908,10 +5876,6 @@
     "scaling.tpp_active": {
      "value": 2832.084818097644,
      "formula": "train.tokens / params.counted_active_non_embedding"
-    },
-    "scaling.batch_ratio": {
-     "value": 38.51129292273304,
-     "formula": "train.batch_tokens / train.tokens^0.47"
     },
     "kv.growth_per_token": {
      "value": 3200.0,
@@ -11584,10 +11548,6 @@
      "value": 722.3886526095398,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 20.24147335319337,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "kv.growth_per_token": {
      "value": 249856,
      "formula": "61 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
@@ -12536,10 +12496,6 @@
     "scaling.tpp_active": {
      "value": 507.985297763925,
      "formula": "train.tokens / params.counted_active_non_embedding"
-    },
-    "scaling.batch_ratio": {
-     "value": 42.32713804232197,
-     "formula": "train.batch_tokens / train.tokens^0.47"
     },
     "kv.growth_per_token": {
      "value": 70272,
@@ -17178,10 +17134,6 @@
      "value": 34.87525987525988,
      "formula": "train.tokens / params.total"
     },
-    "scaling.batch_ratio": {
-     "value": 58.88833995351715,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "scaling.adamw_tau": {
      "value": 0.19970193740685543,
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
@@ -18716,10 +18668,6 @@
     "scaling.tpp_active": {
      "value": 1901.939690855037,
      "formula": "train.tokens / params.counted_active_non_embedding"
-    },
-    "scaling.batch_ratio": {
-     "value": 32.66170997564792,
-     "formula": "train.batch_tokens / train.tokens^0.47"
     },
     "scaling.adamw_tau": {
      "value": 0.07767229629629628,
@@ -22093,10 +22041,6 @@
      "value": 1118.6086917626062,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 52.42199652155272,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "kv.growth_per_token": {
      "value": 16128,
      "formula": "14 global layers × 576 elements × 2 bytes (MLA: kv_lora_rank + rope_dim)"
@@ -23119,10 +23063,6 @@
      "value": 370.97932958733406,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 14.103505006162242,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "scaling.adamw_tau": {
      "value": 0.050331648,
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
@@ -23692,10 +23632,6 @@
      "value": 2137.3923285023698,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 12.699287371023955,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "scaling.adamw_tau": {
      "value": 0.022369621333333332,
      "formula": "train.batch_tokens / (train.lr_peak × train.weight_decay × train.tokens)"
@@ -24192,10 +24128,6 @@
     "scaling.tpp_active": {
      "value": 182.65322776970402,
      "formula": "train.tokens / params.counted_active_non_embedding"
-    },
-    "scaling.batch_ratio": {
-     "value": 8.480641760269032,
-     "formula": "train.batch_tokens / train.tokens^0.47"
     },
     "scaling.adamw_tau": {
      "value": 0.024528093567251465,
@@ -28566,10 +28498,6 @@
      "value": 1610.0396310376977,
      "formula": "train.tokens / params.counted_active_non_embedding"
     },
-    "scaling.batch_ratio": {
-     "value": 39.93824100619804,
-     "formula": "train.batch_tokens / train.tokens^0.47"
-    },
     "kv.growth_per_token": {
      "value": 49152,
      "formula": "12 global layers × 2048 elements × 2 bytes (GQA: kv_heads × (head_dim + v_head_dim))"
@@ -29979,10 +29907,6 @@
     "scaling.tpp_active": {
      "value": 1400.1326458654369,
      "formula": "train.tokens / params.counted_active_non_embedding"
-    },
-    "scaling.batch_ratio": {
-     "value": 81.18931736151727,
-     "formula": "train.batch_tokens / train.tokens^0.47"
     },
     "kv.growth_per_token": {
      "value": 61440,
