@@ -144,6 +144,25 @@ test("the global-KV plot uses sourced values and opens its evidence", async () =
   });
 });
 
+test("the KV preset names every plotted model and identifies models with missing scores", async () => {
+  await withPlot("tab=plot", async (page) => {
+    const points = await page.locator("circle.hit").count();
+    assert.equal(await page.getByRole("checkbox", { name: "All model names" }).isChecked(), true);
+    assert.equal(await page.locator(".dot-label").count(), points);
+    assert.ok((await page.locator(".dot-label").allTextContents()).includes("DeepSeek-V3.2"));
+    await page.getByRole("checkbox", { name: "All model names" }).uncheck();
+    await page.waitForFunction(() => document.querySelectorAll(".dot-label").length < document.querySelectorAll("circle.hit").length);
+    await page.getByRole("checkbox", { name: "All model names" }).check();
+    await page.setViewportSize({ width: 520, height: 950 });
+    await page.waitForFunction(() => document.querySelectorAll(".dot-label").length === document.querySelectorAll("circle.hit").length);
+    const missing = page.locator(".plot-missing");
+    await missing.locator("summary").click();
+    await missing.getByRole("button", { name: "Laguna-XS.2", exact: true }).waitFor();
+    await missing.getByRole("button", { name: "Laguna-XS.2", exact: true }).click();
+    await page.getByRole("complementary", { name: "Laguna-XS.2 sources" }).waitFor();
+  });
+});
+
 for (const [name, hash] of [
   ["capability vs active parameters", "tab=plot&preset=MoE&sort=shape.aspect&x=params.counted_active_non_embedding&cols=shape.aspect%2Cparams.active%2Cparams.total"],
   ["capability vs KV", "tab=plot"],

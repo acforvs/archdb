@@ -170,6 +170,15 @@
 .axis-title { fill: var(--text-2); font-size: 12px; font-weight: 500; }
 .dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; transition: r 0.1s; }
 .dot-label { fill: var(--text-2); font-size: 11px; pointer-events: none; }
+.dot-label { paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.label-leader { stroke: var(--muted); stroke-width: 0.8px; opacity: 0.5; pointer-events: none; }
+.plot-options { display: flex; gap: 14px; align-items: center; padding: 10px 16px 0; color: var(--muted); font-size: 12px; }
+.plot-canvas { position: relative; }
+.plot-options .toggle { color: var(--text-2); }
+.plot-missing { padding: 0 16px 14px; color: var(--text-2); font-size: 12px; }
+.plot-missing summary { cursor: pointer; }
+.plot-missing p { color: var(--muted); }
+.plot-missing div { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .hit { fill: transparent; cursor: pointer; }
 
 /* ---------- panel ---------- */

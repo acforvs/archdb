@@ -32,6 +32,7 @@ export function Plot({ db, models, view, open }: {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 900, h: 560 });
   const [hotId, setHotId] = useState<string | null>(null);
+  const [showAllNames, setShowAllNames] = useState(true);
 
   useLayoutEffect(() => {
     const el = ref.current!;
@@ -59,7 +60,9 @@ export function Plot({ db, models, view, open }: {
   const front = useMemo(() => paretoFront(pts, view.pareto), [pts, view.pareto]);
   const frontLine = [...front].sort((a, b) => a.x - b.x);
 
-  const { w, h } = size;
+  const w = size.w;
+  const labelRows = Math.ceil(pts.length / Math.max(1, Math.floor((w - M.l - M.r) / 200)));
+  const h = Math.max(size.h, showAllNames ? labelRows * 18 + M.t + M.b : 0);
   const sx = scale(pts.map((p) => p.x), xlog, M.l, w - M.r, db.fields[view.x].unit === "bytes", isDate(view.x));
   const sy = scale(pts.map((p) => p.y), ylog, h - M.b, M.t, db.fields[view.y].unit === "bytes", isDate(view.y));
   const fmtAxis = (k: string) => (v: number) =>
@@ -69,19 +72,32 @@ export function Plot({ db, models, view, open }: {
   const selected = new Set(view.sel.split(","));
   // With a front, label the front, the next layer behind it, the extremes and ticked models; otherwise all that fit.
   const second = useMemo(() => paretoFront(pts.filter((p) => !front.has(p)), view.pareto), [pts, front, view.pareto]);
-  const labelled = !front.size ? pts : pts.filter((p) =>
+  const labelled = showAllNames || !front.size ? pts : pts.filter((p) =>
     front.has(p) || second.has(p) || selected.has(p.m.id) || [Math.min, Math.max].some((f) =>
       p.x === f(...pts.map((q) => q.x)) || p.y === f(...pts.map((q) => q.y))));
   const avoid = [frontLine.map((p) => [sx(p.x), sy(p.y)])];
-  // Points drawn within a few pixels of each other share one label and one hover card.
+  // Nearby points share a hover card; compact mode also combines their labels.
   const stacks = new Map<Point, Point[]>();
   for (const p of pts)
     stacks.set(p, pts.filter((q) => Math.hypot(sx(q.x) - sx(p.x), sy(q.y) - sy(p.y)) < 4));
-  const labels = placeLabels(pts, labelled, stacks, sx, sy, w, front, avoid);
-  const missing = models.length - pts.length;
+  const labels = useMemo(() => placeLabels(pts, labelled, stacks, sx, sy, w, h, front, avoid, showAllNames),
+    // Hover changes the point style, not the label layout. These inputs determine the geometry above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pts, front, second, showAllNames, view.sel, w, h, xlog, ylog, view.x, view.y, db]);
+  const plotted = new Set(pts.map((p) => p.m.id));
+  const missingModels = models.filter((m) => !plotted.has(m.id));
+  const missing = missingModels.length;
 
   return (
     <div className="plot-card" ref={ref}>
+      <div className="plot-options">
+        <label className="toggle">
+          <input type="checkbox" checked={showAllNames} onChange={(e) => setShowAllNames(e.target.checked)} />
+          All model names
+        </label>
+        <span>{labels.length} of {pts.length} names shown</span>
+      </div>
+      <div className="plot-canvas">
       <svg width={w} height={h} role="img" aria-label={`${db.fields[view.y].label} against ${db.fields[view.x].label}`}>
         <g className="grid">
           {sx.ticks.map((t) => (
@@ -106,6 +122,13 @@ export function Plot({ db, models, view, open }: {
         {frontLine.length > 1 && (
           <polyline className="front" points={frontLine.map((p) => `${sx(p.x)},${sy(p.y)}`).join(" ")} />
         )}
+        {labels.map(({ p, x, y, width }) => {
+          const endX = Math.max(x, Math.min(x + width, sx(p.x)));
+          const endY = Math.max(y - 11, Math.min(y + 3, sy(p.y)));
+          return Math.hypot(endX - sx(p.x), endY - sy(p.y)) > 12
+            ? <line key={`leader-${p.m.id}`} className="label-leader" x1={sx(p.x)} y1={sy(p.y)} x2={endX} y2={endY} />
+            : null;
+        })}
         {pts.map((p) => (
           <circle
             key={p.m.id}
@@ -118,7 +141,7 @@ export function Plot({ db, models, view, open }: {
           />
         ))}
         {labels.map(({ p, x, y, name }) => (
-          <text key={p.m.id} className={`dot-label${front.size && !front.has(p) ? " off-front" : ""}`} x={x} y={y}>
+          <text key={p.m.id} className={`dot-label${!showAllNames && front.size && !front.has(p) ? " off-front" : ""}`} x={x} y={y}>
             {name}
           </text>
         ))}
@@ -145,14 +168,22 @@ export function Plot({ db, models, view, open }: {
           <div>{db.fields[view.y].label}: <b>{fy(hot.y)}</b></div>
         </div>
       )}
+      </div>
       <p className="footnote">
         {pts.length} of {models.length} models plotted.
         {missing > 0 && ` ${missing} lack one of the two values and are omitted, not drawn at zero.`}
         {front.size > 0 && ` ${front.size} on the Pareto front (${PARETO[view.pareto]}).`}
         {[view.x, view.y].some((k) => k.startsWith("eval.")) && " Hollow points are base checkpoints plotted with their post-trained sibling's score."}
-        {labelled.length < pts.length && " Labels show the front, the layer behind it, the extremes and ticked models; hover the others."}
+        {!showAllNames && " Compact labels prioritize the front, nearby models and your selections."}
         {" "}Click a point for its sources.
       </p>
+      {missing > 0 && (
+        <details className="plot-missing">
+          <summary>{missing} models not plotted</summary>
+          <p>These models lack a value for one of the axes, or a positive value for a logarithmic axis.</p>
+          <div>{missingModels.map((m) => <button className="link" key={m.id} onClick={() => open(m.id)}>{m.name}</button>)}</div>
+        </details>
+      )}
     </div>
   );
 }
@@ -220,14 +251,13 @@ function linTicks(lo: number, hi: number): number[] {
   return out;
 }
 
-/** Greedy direct labels: keep a label only if it overlaps no other label, point or line. A stack of
- * coinciding points gets one label naming the first and counting the rest. */
+/** Prefer nearby clear positions; all-names mode searches the plot and connects displaced labels. */
 function placeLabels(
-  pts: Point[], want: Point[], stacks: Map<Point, Point[]>, sx: Scale, sy: Scale, w: number, first: Set<Point>,
-  lines: number[][][],
+  pts: Point[], want: Point[], stacks: Map<Point, Point[]>, sx: Scale, sy: Scale, w: number, h: number,
+  first: Set<Point>, lines: number[][][], all: boolean,
 ) {
   const boxes: number[][] = [];
-  const out: { p: Point; x: number; y: number; name: string }[] = [];
+  const out: { p: Point; x: number; y: number; name: string; width: number }[] = [];
   const done = new Set<Point>();
   const dots = pts.map((p) => [sx(p.x), sy(p.y)]);
   const along: number[][] = [];
@@ -240,26 +270,45 @@ function placeLabels(
   const sorted = [...want].sort((a, b) => Number(first.has(b)) - Number(first.has(a)) || b.y - a.y);
   for (const p of sorted) {
     if (done.has(p)) continue;
-    const stack = stacks.get(p) ?? [p];
+    const stack = all ? [p] : stacks.get(p) ?? [p];
     const name = stack.length > 1 ? `${p.m.name} +${stack.length - 1}` : p.m.name;
     const cx = sx(p.x), cy = sy(p.y);
-    const width = name.length * 6.4;
+    const width = Math.min(name.length * 6.4, w - M.l - M.r);
     const spots: [number, number][] = [
       [9, 0], [-9 - width, 0], [-width / 2, -14], [-width / 2, 16], [9, -12], [9, 12], [-9 - width, -12], [-9 - width, 12],
     ];
+    if (all) {
+      const extra: [number, number][] = [];
+      for (let y = M.t + 8; y <= h - M.b - 8; y += 18)
+        for (let x = M.l; x + width <= w - M.r; x += 24)
+          extra.push([x - cx, y - cy]);
+      extra.sort((a, b) => Math.hypot(a[0] + width / 2, a[1]) - Math.hypot(b[0] + width / 2, b[1]));
+      spots.push(...extra);
+    }
     const own = (x: number, y: number) => Math.hypot(x - cx, y - cy) < 4;
+    let fallback: { box: number[]; y: number; score: number } | undefined;
     for (const [dx, dy] of spots) {
       const box = [cx + dx, cy + dy - 7, cx + dx + width, cy + dy + 7];
-      if (box[0] < M.l || box[2] > w - M.r) continue;
+      if (box[0] < M.l || box[2] > w - M.r || box[1] < M.t || box[3] > h - M.b) continue;
       const inside = ([x, y]: number[]) => x > box[0] - 2 && x < box[2] + 2 && y > box[1] - 2 && y < box[3] + 2;
       const hitsLabel = boxes.some((b) => !(box[2] < b[0] || box[0] > b[2] || box[3] < b[1] || box[1] > b[3]));
       const hitsDot = dots.some(([x, y]) => x > box[0] - 4 && x < box[2] + 4 && y > box[1] - 4 && y < box[3] + 4 && !own(x, y));
-      if (!hitsLabel && !hitsDot && !along.some(inside)) {
+      if (all) {
+        const score = boxes.reduce((s, b) => s + Math.max(0, Math.min(box[2], b[2]) - Math.max(box[0], b[0]))
+          * Math.max(0, Math.min(box[3], b[3]) - Math.max(box[1], b[1])), 0);
+        if (!fallback || score < fallback.score) fallback = { box, y: cy + dy + 4, score };
+      }
+      if (!hitsLabel && !hitsDot && (all || !along.some(inside))) {
         boxes.push(box);
-        out.push({ p, x: box[0], y: cy + dy + 4, name });
+        out.push({ p, x: box[0], y: cy + dy + 4, name, width });
         stack.forEach((q) => done.add(q));
         break;
       }
+    }
+    if (all && !done.has(p) && fallback) {
+      boxes.push(fallback.box);
+      out.push({ p, x: fallback.box[0], y: fallback.y, name, width });
+      done.add(p);
     }
   }
   return out;
