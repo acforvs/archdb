@@ -431,6 +431,7 @@ test("old shared views discard retired columns, filters, focus and sorts", async
     await page.goto(baseURL + path);
     await page.locator("table.grid tbody tr").first().waitFor();
     await page.getByRole("complementary", { name: "DeepSeek-V3-Base sources" }).waitFor();
+    await page.waitForFunction(() => !location.hash.includes("scaling.batch_ratio"));
     const restored = new URLSearchParams(new URL(page.url()).hash.slice(1));
     assert.equal(restored.get("cols"), "train.tokens,train.batch_tokens");
     assert.equal(restored.get("sort"), "name");
@@ -451,7 +452,7 @@ for (const axis of ["x", "y"]) {
   test(`old plot URLs replace a retired ${axis} axis`, async () => {
     const hash = new URLSearchParams({ tab: "plot", [axis]: "scaling.batch_ratio" });
     await withPlot(hash.toString(), async (page) => {
-      assert.equal(new URL(page.url()).hash.includes("scaling.batch_ratio"), false);
+      await page.waitForFunction(() => !location.hash.includes("scaling.batch_ratio"));
       assert.equal(await page.locator(".plot-card svg").count(), 1);
     });
   });
