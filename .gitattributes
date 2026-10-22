@@ -1,0 +1,2 @@
+# Keep GitHub's language statistics focused on the Python data tooling.
+web/** -linguist-detectable
