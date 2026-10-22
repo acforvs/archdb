@@ -102,11 +102,21 @@ facts:
   attn.bias: {value: true, source: config, at: "/attention_bias"}
   attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
   attn.layout:
-    value: "1 SWA : 1 global"
-    source: card
-    at: "PDF p.4 §2.2 Attention"
-    quote: "attention blocks alternate between banded window and fully dense patterns"
-    note: "Config /layer_types alternates strictly, starting with a sliding-window layer."
+    value: '1 SWA : 1 global'
+    source: config
+    at: config.json; /layer_types
+    quote: '"layer_types": [ "sliding_attention", "full_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "full_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "full_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "full_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "full_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "full_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "full_attention" ]'
+    note: Config /layer_types alternates strictly, starting with a sliding-window layer. Ordered 36-layer backbone from
+      /layer_types; auxiliary modules are excluded.
+    basis: inferred
+    sequence: [SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA,
+      SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA, SWA, GQA]
   attn.local_layers: {value: 18, source: config, at: "/layer_types | count sliding_attention"}
   attn.local_heads:
     value: 64

@@ -63,11 +63,16 @@ facts:
     at: "p.3 §2.2"
     quote: "It adopts GQA (Ainslie et al., 2023) for the softmax layers and KDA (Kimi Delta Attention) (Yang et al., 2025; Kimi Team, 2025) for the linear layers"
   attn.layout:
-    value: "3 KDA : 1 GQA (GQA first in each block of 4)"
-    source: report
-    at: "p.3 §2.2"
-    quote: "Within each block the softmax layer comes first (S-L-L-L), unlike the linear-first ordering (L-L-L-S) adopted by Kimi Linear and Qwen3.5."
-    note: "Config /gqa_layers puts GQA at layers 0, 4, …, 44 (gqa_interval 3 KDA layers between)."
+    value: '3 KDA : 1 GQA (GQA first in each block of 4)'
+    source: config
+    at: config.json; /gqa_layers
+    quote: '"gqa_layers": [ 0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44 ]'
+    note: Config /gqa_layers puts GQA at layers 0, 4, …, 44 (gqa_interval 3 KDA layers between). /gqa_layers gives zero-based
+      global-attention indices; other layers use KDA.
+    basis: inferred
+    sequence: [GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA,
+      GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA,
+      GQA, KDA, KDA, KDA, GQA, KDA, KDA, KDA]
   attn.global_layers: {value: 12, source: config, at: "/gqa_layers | len"}
   attn.linear_layers:
     value: 36

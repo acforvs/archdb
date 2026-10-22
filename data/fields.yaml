@@ -172,7 +172,7 @@ fields:
     type: str
     required: hybrid
     label: Layer layout
-    definition: "Interleaving of mixer types, written as a repeating unit, e.g. '3 GDN : 1 GQA' or '5 SWA : 1 global'."
+    definition: "Token-mixer order, summarized as a pattern or layer positions. The fact's optional sequence lists each mixer in order; a ratio alone does not establish the order. Auxiliary prediction modules and standalone FFNs are excluded."
   attn.global_layers:
     type: int
     required: always

@@ -66,10 +66,26 @@ facts:
     at: "p.9 §3.2; Table 33 caption p.85"
     quote: "the 32B model uses grouped-query attention (Ainslie et al., 2023) for increased efficiency."
   attn.layout:
-    value: "3 SWA : 1 global (last layer global)"
-    source: report
-    at: "p.9 §3.2 Architecture"
-    quote: "We add SWA at three out of every four layers, and ensure that the last layer always uses full attention."
+    value: '3 SWA : 1 global (last layer global)'
+    source: config
+    at: config.json; /layer_types
+    quote: '"layer_types": [ "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention" ]'
+    note: Ordered 64-layer backbone from /layer_types; auxiliary modules are excluded.
+    basis: inferred
+    sequence: [SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, GQA]
   attn.window: {value: 4096, source: config, at: "/sliding_window"}
   attn.local_heads:
     value: 40

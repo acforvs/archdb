@@ -94,10 +94,19 @@ facts:
     quote: "The attention layers interleave sliding-window attention layers with Rotational Positional Embeddings and global attention layers without positional embeddings in a 3:1 ratio"
   attn.kv_heads: {value: 8, source: config, at: "/text_config/num_key_value_heads"}
   attn.layout:
-    value: "3 SWA : 1 global"
-    source: card
-    at: "README.md; Model Architecture"
-    quote: "global attention layers without positional embeddings in a 3:1 ratio"
+    value: '3 SWA : 1 global'
+    source: config
+    at: config.json; /text_config/layer_types
+    quote: '"layer_types": [ "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention" ]'
+    note: Ordered 32-layer backbone from /text_config/layer_types; auxiliary modules are excluded.
+    basis: inferred
+    sequence: [SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA]
   attn.local_layers: {value: 24, source: config, at: "/text_config/layer_types | count sliding_attention"}
   attn.position:
     value: "RoPE (SWA), NoPE (global)"

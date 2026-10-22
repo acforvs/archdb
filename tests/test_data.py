@@ -114,3 +114,23 @@ def test_cache_precision_checks_references_and_component_coverage():
     ]:
         f["attn.kv_precision"]["value"] = [{**component, key: value}]
         assert _check_kv("test:", f)
+
+
+def test_layer_sequence_requires_known_types_and_agrees_with_all_counts():
+    from copy import deepcopy
+
+    from archdb.data import _check_sequence
+
+    facts = {
+        "shape.layers": {"value": 4},
+        "attn.global_layers": {"value": 1},
+        "attn.local_layers": {"value": 3},
+        "attn.layout": {"sequence": ["SWA", "GQA", "SWA", "SWA"]},
+    }
+    assert _check_sequence("test:", facts) == []
+    for sequence in [[], ["SWA"], ["GQA"] * 4, ["unknown"] * 4, [True] * 4, "SWA"]:
+        changed = deepcopy(facts)
+        changed["attn.layout"]["sequence"] = sequence
+        assert _check_sequence("test:", changed)
+    facts["shape.layers"]["sequence"] = ["SWA"] * 4
+    assert any("only supported on attn.layout" in e for e in _check_sequence("test:", facts))

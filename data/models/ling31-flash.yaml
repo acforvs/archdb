@@ -82,11 +82,17 @@ facts:
     quote: "Transformer Layers 63 KDA + 9 Gated MLA (7:1)"
   attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
   attn.layout:
-    value: "7 KDA : 1 MLA"
+    value: '7 KDA : 1 MLA'
     source: modeling_bailing_moe_v3
-    at: "modeling_bailing_moe_v3.py; BailingMoeV3DecoderLayer.__init__"
-    quote: "if (layer_idx + 1) % config.layer_group_size == 0"
-    note: "/layer_group_size = 8: MLA at layers 7, 15, …, 71."
+    at: modeling_bailing_moe_v3.py; DecoderLayer.__init__
+    quote: if (layer_idx + 1) % config.layer_group_size == 0
+    note: '/layer_group_size = 8: MLA at layers 7, 15, …, 71. Ordered from that conditional with /layer_group_size=8;
+      the implementation also makes any incomplete final group global.'
+    basis: inferred
+    sequence: [KDA, KDA, KDA, KDA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, KDA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, KDA,
+      KDA, KDA, KDA, MLA, KDA, KDA, KDA, KDA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, KDA, KDA, KDA, KDA, MLA,
+      KDA, KDA, KDA, KDA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, KDA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, KDA,
+      KDA, KDA, KDA, MLA, KDA, KDA, KDA, KDA, KDA, KDA, KDA, MLA]
   attn.linear_head_dim:
     value: 128
     source: config

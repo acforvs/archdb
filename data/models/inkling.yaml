@@ -57,11 +57,19 @@ facts:
     at: "The making of Inkling; Architecture"
     quote: "we interleave sliding-window and global layers at a 5:1 ratio with 8 KV heads"
   attn.layout:
-    value: "5 SWA : 1 global"
-    source: announcement
-    at: "The making of Inkling; Architecture"
-    quote: "we interleave sliding-window and global layers at a 5:1 ratio with 8 KV heads"
-    note: "Config /text_config/local_layer_ids omits 5, 11, ..., 65: global at every 6th layer."
+    value: '5 SWA : 1 global'
+    source: config
+    at: config.json; /text_config/local_layer_ids
+    quote: '"local_layer_ids": [ 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 24, 25, 26,
+      27, 28, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 42, 43, 44, 45, 46, 48, 49, 50, 51, 52, 54, 55, 56, 57, 58, 60,
+      61, 62, 63, 64 ]'
+    note: 'Config /text_config/local_layer_ids omits 5, 11, ..., 65: global at every 6th layer. /text_config/local_layer_ids
+      gives zero-based SWA indices; other backbone layers use global attention.'
+    basis: inferred
+    sequence: [SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, SWA, SWA, GQA]
   attn.global_layers:
     value: 11
     source: configuration_inkling

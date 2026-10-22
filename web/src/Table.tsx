@@ -187,7 +187,7 @@ export function Table({ db, models, view, set }: {
                       onMouseLeave={() => setHover(null)}
                     >
                       {k === "attn.layout" && stack
-                        ? <><LayerStrip stack={stack} title={typeof v === "string" ? v : undefined} />{!stack.ordered && <span className="strip-status">counts only</span>}</>
+                        ? <LayerStrip stack={stack} title={typeof v === "string" ? v : undefined} />
                         : unmodeled ? view.kvdt === "sourced" && k.startsWith("kv.") ? "not sourced" : "not modeled" : undisclosed ? "n/d" : format(k, db.fields[k], v)}
                       {!empty && siblingScore(m, k) && (
                         <sup className="mark" aria-label="post-trained sibling">‡</sup>

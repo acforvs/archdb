@@ -82,12 +82,23 @@ facts:
     quote: "we introduce a hybrid architecture combining sparse and linear attention"
     note: "Linear layers are Kimi Delta Attention (Glm5NextTextLinearAttention); sparse layers are MLA with a DSA indexer (Glm5NextTextAttention)."
   attn.layout:
-    value: "(3 KDA : 1 MLA+DSA) × 11 + 1 KDA"
+    value: '(3 KDA : 1 MLA+DSA) × 11 + 1 KDA'
     source: config
-    at: "config.json text_config.linear_attn_config.full_attn_layers"
-    quote: "\"full_attn_layers\": [ 3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43 ]"
+    at: config.json; /text_config/layer_types
+    quote: '"layer_types": [ "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention",
+      "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention", "linear_attention", "linear_attention",
+      "linear_attention", "deepseek_sparse_attention", "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention",
+      "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention", "linear_attention", "linear_attention",
+      "linear_attention", "deepseek_sparse_attention", "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention",
+      "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention", "linear_attention", "linear_attention",
+      "linear_attention", "deepseek_sparse_attention", "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention",
+      "linear_attention", "linear_attention", "linear_attention", "deepseek_sparse_attention", "linear_attention" ]'
     basis: inferred
-    note: "0-indexed MLA+DSA layers of 45; the rest (kda_layers), including the last (44), are KDA."
+    note: 0-indexed MLA+DSA layers of 45; the rest (kda_layers), including the last (44), are KDA. Ordered 45-layer
+      backbone from /text_config/layer_types; auxiliary modules are excluded.
+    sequence: [KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA,
+      KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA, KDA, KDA, KDA, DSA,
+      KDA, KDA, KDA, DSA, KDA]
   attn.global_layers: {value: 11, source: config, at: "/text_config/layer_types | count deepseek_sparse_attention"}
   attn.linear_layers: {value: 34, source: config, at: "/text_config/layer_types | count linear_attention"}
   attn.heads: {value: 64, source: config, at: "/text_config/num_attention_heads"}

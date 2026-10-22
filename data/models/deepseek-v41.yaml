@@ -202,11 +202,24 @@ facts:
       (§2.4.4).'
   attn.kv_heads: {value: 1, source: config, at: "/text_config/num_key_value_heads"}
   attn.layout:
-    value: "2 SWA + 18 CSA2 m=2 (encoder: 3 × [1 Full, 5 Reuse]) + 20 CSA2 m=1 (decoder: [1 Full, 3 Reuse], then 4 × [1 Reindex, 3 Reuse])"
-    source: report
-    at: "p.22 §4.2.1"
-    quote: "The remaining 18 encoder layers use CSA2 with a compression rate of 𝑚 = 2."
-    note: "Decoder: \"The 20 decoder layers use CSA2 with a compression rate of 𝑚 = 1\" (same paragraph). Every CSA2 layer also attends to its own 128-token SWA KV. Per-layer ratios in /text_config/compress_ratios (last 3 entries are DSpark layers)."
+    value: '2 SWA + 18 CSA2 m=2 (encoder: 3 × [1 Full, 5 Reuse]) + 20 CSA2 m=1 (decoder: [1 Full, 3 Reuse], then 4 ×
+      [1 Reindex, 3 Reuse])'
+    source: config
+    at: config.json; /text_config/compress_ratios, /text_config/kv_source_layer_ids, /text_config/index_source_layer_ids
+    quote: '"compress_ratios": [ 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 ]'
+    note: 'First 40 compress_ratios entries describe the backbone; the last 3 are DSpark layers. Indices 0–19 are
+      encoder, 20–39 decoder (report §4.2.1). Nonzero ratios retain a 128-token SWA branch in the same layer. Full
+      modes own KV at kv_source_layer_ids [2, 8, 14, 20]; Reindex layers appear in index_source_layer_ids but do not
+      own KV ([24, 28, 32, 36]); the remaining CSA2 layers reuse both. See inference/model.py Attention.__init__.'
+    basis: inferred
+    sequence: [SWA, SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2
+        + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2
+        + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2 + SWA, CSA2 m=2
+        + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1
+        + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1
+        + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA, CSA2 m=1
+        + SWA, CSA2 m=1 + SWA, CSA2 m=1 + SWA]
   attn.local_layers:
     value: 2
     source: report

@@ -100,10 +100,21 @@ facts:
     quote: "design a hybrid attention architecture combining Lightning Attention with MLA in a 7:1 ratio"
   attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
   attn.layout:
-    value: "7 Lightning : 1 MLA"
-    source: report
-    at: "p.5 §2.1"
-    quote: "design a hybrid attention architecture combining Lightning Attention with MLA in a 7:1 ratio"
+    value: '7 Lightning : 1 MLA'
+    source: modeling_bailing_moe_v2_5
+    at: modeling_bailing_moe_v2_5.py; DecoderLayer.__init__
+    quote: if (layer_idx + 1) % config.layer_group_size == 0
+    note: Ordered from that conditional with /layer_group_size=8; the implementation also makes any incomplete final
+      group global.
+    basis: inferred
+    sequence: [Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, MLA, Lightning, Lightning,
+      Lightning, Lightning, Lightning, Lightning, Lightning, MLA, Lightning, Lightning, Lightning, Lightning,
+      Lightning, Lightning, Lightning, MLA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning,
+      Lightning, MLA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, MLA,
+      Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, MLA, Lightning, Lightning,
+      Lightning, Lightning, Lightning, Lightning, Lightning, MLA, Lightning, Lightning, Lightning, Lightning,
+      Lightning, Lightning, Lightning, MLA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning,
+      Lightning, MLA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, MLA]
   attn.linear_head_dim: {value: 128, source: config, at: "/head_dim"}
   attn.linear_heads: {value: 64, source: config, at: "/num_attention_heads"}
   attn.linear_kind:

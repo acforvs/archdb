@@ -74,11 +74,22 @@ facts:
     quote: "a transformer block with softmax attention follows every seven transnormer blocks"
     note: "Transnormer blocks use Lightning attention (linear); the softmax blocks use GQA."
   attn.layout:
-    value: "7 Lightning : 1 GQA"
+    value: '7 Lightning : 1 GQA'
     source: config
-    at: "config.json attn_type_list"
-    quote: "\"attn_type_list\": [ 0, 0, 0, 0, 0, 0, 0, 1, 0,"
-    note: "Repeats 10 times; layer 79 is the last softmax layer."
+    at: config.json; /attn_type_list
+    quote: '"attn_type_list": [ 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+      0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+      0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1 ]'
+    note: 'Repeats 10 times; layer 79 is the last softmax layer. /attn_type_list: 0 = Lightning, 1 = softmax/GQA (MiniMaxM1Model.__init__).'
+    basis: inferred
+    sequence: [Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, GQA, Lightning, Lightning,
+      Lightning, Lightning, Lightning, Lightning, Lightning, GQA, Lightning, Lightning, Lightning, Lightning,
+      Lightning, Lightning, Lightning, GQA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning,
+      Lightning, GQA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, GQA,
+      Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, GQA, Lightning, Lightning,
+      Lightning, Lightning, Lightning, Lightning, Lightning, GQA, Lightning, Lightning, Lightning, Lightning,
+      Lightning, Lightning, Lightning, GQA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning,
+      Lightning, GQA, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, Lightning, GQA]
   attn.global_layers:
     value: 10
     source: config

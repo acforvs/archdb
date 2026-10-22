@@ -65,12 +65,24 @@ facts:
     at: "README.md; Model Overview table; Attention"
     quote: "Gated GQA + Sliding Window Attention"
   attn.layout:
-    value: "5 SWA : 1 global ×8, then 3 SWA : 1 global"
+    value: '5 SWA : 1 global ×8, then 3 SWA : 1 global'
     source: config
-    at: "config.json; layer_types"
-    quote: '"sliding_attention", "full_attention", "sliding_attention"'
+    at: config.json; /layer_types
+    quote: '"layer_types": [ "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention" ]'
     basis: inferred
-    note: "/layer_types has full_attention at layers 5, 11, ..., 47 and 51; all others sliding_attention."
+    note: /layer_types has full_attention at layers 5, 11, ..., 47 and 51; all others sliding_attention. Ordered 52-layer
+      backbone from /layer_types; auxiliary modules are excluded.
+    sequence: [SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA]
   attn.global_layers: {value: 9, source: config, at: "/layer_types | count full_attention"}
   attn.local_layers: {value: 43, source: config, at: "/layer_types | count sliding_attention"}
   attn.heads: {value: 48, source: config, at: "/num_attention_heads"}

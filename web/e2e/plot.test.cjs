@@ -577,6 +577,88 @@ test("compact model specs open the evidence for the value clicked", async () => 
   } finally { await page.close(); }
 });
 
+test("layer layouts show Muse Spark's actual order and use counts for unresolved layouts", async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    const hash = new URLSearchParams({ preset: "Custom", cols: "attn.layout", q: "Muse-Spark" });
+    await page.goto(`${baseURL}/#${hash}`);
+    const row = page.locator("table.grid tbody tr");
+    await row.waitFor();
+    const expected = "SG" + "SSSG".repeat(15);
+    const order = async (strip) => strip.locator("rect").evaluateAll((bars) => bars.map((bar) =>
+      bar.classList.contains("l-global") ? "G" : "S").join(""));
+    assert.equal(await order(row.locator("svg.strip")), expected);
+    assert.equal(await row.locator(".layer-counts").count(), 0);
+    await row.getByRole("button", { name: "Muse-Spark-Open-816B-A42B", exact: true }).click();
+    const panel = page.locator(".panel");
+    await panel.waitFor();
+    assert.equal(await order(panel.locator("svg.strip")), expected);
+
+    hash.set("q", "MiMo-V2-Flash-Base");
+    await page.goto(`${baseURL}/#${hash}`);
+    await row.locator("svg.strip").waitFor();
+    assert.equal(await order(row.locator("svg.strip")), "GSSSSG" + "SSSSSG".repeat(7));
+    await row.getByRole("button", { name: "MiMo-V2-Flash-Base", exact: true }).click();
+    await panel.locator("svg.strip").waitFor();
+    assert.equal(await order(panel.locator("svg.strip")), "GSSSSG" + "SSSSSG".repeat(7));
+
+    hash.set("q", "DeepSeek-V4.1-Flash");
+    await page.goto(`${baseURL}/#${hash}`);
+    await row.locator("svg.strip").waitFor();
+    assert.deepEqual(await row.locator("svg.strip rect").evaluateAll((bars) => bars.map((b) => b.dataset.layerType)),
+      ["SWA", "SWA", ...Array(18).fill("CSA2 m=2 + SWA"), ...Array(20).fill("CSA2 m=1 + SWA")]);
+    await page.getByRole("checkbox", { name: "Select the models shown", exact: true }).check();
+    hash.set("side", "1");
+    await page.goto(`${baseURL}/#${hash}`);
+    await page.locator(".compare svg.strip").waitFor();
+    assert.equal(await page.locator(".compare svg.strip rect").count(), 40);
+
+    await page.route("**/data.json*", async (route) => {
+      const response = await route.fetch();
+      const db = await response.json();
+      delete db.models.find((m) => m.id === "muse-spark-open").facts["attn.layout"].sequence;
+      await route.fulfill({ response, json: db });
+    });
+    hash.set("q", "Muse-Spark");
+    hash.delete("side");
+    await page.goto(`${baseURL}/#${hash}`);
+    await page.reload();
+    await row.locator(".layer-counts").waitFor();
+    assert.equal(await row.locator("svg.strip").count(), 0);
+    assert.match(await row.locator(".layer-counts").innerText(), /Order not shown/);
+    await row.getByRole("button", { name: "Muse-Spark-Open-816B-A42B", exact: true }).click();
+    await panel.locator(".layer-counts").waitFor();
+    assert.equal(await panel.locator("svg.strip").count(), 0);
+    assert.deepEqual(errors, []);
+  } finally { await page.close(); }
+});
+
+for (const mobile of [false, true]) {
+  test(`all model catalog cells open their model page (${mobile ? "touch" : "desktop"})`, async () => {
+    const page = await browser.newPage(mobile
+      ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }
+      : { viewport: { width: 1440, height: 950 } });
+    try {
+      await page.goto(`${baseURL}/models/`);
+      const row = page.locator(".catalog tbody tr").first();
+      const href = await row.locator("th a").getAttribute("href");
+      const name = await row.locator("th a").innerText();
+      for (const i of [0, 4]) {
+        const cell = row.locator("td").nth(i);
+        await cell.scrollIntoViewIfNeeded();
+        const box = await cell.boundingBox();
+        const position = { x: 5, y: box.height - 3 };
+        await (mobile ? cell.tap({ position }) : cell.click({ position }));
+        await page.waitForURL(new URL(href, baseURL).href);
+        assert.equal(await page.locator("main h1").innerText(), name);
+        await page.goBack();
+      }
+    } finally { await page.close(); }
+  });
+}
+
 test("the row and detail links open the exact base checkpoint on Hugging Face", async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   try {

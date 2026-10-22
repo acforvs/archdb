@@ -78,12 +78,18 @@ facts:
     quote: "Full attention on NoPE layers (every 4th, counted backward from the last), sliding otherwise — the reference config's sliding_window_pattern [w, w, w, 0]."
     note: "Card: grouped-query attention."
   attn.layout:
-    value: "3 SWA : 1 global"
+    value: '1 SWA, then 1 global, then (3 SWA : 1 global) × 15'
     source: configuration_muse_spark
-    at: "configuration_muse_spark.py; MuseSparkTextConfig.__post_init__"
-    quote: "Full attention on NoPE layers (every 4th, counted backward from the last), sliding otherwise — the reference config's sliding_window_pattern [w, w, w, 0]."
+    at: configuration_muse_spark.py; MuseSparkTextConfig.__post_init__; lines 153–155
+    quote: '"full_attention" if (self.num_hidden_layers - 1 - i) % 4 == 0 else "sliding_attention"'
     basis: inferred
-    note: "With 62 layers (card), global layers are 1, 5, ..., 61."
+    note: At 62 layers, these defaults put global attention at zero-based indices 1, 5, ..., 61 (one-based layers 2,
+      6, ..., 62). The checkpoint config is gated; this sequence is derived from MuseSparkTextConfig defaults, not an
+      extracted checkpoint array.
+    sequence: [SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, GQA]
   attn.global_layers:
     value: 16
     source: configuration_muse_spark

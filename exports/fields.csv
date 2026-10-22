@@ -23,7 +23,7 @@ shape.memory,shape,Lookup memory,str,,False,"Hashed n-gram or conditional-memory
 shape.tokenizer,shape,Tokenizer,str,,False,Tokenizer type and lineage as described by the publisher (e.g. byte-level BPE shared with an earlier model).
 shape.aspect,shape,d_model / layers,float,ratio,True,"Width-to-depth ratio, d_model divided by the number of blocks."
 attn.kind,attn,Token mixers,str,,False,"Token-mixing layer types in the backbone, e.g. GQA, MLA, SWA, Gated DeltaNet, Mamba-2, DSA (DeepSeek sparse attention)."
-attn.layout,attn,Layer layout,str,,False,"Interleaving of mixer types, written as a repeating unit, e.g. '3 GDN : 1 GQA' or '5 SWA : 1 global'."
+attn.layout,attn,Layer layout,str,,False,"Token-mixer order, summarized as a pattern or layer positions. The fact's optional sequence lists each mixer in order; a ratio alone does not establish the order. Auxiliary prediction modules and standalone FFNs are excluded."
 attn.global_layers,attn,Global-attention layers,int,layers,False,"Layers whose KV cache grows with full context (dense or sparse global attention, MLA). Excludes sliding-window and linear/recurrent layers."
 attn.swa_ratio,attn,SWA : global,float,ratio,True,"attn.local_layers divided by attn.global_layers, the sliding-window to global interleave ratio (5 for '5 SWA : 1 global')."
 attn.linear_ratio,attn,Linear : global,float,ratio,True,attn.linear_layers divided by attn.global_layers (3 for '3 Gated DeltaNet : 1 GQA').

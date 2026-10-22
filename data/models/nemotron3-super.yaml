@@ -84,12 +84,17 @@ facts:
     quote: "The attention layers employ Grouped-Query Attention (GQA) with 32 query heads and 2 KV heads"
   attn.kv_heads: {value: 2, source: config, at: "/num_key_value_heads"}
   attn.layout:
-    value: "40 Mamba-2 + 8 GQA"
+    value: 40 Mamba-2 + 8 GQA
     source: config
-    at: "config.json; hybrid_override_pattern"
+    at: config.json; /hybrid_override_pattern
     quote: '"hybrid_override_pattern": "MEMEMEM*EMEMEMEM*EMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEMEM*EMEMEMEM*EMEMEMEME"'
     basis: inferred
-    note: "Irregular: Mamba-2 runs before, between and after the 8 attention layers are 4, 4, 4, 5, 5, 5, 5, 4, 4."
+    note: 'Irregular: Mamba-2 runs before, between and after the 8 attention layers are 4, 4, 4, 5, 5, 5, 5, 4, 4. M
+      = Mamba-2, * = GQA; E denotes a standalone MoE block and is omitted from the token-mixer diagram, matching shape.layers.'
+    sequence: [Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2]
   attn.linear_layers: {value: 40, source: config, at: "/hybrid_override_pattern | count M"}
   attn.linear_kind:
     value: "Mamba-2: 128 heads × head dim 64, state 128, 8 groups, conv kernel 4"

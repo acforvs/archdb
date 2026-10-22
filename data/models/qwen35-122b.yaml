@@ -70,11 +70,28 @@ facts:
     note: "Gated Attention is GQA with 32 Q / 2 KV heads."
   attn.kv_heads: {value: 2, source: config, at: "/text_config/num_key_value_heads"}
   attn.layout:
-    value: "3 Gated DeltaNet : 1 GQA"
-    source: card
-    at: "README.md; Model Overview; Hidden Layout"
-    quote: "12 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))"
-    note: "Config full_attention_interval 4; layer_types lists the same pattern."
+    value: '3 Gated DeltaNet : 1 GQA'
+    source: config
+    at: config.json; /text_config/layer_types
+    quote: '"layer_types": [ "linear_attention", "linear_attention", "linear_attention", "full_attention", "linear_attention",
+      "linear_attention", "linear_attention", "full_attention", "linear_attention", "linear_attention", "linear_attention",
+      "full_attention", "linear_attention", "linear_attention", "linear_attention", "full_attention", "linear_attention",
+      "linear_attention", "linear_attention", "full_attention", "linear_attention", "linear_attention", "linear_attention",
+      "full_attention", "linear_attention", "linear_attention", "linear_attention", "full_attention", "linear_attention",
+      "linear_attention", "linear_attention", "full_attention", "linear_attention", "linear_attention", "linear_attention",
+      "full_attention", "linear_attention", "linear_attention", "linear_attention", "full_attention", "linear_attention",
+      "linear_attention", "linear_attention", "full_attention", "linear_attention", "linear_attention", "linear_attention",
+      "full_attention" ]'
+    note: Config full_attention_interval 4; layer_types lists the same pattern. Ordered 48-layer backbone from /text_config/layer_types;
+      auxiliary modules are excluded.
+    basis: inferred
+    sequence: [Gated DeltaNet, Gated DeltaNet, Gated DeltaNet, GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet,
+      GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet, GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet,
+      GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet, GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet,
+      GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet, GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet,
+      GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet, GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet,
+      GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet, GQA, Gated DeltaNet, Gated DeltaNet, Gated DeltaNet,
+      GQA]
   attn.linear_layers: {value: 36, source: config, at: "/text_config/layer_types | count linear_attention"}
   attn.position:
     value: "partial RoPE"

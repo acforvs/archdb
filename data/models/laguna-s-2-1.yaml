@@ -79,12 +79,24 @@ facts:
     quote: "grouped-query attention, and interleaved full/sliding-window attention"
   attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
   attn.layout:
-    value: "1 global : 3 SWA"
+    value: '1 global : 3 SWA'
     source: config
-    at: "config.json; /layer_types"
-    quote: '"full_attention", "sliding_attention", "sliding_attention", "sliding_attention"'
+    at: config.json; /layer_types
+    quote: '"layer_types": [ "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention",
+      "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention",
+      "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention",
+      "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention",
+      "sliding_attention" ]'
     basis: inferred
-    note: "The pinned /layer_types array repeats this four-layer pattern 12 times, beginning with the global layer."
+    note: The pinned /layer_types array repeats this four-layer pattern 12 times, beginning with the global layer. Ordered
+      48-layer backbone from /layer_types; auxiliary modules are excluded.
+    sequence: [GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA,
+      GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA,
+      GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA]
   attn.local_kv_heads:
     value: 8
     source: config

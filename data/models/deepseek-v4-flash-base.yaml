@@ -183,11 +183,19 @@ facts:
     at: "/num_key_value_heads"
     note: "Shared-KV MQA: one KV head serves as both key and value (p.11 §2.3.1)."
   attn.layout:
-    value: "2 SWA, then 1 CSA : 1 HCA (21 CSA + 20 HCA)"
-    source: report
-    at: "p.24 §4.2.1"
-    quote: "For the first two layers, we use pure sliding window attention. For the subsequent layers, CSA and HCA are used in an interleaved manner."
-    note: "Counts from /compress_ratios (0 = SWA, 4 = CSA, 128 = HCA; trailing 0 is the MTP block)."
+    value: '2 SWA, then 1 CSA : 1 HCA (21 CSA + 20 HCA)'
+    source: config
+    at: config.json; /compress_ratios
+    quote: '"compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128,
+      4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 0]'
+    note: Counts from /compress_ratios (0 = SWA, 4 = CSA, 128 = HCA; trailing 0 is the MTP block). First 43 /compress_ratios
+      entries only; trailing MTP/DSpark entries excluded. Nonzero ratios retain an SWA branch in the same layer.
+    basis: inferred
+    sequence: [SWA, SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA
+        + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA
+        + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA
+        + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA
+        + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA]
   attn.local_layers:
     value: 2
     source: report

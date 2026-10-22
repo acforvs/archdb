@@ -87,11 +87,19 @@ facts:
     quote: "Kimi K3 uses a layerwise hybrid of linear and global attention, combining KDA [64] with Gated MLA."
   attn.kv_lora_rank: {value: 512, source: config, at: "/text_config/kv_lora_rank"}
   attn.layout:
-    value: "(3 KDA : 1 MLA) × 23 + 1 MLA"
-    source: report
-    at: "p.4 §2.1"
-    quote: "Each block contains 3 KDA layers followed by 1 Gated MLA layer, giving a 3:1 mixing ratio. This pattern is repeated throughout the backbone. The two attention mechanisms are described separately below. An additional Gated MLA layer is placed at the end of the backbone"
-    note: "linear_attn_config full_attn_layers (1-indexed) = 4, 8, …, 92, 93; kda_layers lists the other 69."
+    value: '(3 KDA : 1 MLA) × 23 + 1 MLA'
+    source: config
+    at: config.json; /text_config/linear_attn_config/full_attn_layers
+    quote: '"full_attn_layers": [ 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84,
+      88, 92, 93 ]'
+    note: linear_attn_config full_attn_layers (1-indexed) = 4, 8, …, 92, 93; kda_layers lists the other 69. full_attn_layers
+      uses one-based indices; kda_layers is the complementary list. Excludes auxiliary modules.
+    basis: inferred
+    sequence: [KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA,
+      KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA,
+      KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA,
+      KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA,
+      KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, KDA, KDA, KDA, MLA, MLA]
   attn.qk_norm:
     value: false
     source: modeling_kimi_linear

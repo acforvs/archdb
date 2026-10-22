@@ -64,7 +64,6 @@ export function Compare({ db, models, cols, view, set }: {
                         {nd ? "n/d" : stack ? (
                           <>
                             <LayerStrip stack={stack} />
-                            {!stack.ordered && <span className="strip-status">counts only</span>}
                             <span className="strip-text">{format(k, db.fields[k], v, true)}</span>
                           </>
                         ) : format(k, db.fields[k], v, true)}

@@ -155,11 +155,34 @@ facts:
     source: inference-model
     at: "inference/model.py; Step5Cache, DenseLayerCache"
   attn.layout:
-    value: "3 SWA : 1 DSA"
+    value: '3 SWA : 1 DSA'
     source: config
-    at: "config.json text_config.layer_types"
-    quote: "\"layer_types\": [ \"sliding_attention\", \"sliding_attention\", \"sliding_attention\", \"full_attention\", \"sliding_attention\","
-    note: "Repeats 23 times; the last main layer (91) is DSA."
+    at: config.json; /text_config/layer_types
+    quote: '"layer_types": [ "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention"
+      ]'
+    note: Repeats 23 times; the last main layer (91) is DSA. Ordered 92-layer backbone from /text_config/layer_types;
+      auxiliary modules are excluded. The array has 95 entries; only the first num_hidden_layers=92 are backbone layers.
+    basis: inferred
+    sequence: [SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA,
+      SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA,
+      SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA,
+      SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA,
+      SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA, SWA, SWA, SWA, DSA]
   attn.local_layers:
     value: 69
     source: config

@@ -45,7 +45,8 @@
 .model-page .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .model-page .button.secondary { background: transparent; color: var(--text); border-color: var(--line-strong); }
 .model-page .button.secondary:hover { color: #fff; }
-/* The whole row opens the model: the name link's hit area is stretched over the row. */
-.catalog tbody tr { position: relative; cursor: pointer; }
-.catalog tbody th a::after { content: ""; position: absolute; inset: 0; }
-.catalog tbody th a:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Native links cover each cell, including in browsers that cannot position an overlay on a table row. */
+.catalog tbody th, .catalog tbody td { position: relative; }
+.catalog tbody a::after { content: ""; position: absolute; inset: 0; }
+.catalog td a { color: inherit; text-decoration: none; }
+.catalog tbody a:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; }

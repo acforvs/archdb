@@ -62,11 +62,17 @@ facts:
     at: "p.1 Abstract"
     quote: "Motif 3 is built around Grouped Differential Latent Attention (GDLA), which integrates grouped differential attention with the compressed key-value representation of Multi-head Latent Attention."
   attn.layout:
-    value: "3 SWA : 1 global (global first: layers 0, 4, …, 52)"
+    value: '3 SWA : 1 global (global first: layers 0, 4, …, 52)'
     source: report
-    at: "p.19 §4.3 Model configuration"
-    quote: "Under zero-based indexing, layers 0, 4, 8, . . . use full attention, while the three intervening layers use sliding-window attention."
-    note: "Both layer types use GDLA; config use_sliding_window true, sliding_window_pattern interleave."
+    at: p.19 §4.3 Model configuration
+    quote: Under zero-based indexing, layers 0, 4, 8, . . . use full attention, while the three intervening layers use
+      sliding-window attention.
+    note: Both layer types use GDLA; config use_sliding_window true, sliding_window_pattern interleave. The source gives
+      zero-based order explicitly; modeling_motif.py uses layer_idx % sliding_window_period, with config period 4.
+    basis: inferred
+    sequence: [GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA,
+      SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA,
+      SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA, SWA, SWA, SWA, GDLA]
   attn.global_layers:
     value: 14
     source: modeling_motif

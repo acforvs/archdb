@@ -91,10 +91,19 @@ facts:
     note: "Global layers reuse keys as values (attention_k_eq_v: no v_proj; V is the K projection before RoPE and k_norm). use_bidirectional_attention vision: image tokens attend bidirectionally, text is causal."
   attn.kv_heads: {value: 2, source: config, at: "/text_config/num_global_key_value_heads"}
   attn.layout:
-    value: "5 SWA : 1 global"
-    source: report
-    at: "PDF page 2; §2 Long-context efficiency"
-    quote: "for E2B and 5-to-1 for the rest."
+    value: '5 SWA : 1 global'
+    source: config
+    at: config.json; /text_config/layer_types
+    quote: '"layer_types": [ "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention" ]'
+    note: Ordered 30-layer backbone from /text_config/layer_types; auxiliary modules are excluded.
+    basis: inferred
+    sequence: [SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA]
   attn.local_head_dim:
     value: 256
     source: config

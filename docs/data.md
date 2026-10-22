@@ -38,6 +38,15 @@ layers; the number is not an estimate of all-gather time.
 from the longer `train.hardware` notes. When a value applies to a particular training stage, its
 evidence note identifies that stage. `meta.modality` lists the checkpoint's input modalities.
 
+`facts["attn.layout"].sequence` is an optional ordered list of token-mixer types, covered by that
+fact's source and evidence. Diagrams use this list rather than interpreting the summary ratio.
+It excludes auxiliary MTP/draft modules and standalone FFN blocks; for Nemotron, it preserves the
+order of the Mamba and attention blocks after filtering out standalone FFNs. The validator checks
+the sequence length and each mixer count. Without a sequence, mixed architectures show counts only.
+DeepSeek's CSA/HCA/CSA2 entries include SWA in the same attention layer; `SWA` denotes a window-only
+layer. Muse Spark's sequence is explicitly inferred from implementation defaults; its checkpoint
+config remains gated.
+
 Benchmark scores (`eval.*`) are independent measurements of the released post-trained models, kept in
 [`data/evals.yaml`](../data/evals.yaml) apart from the architecture records.
 

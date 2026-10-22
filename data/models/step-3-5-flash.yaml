@@ -79,10 +79,23 @@ facts:
     at: "p.7 §2.2"
     quote: "This configuration repeats a four-layer motif consisting of three SWA layers (W =512) followed by a single full GQA-8 layer."
   attn.layout:
-    value: "3 SWA : 1 global (leading global layer + 11 × [3 SWA, 1 global])"
-    source: report
-    at: "p.6 Figure 2 caption"
-    quote: "with a leading Full Attention layer followed by L = 11 Hybrid Blocks, each interleaving 3 Sliding Window Attention (SWA) layers with one Full Attention layer"
+    value: '3 SWA : 1 global (leading global layer + 11 × [3 SWA, 1 global])'
+    source: config
+    at: config.json; /layer_types
+    quote: '"layer_types": [ "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention",
+      "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention",
+      "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention",
+      "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention",
+      "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention" ]'
+    note: Ordered 45-layer backbone from /layer_types; auxiliary modules are excluded. The array has 46 entries; only
+      the first num_hidden_layers=45 are backbone layers.
+    basis: inferred
+    sequence: [GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA,
+      GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA,
+      GQA, SWA, SWA, SWA, GQA]
   attn.global_layers:
     value: 12
     source: config

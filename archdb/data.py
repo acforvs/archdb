@@ -36,7 +36,30 @@ PINNED = re.compile(
     r"|web\.archive\.org/web/\d{14}(id_)?/"
     r"|[?&]oldid=\d+"
 )
-FACT_KEYS = {"value", "source", "at", "quote", "note", "basis"}
+FACT_KEYS = {"value", "source", "at", "quote", "note", "basis", "sequence"}
+LAYER_MIXERS = {
+    **dict.fromkeys(
+        (
+            "global",
+            "GQA",
+            "MHA",
+            "MQA",
+            "MLA",
+            "MLA+DSA",
+            "DSA",
+            "QSA",
+            "MSA",
+            "GDLA",
+            "CSA + SWA",
+            "HCA + SWA",
+            "CSA2 m=2 + SWA",
+            "CSA2 m=1 + SWA",
+        ),
+        "global",
+    ),
+    "SWA": "swa",
+    **dict.fromkeys(("KDA", "Gated DeltaNet", "Lightning", "Mamba-2"), "linear"),
+}
 TYPES = {
     "int": (int,),
     "float": (int, float),
@@ -240,6 +263,34 @@ def validate(models: list[Model], fields: dict[str, dict], orgs: dict | None = N
         for sid in set(m.sources) - used:
             errors.append(f"{where} source {sid} is never cited")
         errors += _check_kv(where, m.facts)
+        errors += _check_sequence(where, m.facts)
+    return errors
+
+
+def _check_sequence(where: str, facts: dict) -> list[str]:
+    errors = []
+    for key, fact in facts.items():
+        if not isinstance(fact, dict) or "sequence" not in fact:
+            continue
+        seq = fact["sequence"]
+        if key != "attn.layout":
+            errors.append(f"{where} sequence is only supported on attn.layout")
+        elif (
+            not isinstance(seq, list)
+            or not seq
+            or any(not isinstance(x, str) or x not in LAYER_MIXERS for x in seq)
+        ):
+            errors.append(f"{where} attn.layout sequence must contain known token-mixer types")
+        elif len(seq) != _num(facts, "shape.layers"):
+            errors.append(f"{where} attn.layout sequence length must match shape.layers")
+        else:
+            for kind, field in (
+                ("global", "global_layers"),
+                ("swa", "local_layers"),
+                ("linear", "linear_layers"),
+            ):
+                if sum(LAYER_MIXERS[x] == kind for x in seq) != _num(facts, "attn." + field):
+                    errors.append(f"{where} attn.layout sequence disagrees with attn.{field}")
     return errors
 
 

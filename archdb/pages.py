@@ -164,13 +164,14 @@ def dataset_metadata(data: dict) -> dict:
 def catalog(data: dict) -> str:
     rows = []
     for model in sorted(data["models"], key=lambda m: m["name"].lower()):
+        href = f"/models/{escape(model['id'])}/"
         cells = []
         for key in ("params.total", "params.active", "attn.kind", "shape.layers", "shape.d_model"):
             fact = model["facts"].get(key)
             text = display(fact["value"], data["fields"][key]) if fact else "Not disclosed"
-            cells.append(f"<td>{escape(text)}</td>")
+            cells.append(f'<td><a href="{href}" tabindex="-1">{escape(text)}</a></td>')
         rows.append(
-            f'<tr><th scope="row"><a href="/models/{escape(model["id"])}/">{escape(model["name"])}</a>'
+            f'<tr><th scope="row"><a href="{href}">{escape(model["name"])}</a>'
             f"<span>{escape(model['org'])}</span></th>{''.join(cells)}</tr>"
         )
     return f"""<div class="catalog"><table><caption>Model architectures</caption><thead><tr>
@@ -237,7 +238,9 @@ def model_body(model: dict, data: dict) -> str:
     body += f'<p class="actions"><a class="button" href="/#{escape(query)}">Open in the comparison table</a>{outbound}</p>'
     body += '<p class="context-note">KV calculations use one sequence at 131,072 tokens and 16-bit cache elements. '
     body += "They include bounded sliding-window caches. This is retained cache payload, not peak prefill memory. "
-    body += "The comparison table also offers sourced mixed-precision layouts, including quantization scales.</p>"
+    body += (
+        "The comparison table also offers sourced mixed-precision layouts, including quantization scales.</p>"
+    )
     sections, links = [], []
     for group, label in data["groups"].items():
         rows = []

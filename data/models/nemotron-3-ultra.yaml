@@ -77,12 +77,27 @@ facts:
     note: "Attention is GQA with 64 query and 2 KV heads (Table 1)."
   attn.kv_heads: {value: 2, source: config, at: "/num_key_value_heads"}
   attn.layout:
-    value: "48 Mamba-2 + 12 GQA"
-    source: report
-    at: "PDF page 3; §2.1, Figure 2"
-    quote: "The layer pattern and configuration for Nemotron 3 Ultra are shown in Figure 2 and Table 1"
+    value: 48 Mamba-2 + 12 GQA
+    source: config
+    at: config.json; /layers_block_type
+    quote: '"layers_block_type": [ "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe",
+      "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe",
+      "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe",
+      "mamba", "moe" ]'
     basis: inferred
-    note: "From config layers_block_type. Irregular: Mamba-2 runs before, between and after the 12 attention layers are 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4."
+    note: 'From config layers_block_type. Irregular: Mamba-2 runs before, between and after the 12 attention layers
+      are 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4. Ordered token mixers from /layers_block_type; standalone moe/MLP blocks
+      are omitted, matching shape.layers. Their order is not a claim that the FFNs are absent.'
+    sequence: [Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2,
+      Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2,
+      Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2,
+      GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2]
   attn.linear_layers: {value: 48, source: config, at: "/layers_block_type | count mamba"}
   attn.linear_kind:
     value: "Mamba-2: 256 heads × head dim 64, state 128, 8 groups, conv kernel 4"

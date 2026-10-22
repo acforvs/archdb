@@ -73,11 +73,17 @@ facts:
     at: "p.6 §2.1 Attention"
     quote: "pairing 5 local attention layers (Beltagy et al., 2020) with 1 global attention layer"
   attn.layout:
-    value: "5 SWA : 1 global"
+    value: '5 SWA : 1 global'
     source: report
-    at: "p.6 §2.1 Attention"
-    quote: "pairing 5 local attention layers (Beltagy et al., 2020) with 1 global attention layer"
-    note: "The last layer of each group of 6 is global (p.7 §2.2.1)."
+    at: p.6 §2.1 Attention
+    quote: pairing 5 local attention layers (Beltagy et al., 2020) with 1 global attention layer
+    note: The last layer of each group of 6 is global (p.7 §2.2.1). Ordered from the reported last-layer-of-each-group
+      rule; no public checkpoint config.
+    basis: inferred
+    sequence: [SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA]
   attn.global_layers:
     value: 13
     source: report

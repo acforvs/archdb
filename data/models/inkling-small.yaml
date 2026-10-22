@@ -56,12 +56,17 @@ facts:
     at: "README.md; §3 Model Properties, Architecture type"
     quote: "Attention is a hybrid of local and global layers."
   attn.layout:
-    value: "5 SWA : 1 global"
-    source: card
-    at: "README.md; §3 Model Properties, Architecture type"
-    quote: "A 42-layer decoder-only transformer"
+    value: '5 SWA : 1 global'
+    source: config
+    at: config.json; /text_config/local_layer_ids
+    quote: '"local_layer_ids": [ 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 24, 25, 26,
+      27, 28, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40 ]'
     basis: inferred
-    note: "Config /text_config/local_layer_ids omits 5, 11, 17, 23, 29, 35, 41: global at every 6th layer."
+    note: 'Config /text_config/local_layer_ids omits 5, 11, 17, 23, 29, 35, 41: global at every 6th layer. /text_config/local_layer_ids
+      gives zero-based SWA indices; other backbone layers use global attention.'
+    sequence: [SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, GQA]
   attn.global_layers:
     value: 7
     source: card

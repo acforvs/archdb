@@ -88,11 +88,30 @@ facts:
     quote: "The hybrid attention architecture, QK Norm, and SWA-only RoPE are retained"
   attn.kv_heads: {value: 8, source: config, at: "/num_key_value_heads"}
   attn.layout:
-    value: "1 global + 1 SWA (4096 window) + 19 × (3 SWA : 1 global)"
-    source: card
-    at: "README.md; Model Configurations; Attention"
-    quote: "19 x [3 x 128 SWA + 1 x Global] Blocks"
-    note: "Depth expansion repeated whole LLLG blocks, 12 → 19 (report p.4 §2.2)."
+    value: '1 global + 1 SWA (4096 window) + 19 × (3 SWA : 1 global)'
+    source: config
+    at: config.json; /layer_types
+    quote: '"layer_types": [ "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention" ]'
+    note: Depth expansion repeated whole LLLG blocks, 12 → 19 (report p.4 §2.2). Ordered 78-layer backbone from /layer_types;
+      auxiliary modules are excluded.
+    basis: inferred
+    sequence: [GQA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA]
   attn.local_layers: {value: 58, source: config, at: "/layer_types | count sliding_attention"}
   attn.position:
     value: "RoPE (SWA), NoPE (global)"

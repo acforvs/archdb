@@ -64,11 +64,18 @@ facts:
     at: "p.5 §2.1"
     quote: "The model consists of 39 SWA layers and 9 GA layers. Both SWA and GA utilize Grouped-Query Attention (GQA)"
   attn.layout:
-    value: "5 SWA : 1 global"
-    source: report
-    at: "p.1 Abstract"
-    quote: "with a 128-token sliding window under a 5:1 hybrid ratio"
-    note: "Config hybrid_layer_pattern puts global layers at 0, 5, 11, 17, 23, 29, 35, 41, 47: 4 SWA layers before the first hybrid GA, 5 before each later one."
+    value: Global at layers 0, 5, 11, 17, 23, 29, 35, 41, 47; SWA elsewhere (0-based)
+    source: config
+    at: config.json; /hybrid_layer_pattern
+    quote: '"hybrid_layer_pattern": [ 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1,
+      1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0 ]'
+    note: 'Config hybrid_layer_pattern puts global layers at 0, 5, 11, 17, 23, 29, 35, 41, 47: 4 SWA layers before the
+      first hybrid GA, 5 before each later one. /hybrid_layer_pattern: 1 = SWA, 0 = global (MiMoV2DecoderLayer); ordered
+      backbone only.'
+    basis: inferred
+    sequence: [GQA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA]
   attn.global_layers:
     value: 9
     source: report

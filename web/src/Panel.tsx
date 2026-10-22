@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { cell, hfView, modelLinks, type CellOpts, type DB, type Fact, type Model, type Stage } from "./data";
 import { format, lr, si } from "./format";
 import { GLOSSARY, terms } from "./glossary";
-import { LayerStrip, StripLegend, layerStack, type Mixer } from "./LayerStack";
+import { LayerStrip, LayerTypeLegend, layerStack } from "./LayerStack";
 import type { View } from "./App";
 
 /** Key specs at the top of the panel; each value opens its own evidence. */
@@ -125,7 +125,7 @@ export function Panel({ db, model, view, onClose }: { db: DB; model: Model; view
             <LayerStrip stack={stack} unit={Math.max(4, Math.min(8, Math.floor(540 / stack.layers.length)))} height={30} />
             </button>
             <figcaption>
-              <StripLegend kinds={[...new Set(stack.layers)] as Mixer[]} />
+              <LayerTypeLegend stack={stack} />
               <span>
                 {String(model.facts["attn.layout"]?.value ?? `${stack.layers.length} layers`)}
                 {!stack.ordered && " · grouped by type; layer order not shown"}

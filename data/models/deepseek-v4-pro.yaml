@@ -175,11 +175,22 @@ facts:
     at: "/num_key_value_heads"
     note: "Shared-KV MQA: one KV head serves as both key and value (p.11 §2.3.1)."
   attn.layout:
-    value: "2 HCA, then 1 CSA : 1 HCA (30 CSA + 31 HCA)"
-    source: report
-    at: "p.25 §4.2.1"
-    quote: "For the first two layers, we use HCA. For the subsequent layers, CSA and HCA are used in an interleaved manner."
-    note: "Counts from /compress_ratios (4 = CSA, 128 = HCA)."
+    value: '2 HCA, then 1 CSA : 1 HCA (30 CSA + 31 HCA)'
+    source: config
+    at: config.json; /compress_ratios
+    quote: '"compress_ratios": [128, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4,
+      128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4,
+      128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128, 4, 0]'
+    note: Counts from /compress_ratios (4 = CSA, 128 = HCA). First 61 /compress_ratios entries only; trailing MTP/DSpark
+      entries excluded. Nonzero ratios retain an SWA branch in the same layer.
+    basis: inferred
+    sequence: [HCA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA,
+      HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA,
+      CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA,
+      HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA,
+      CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA,
+      HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA,
+      CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA, HCA + SWA, CSA + SWA]
   attn.position:
     value: "partial RoPE (last 64 dims of Q and KV entries; inverse rotation on attention output)"
     source: report

@@ -101,12 +101,18 @@ facts:
     at: "PDF page 4; §2.1"
     quote: "interleave Local Sliding Window Attention (SWA) and Global Attention (GA)"
   attn.layout:
-    value: "5 SWA : 1 global"
-    source: report
-    at: "PDF page 4; §2.1"
-    quote: "each structured with 𝑁 consecutive SWA blocks followed by a GA block"
+    value: Global at layers 0, 5, 11, 17, 23, 29, 35, 41, 47; SWA elsewhere (0-based)
+    source: config
+    at: config.json; /hybrid_layer_pattern
+    quote: '"hybrid_layer_pattern": [ 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1,
+      1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0 ]'
     basis: inferred
-    note: "N is not given in the report. Config hybrid_layer_pattern has runs of 4, 5, 5, 5, 5, 5, 5, 5 SWA layers between globals, with layers 0 and 47 global."
+    note: 'N is not given in the report. Config hybrid_layer_pattern has runs of 4, 5, 5, 5, 5, 5, 5, 5 SWA layers between
+      globals, with layers 0 and 47 global. /hybrid_layer_pattern: 1 = SWA, 0 = global (MiMoV2DecoderLayer); ordered
+      backbone only.'
+    sequence: [GQA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, GQA, SWA, SWA, SWA, SWA, SWA, GQA]
   attn.window:
     value: 128
     source: report

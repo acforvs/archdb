@@ -34,6 +34,8 @@ export interface Fact {
   quote?: string;
   note?: string;
   basis?: "inferred";
+  /** Sourced token-mixer order, excluding auxiliary prediction modules and standalone FFNs. */
+  sequence?: string[];
 }
 
 export interface Derived {

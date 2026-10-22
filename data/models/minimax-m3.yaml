@@ -85,11 +85,17 @@ facts:
     quote: "M3 introduces MiniMax Sparse Attention (MSA) to improve long context efficiency."
   attn.kv_heads: {value: 4, source: config, at: "/text_config/num_key_value_heads"}
   attn.layout:
-    value: "3 GQA + 57 MSA"
+    value: 3 GQA + 57 MSA
     source: config
-    at: "config.json text_config.sparse_attention_config.sparse_attention_freq"
-    quote: "\"sparse_attention_freq\": [ 0, 0, 0, 1,"
-    note: "sparse_attention_freq has 3 zeros (layers 0–2) and 57 ones."
+    at: config.json; /text_config/sparse_attention_config/sparse_attention_freq
+    quote: '"sparse_attention_freq": [ 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]'
+    note: sparse_attention_freq has 3 zeros (layers 0–2) and 57 ones. sparse_attention_freq selects MSA at 1 and dense
+      GQA at 0; backbone only.
+    basis: inferred
+    sequence: [GQA, GQA, GQA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA,
+      MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA,
+      MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA, MSA]
   attn.position:
     value: "partial RoPE (64 of 128 dims)"
     source: hf-transformers

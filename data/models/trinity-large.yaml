@@ -68,11 +68,25 @@ facts:
     at: "p.4 §2.2"
     quote: "We combine grouped-query attention (GQA) [Ainslie et al., 2023], QK-normalization (QK-norm) [Henry et al., 2020], gated attention"
   attn.layout:
-    value: "3 SWA : 1 global"
-    source: report
-    at: "p.5 §2.2 Local/global attention pattern"
-    quote: "they have three local (SWA) attention layers with RoPE, followed by one global layer without positional embeddings (NoPE)"
-    note: "Config global_attn_every_n_layers 4."
+    value: '3 SWA : 1 global'
+    source: config
+    at: config.json; /layer_types
+    quote: '"layer_types": [ "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention", "sliding_attention", "sliding_attention", "sliding_attention", "full_attention", "sliding_attention",
+      "sliding_attention", "sliding_attention", "full_attention", "sliding_attention", "sliding_attention", "sliding_attention",
+      "full_attention" ]'
+    note: Config global_attn_every_n_layers 4. Ordered 60-layer backbone from /layer_types; auxiliary modules are excluded.
+    basis: inferred
+    sequence: [SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, GQA]
   attn.global_layers: {value: 15, source: config, at: "/layer_types | count full_attention"}
   attn.local_layers: {value: 45, source: config, at: "/layer_types | count sliding_attention"}
   attn.heads: {value: 48, source: config, at: "/num_attention_heads"}

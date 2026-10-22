@@ -98,11 +98,19 @@ facts:
     quote: "query_states = query_states.view(*input_shape, self.num_attention_heads, self.head_dim).transpose(1, 2)"
     note: "No norm between projection and RoPE in either layer type."
   attn.layout:
-    value: "60 SWA + 10 global"
-    source: report
-    at: "PDF page 6; Table 1"
-    quote: "Layers (Total/SWA/GA) 48/39/9 70/60/10"
-    note: "Irregular: /hybrid_layer_pattern has runs of 6, 7, 7, 7, 7, 7, 7, 6, 6 SWA between globals at 0, 7, 15, 23, 31, 39, 47, 55, 62, 69."
+    value: Global at layers 0, 7, 15, 23, 31, 39, 47, 55, 62, 69; SWA elsewhere (0-based)
+    source: config
+    at: config.json; /hybrid_layer_pattern
+    quote: '"hybrid_layer_pattern": [ 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1,
+      1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0,
+      1, 1, 1, 1, 1, 1, 0 ]'
+    note: 'Irregular: /hybrid_layer_pattern has runs of 6, 7, 7, 7, 7, 7, 7, 6, 6 SWA between globals at 0, 7, 15, 23,
+      31, 39, 47, 55, 62, 69. /hybrid_layer_pattern: 1 = SWA, 0 = global (MiMoV2DecoderLayer); ordered backbone only.'
+    basis: inferred
+    sequence: [GQA, SWA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA,
+      SWA, SWA, GQA, SWA, SWA, SWA, SWA, SWA, SWA, GQA]
   attn.local_layers: {value: 60, source: config, at: "/hybrid_layer_pattern | count 1"}
   attn.position:
     value: "partial RoPE (64 of 192 QK dims; base 1e7 global, 1e4 SWA)"

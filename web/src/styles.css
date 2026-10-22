@@ -171,9 +171,10 @@
 
 /* ---------- layer stack strips ---------- */
 .strip { display: block; overflow: visible; }
-.strip .l-global, .strip-legend .l-global { fill: var(--layer-global); background: var(--layer-global); }
-.strip .l-swa, .strip-legend .l-swa { fill: var(--layer-swa); background: var(--layer-swa); }
-.strip .l-linear, .strip-legend .l-linear { fill: var(--layer-linear); background: var(--layer-linear); }
+.strip .compressed-variant, .strip-legend .compressed-variant { opacity: 0.5; }
+.strip .l-global, .strip-legend .l-global, .layer-counts .l-global { fill: var(--layer-global); background: var(--layer-global); }
+.strip .l-swa, .strip-legend .l-swa, .layer-counts .l-swa { fill: var(--layer-swa); background: var(--layer-swa); }
+.strip .l-linear, .strip-legend .l-linear, .layer-counts .l-linear { fill: var(--layer-linear); background: var(--layer-linear); }
 .strip-legend { display: inline-flex; flex-wrap: wrap; gap: 0 10px; font-weight: 400; }
 .strip-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .strip-legend i { display: inline-block; width: 4px; height: 7px; vertical-align: baseline; }
@@ -181,7 +182,10 @@
 .strip-legend { font-size: 11.5px; color: var(--text-2); }
 .strip-legend span { align-items: flex-end; }
 .strip-text { display: block; margin-top: 4px; }
-.strip-status { display: block; color: var(--muted); font: 11px/1.4 var(--sans); }
+.layer-counts { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/1.4 var(--sans); }
+.layer-counts > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.layer-counts i { width: 8px; height: 8px; }
+.layer-counts small { flex-basis: 100%; color: var(--muted); font-size: 11px; }
 .grid td .strip { display: inline-block; vertical-align: middle; }
 
 /* ---------- plot ---------- */
