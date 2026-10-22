@@ -211,6 +211,18 @@ facts:
     source: report
     at: "p.7 §2.4.1"
     quote: "Kimi K2 was trained on a cluster equipped with NVIDIA H800 GPUs."
+  train.accelerators:
+    value: "H800"
+    source: report
+    at: "p.7 §2.4.1"
+    quote: "Kimi K2 was trained on a cluster equipped with NVIDIA H800 GPUs."
+    note: "Count not stated."
+  train.parallelism:
+    value: "PP16 · VPP · EP16 · ZeRO-1 DP"
+    source: report
+    at: "p.8 §2.4.2"
+    quote: "Pipeline Parallelism (PP) with virtual stages [28, 53, 38, 57, 47, 21], 16-way Expert Parallelism (EP) [39], and ZeRO-1 Data Parallelism [60]."
+    note: "The PP degree ends the previous line, which Figure 7 separates from the quote: 'a combination of 16-way'; VPP degree not stated."
   train.lr_min:
     value: 7e-6
     source: report

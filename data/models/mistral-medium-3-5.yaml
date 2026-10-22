@@ -26,6 +26,11 @@ facts:
     at: "README.md; License"
     quote: "This model is licensed under a [Modified MIT License](https://huggingface.co/mistralai/Mistral-Medium-3.5-128B/blob/main/LICENSE)."
     note: "Card front matter: license: other."
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Key Features"
+    quote: "Multimodal input: Accepts both text and image input, with text output."
 
   params.total:
     value: 128_000_000_000

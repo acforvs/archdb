@@ -33,6 +33,13 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: config
+    at: "config.json; architectures"
+    quote: '"architectures": [ "MiniMaxM1ForCausalLM" ]'
+    note: "No modality statement; causal-LM class with no vision or audio config, built on MiniMax-Text-01."
 
   params.total:
     value: 456_000_000_000
@@ -281,6 +288,12 @@ facts:
     source: text01-report
     at: "p.14 §3"
     quote: "the number of H800 GPUs ranges from 1500 to 2500"
+  train.accelerators:
+    value: "1,500–2,500 H800"
+    source: text01-report
+    at: "p.14 §3"
+    quote: "the number of H800 GPUs ranges from 1500 to 2500"
+    note: "MiniMax-Text-01 pretraining cluster (base of M1), size varied over the run."
   train.data:
     value: "Text-01: academic literature, books, web, code, scored by a 5B-active/60B MoE; high-quality data up to 4 epochs. M1: STEM, code, book and reasoning data raised to 70%, no synthetic data"
     source: m1-report

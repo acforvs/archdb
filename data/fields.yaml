@@ -34,19 +34,24 @@ fields:
     required: open_weights
     label: License
     definition: License of the released weights as declared by the publisher (model card metadata or license file), e.g. apache-2.0, mit, or the name of a custom license.
+  meta.modality:
+    type: str
+    label: Input modalities
+    aliases: [multimodal, vision, VLM, omni, audio]
+    definition: "Input modalities of the released checkpoint as the publisher states them, from: text, image, video, audio, joined with ' + ' in that order (\"text\", \"text + image + video\")."
 
   # --- params ----------------------------------------------------------------
   params.total:
     type: float
     required: always
     unit: params
-    label: Reported total params
+    label: Total params
     definition: Total parameter count as reported by the publisher. See params.note for whether embeddings, MTP heads or vision towers are included.
   params.active:
     type: float
     required: always
     unit: params
-    label: Reported active params
+    label: Active params
     definition: Parameters used per token in the forward pass, as reported by the publisher.
   params.active_prefill:
     type: float
@@ -81,10 +86,24 @@ fields:
     aliases: [ngram, engram, n-gram, per-layer embedding]
     derived: true
     definition: Parameters in n-gram / Engram / per-layer embedding tables counted from the checkpoint. Like the token embedding, they are lookups and are excluded from params.counted_total and params.counted_active_non_embedding.
+  params.counted_non_embedding:
+    type: float
+    unit: params
+    label: Non-emb. params (counted)
+    aliases: [non-embedding, checkpoint]
+    derived: true
+    definition: Language backbone weights excluding input embeddings, output head, lookup/Engram tables, MTP modules and vision/audio towers. Equals params.counted_total minus params.counted_embedding. Same validation as params.counted_total.
+  params.counted_max_layer:
+    type: float
+    unit: params
+    label: Largest layer (counted)
+    aliases: [per-layer, all-gather, FSDP, checkpoint]
+    derived: true
+    definition: Largest group of language-backbone weights sharing a full layers.<index> tensor path, including every routed expert. Excludes lookup/Engram tables, embeddings, output head, MTP and other modalities. Hybrid checkpoints may store mixers and FFNs as separate layers. All-gather volume also depends on wrapping, sharding and dtype.
   params.counted_active_non_embedding:
     type: float
     unit: params
-    label: Counted active params (non-embedding)
+    label: Active non-emb. (counted)
     aliases: [non-embedding, Kaplan N, checkpoint]
     derived: true
     definition: Active parameters per token excluding the input embedding and output head, counted from the checkpoint as all non-expert weights plus routed-expert weights × top_k / experts. Same validation as params.counted_total.
@@ -695,6 +714,16 @@ fields:
     type: str
     label: Hardware
     definition: Accelerators used for pretraining, count and duration where stated.
+  train.accelerators:
+    type: str
+    label: Accelerators
+    aliases: [GPUs, TPUs, hardware, cluster]
+    definition: "Accelerator count and type for the main pretraining run, as the count with thousands separators and the chip's short name (\"2,048 H800\", \"2,048 GH200\"). A stated range or bound stays as stated (\"2,048–4,096 GH200\")."
+  train.parallelism:
+    type: str
+    label: Parallelism
+    aliases: [TP, PP, EP, DP, CP, FSDP, ZeRO, pipeline, tensor parallel, expert parallel]
+    definition: "Parallelism layout of the main pretraining run as stated, as degree-annotated terms in the order TP, PP, VPP, EP, CP, DP (\"PP16 · EP64 · ZeRO-1 DP\"); a term without a stated degree has none (\"FSDP\")."
   train.compute:
     type: str
     label: Compute

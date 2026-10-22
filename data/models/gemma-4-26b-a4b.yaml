@@ -26,6 +26,12 @@ facts:
     source: blog
     at: "Gemma 4 launch post header"
     quote: "Gemma 4: Byte for byte, the most capable open models Apr 02, 2026"
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Mixture-of-Experts (MoE) Model table"
+    quote: "| **Expert Count** | 8 active / 128 total and 1 shared | | **Supported Modalities** | Text, Image |"
+    note: "The card also lists video understanding as processing sequences of frames; audio is limited to E2B, E4B and 12B."
   params.active:
     value: 3_800_000_000
     source: card
@@ -207,3 +213,14 @@ facts:
     source: report
     at: "PDF page 2; Table 2"
     quote: "26B-A4B* v6e 6,144 16 16 24"
+  train.accelerators:
+    value: "6,144 TPU v6e"
+    source: report
+    at: "PDF page 2; Table 2"
+    quote: "26B-A4B* v6e 6,144 16 16 24"
+  train.parallelism:
+    value: "data16 · seq16 · replica24"
+    source: report
+    at: "PDF page 2; Table 2"
+    quote: "26B-A4B* v6e 6,144 16 16 24"
+    note: "Table 2 sharding axes (data, sequence, replica) as named by the report, not mapped to TP/CP/DP; §2.7 adds ZeRO-3 optimizer-state sharding."

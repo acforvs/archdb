@@ -20,6 +20,14 @@ PUBLIC = ROOT / "web" / "public"
 EXPORTS = ROOT / "exports"
 
 
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    """Revalidate local files after a rebuild."""
+
+    def end_headers(self) -> None:
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
+
 def build(check: bool = False) -> None:
     groups, fields = load_fields()
     models = load_models()
@@ -90,7 +98,7 @@ def main(argv=None) -> None:
         )
         sys.exit(1 if failed else 0)
     if args.cmd == "count-params":
-        from .checkpoint import count
+        from .checkpoint import PARTS, count
 
         path = ROOT / "data" / "param_counts.yaml"
         counts = yaml.load(path.read_text(), Loader) or {} if path.exists() else {}
@@ -108,7 +116,7 @@ def main(argv=None) -> None:
             if c:
                 counts[m.id] = c
                 path.write_text(head + yaml.safe_dump(dict(sorted(counts.items())), sort_keys=False))
-                print(f"{m.id}: {sum(v for v in c.values() if isinstance(v, int)) / 1e9:.1f}B in checkpoint")
+                print(f"{m.id}: {sum(c[p] for p in PARTS) / 1e9:.1f}B in checkpoint")
         print("\n".join(failed))
         sys.exit(1 if failed else 0)
     if args.cmd == "build":
@@ -116,7 +124,7 @@ def main(argv=None) -> None:
     if args.cmd == "serve":
         if not (SITE / "index.html").exists():
             sys.exit("site/ is missing: run `uv run archdb build && npm --prefix web run build` first")
-        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(SITE))
+        handler = functools.partial(NoCacheHandler, directory=str(SITE))
         print(f"http://127.0.0.1:{args.port}")
         http.server.ThreadingHTTPServer(("127.0.0.1", args.port), handler).serve_forever()
 

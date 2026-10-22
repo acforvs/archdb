@@ -29,6 +29,13 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: card
+    at: "README.md; intro"
+    quote: "MiMo-V2-Flash is a Mixture-of-Experts (MoE) language model"
+    note: "No explicit modality statement; config.json (MiMoV2FlashForCausalLM) has no vision or audio config."
 
   params.total:
     value: 309_000_000_000

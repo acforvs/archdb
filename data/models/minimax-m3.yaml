@@ -39,6 +39,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: minimax-community"
+  meta.modality:
+    value: "text + image + video"
+    source: card
+    at: "README.md; Highlights"
+    quote: "enabling deeper semantic fusion across text, image, and video"
 
   params.active:
     value: 23_000_000_000

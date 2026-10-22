@@ -47,6 +47,13 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: card
+    at: "README.md front matter"
+    quote: "pipeline_tag: text-generation"
+    note: "No modality statement; the card's pipeline tag is text-generation and config.json (LongcatCausalLM) has no vision or audio config."
 
   params.active:
     value: 48_000_000_000
@@ -193,6 +200,18 @@ facts:
     at: "blog bundle; Training"
     quote: "LongCat-2.0 is pre-trained on over 50K AI ASICs"
     note: "6D parallelism (TP/CP/EP/DP/PP plus EMBP for the N-gram Embeddings), ZeRO-1, selective recomputation and allocator-level OOM-aware offloading; CP scaled past 512 for 1M-length training."
+  train.accelerators:
+    value: ">50,000 AI ASICs"
+    source: blog
+    at: "blog bundle; Training"
+    quote: "LongCat-2.0 is pre-trained on over 50K AI ASICs"
+    note: "Chip not named."
+  train.parallelism:
+    value: "TP · PP · EP · CP · DP · EMBP"
+    source: blog
+    at: "blog bundle; Training, Training at Scale"
+    quote: "Beyond standard TP/CP/EP/DP/PP, we introduce EMBP to parallelize and accelerate N-gram Embeddings."
+    note: "No degrees stated; EMBP parallelizes the N-gram Embeddings; the same section states ZeRO-1."
   train.optimizer:
     value: Muon
     source: blog

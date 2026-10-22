@@ -179,12 +179,12 @@ export function numeric(field: Field, v: Value | undefined): number | null {
 
 export const PRESETS: Record<string, string[]> = {
   Overview: [
-    "meta.released", "params.total", "params.active", "moe.active_fraction", "shape.layers", "shape.d_model",
-    "attn.layout", "kv.bytes_per_token", "kv.bytes_at_context", "ctx.final", "train.tokens", "train.optimizer",
-    "train.lr_peak",
+    "meta.released", "params.total", "params.active", "shape.layers", "shape.d_model", "attn.layout", "attn.kind",
+    "attn.kv_heads", "attn.local_kv_heads", "attn.kv_lora_rank", "moe.experts", "moe.top_k", "ctx.final", "train.tokens",
   ],
   Shape: [
-    "params.total", "params.active", "params.counted_active_non_embedding", "shape.layers", "shape.d_model", "shape.aspect", "attn.heads", "attn.kv_heads",
+    "params.total", "params.active", "shape.layers", "shape.d_model", "shape.aspect", "attn.heads", "attn.kv_heads",
+    "attn.local_kv_heads", "attn.linear_heads",
     "attn.group_size", "attn.head_dim", "attn.qk_width", "ffn.dim", "ffn.mult", "moe.experts", "moe.top_k",
     "moe.shared", "moe.expert_dim", "moe.shared_dim", "moe.granularity", "moe.latent_dim", "shape.vocab",
     "shape.tied_embeddings",
@@ -223,15 +223,40 @@ export const PRESETS: Record<string, string[]> = {
     "scaling.parametrization", "scaling.hp_rule", "scaling.ladder", "norm.output_scale",
     "norm.embedding",
   ],
-  "Data & compute": [
-    "meta.released", "meta.license", "train.tokens", "train.data", "train.cutoff", "train.hardware", "train.compute",
-    "shape.tokenizer", "shape.vocab", "shape.memory",
+  Infra: [
+    "params.total", "params.active", "params.counted_non_embedding", "params.counted_active_non_embedding",
+    "params.counted_max_layer", "params.active_prefill", "shape.layers", "shape.d_model", "train.accelerators",
+    "train.parallelism", "train.precision", "train.compute", "train.hardware", "kv.bytes_per_token",
+    "kv.bytes_at_context",
+  ],
+  "Data & license": [
+    "meta.released", "meta.license", "meta.modality", "train.tokens", "train.data", "train.cutoff", "shape.tokenizer",
+    "shape.vocab", "shape.memory",
   ],
   Evals: [
     "meta.released", "params.total", "params.active", "eval.aa_index", "eval.deepswe",
     "kv.bytes_per_token", "kv.bytes_at_context", "train.tokens",
   ],
 };
+
+/** What each column set is for; shown on hover. */
+export const PRESET_NOTES: Record<string, string> = {
+  Overview: "Size, layer stack, KV heads (global and SWA) or MLA latent, experts, context and training tokens",
+  Shape: "Depth, width, aspect ratio, heads, FFN and expert dimensions, vocabulary",
+  "Attention & KV": "Mixer types and layout, heads, windows, RoPE, KV-cache size",
+  MoE: "Experts, routing, granularity, balancing",
+  "Norms & FFN": "Normalization, activations, soft-caps, biases",
+  MTP: "Multi-token prediction modules and losses",
+  Recipe: "Tokens, optimizer, learning rate and schedule, batch size, context stages",
+  Scaling: "Tokens per parameter, AdamW timescale, parametrization, HP rules",
+  Infra: "Counted parameters without embeddings, largest layer, accelerators, parallelism, precision, KV memory",
+  "Data & license": "License, input modalities, data, cutoff, tokenizer",
+  Evals: "Benchmark scores next to size and KV cost",
+  "All fields": "Every field in the dataset",
+};
+
+/** Column sets that were renamed; old links open the closest current set. */
+export const PRESET_ALIASES: Record<string, string> = { "Data & compute": "Infra" };
 
 export function isNumeric(f: Field): boolean {
   return f.type === "date" || f.type === "int" || f.type === "float";
@@ -248,4 +273,21 @@ export function fieldText(k: string, f: Field): string {
 
 export function hfView(url: string): string {
   return url.replace("/resolve/", "/blob/");
+}
+
+/** Use the checkpoint config for the HF link; shared code may live in a sibling repo. */
+export function modelLinks(m: Model): { hf?: string; report?: string; reportLabel: string } {
+  const sources = Object.values(m.sources);
+  const repo = [...sources.filter((s) => s.kind === "config" && s.url.endsWith("/config.json")),
+    ...sources.filter((s) => s.kind === "model-card")]
+    .map((s) => /^https:\/\/huggingface\.co\/([^/]+\/[^/]+)\/resolve\//.exec(s.url)?.[1])
+    .find(Boolean);
+  const pick = (kind: string) => sources.find((s) => s.kind === kind)?.url;
+  const paper = pick("paper");
+  const report = paper ?? pick("blog");
+  return {
+    hf: repo ? `https://huggingface.co/${repo}` : undefined,
+    report: report && hfView(report),
+    reportLabel: paper ? "Paper" : "Blog",
+  };
 }

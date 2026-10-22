@@ -29,6 +29,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Key Features"
+    quote: "Multimodal input: Accepts both text and image input, with text output."
 
   params.active:
     value: 6_500_000_000

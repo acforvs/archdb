@@ -41,6 +41,11 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text + image"
+    source: blog
+    at: "Step3 blog; Pretrain, multimodal pathway"
+    quote: "our 5B-parameter vision encoder extracts dense image features"
 
   params.total:
     value: 321_000_000_000

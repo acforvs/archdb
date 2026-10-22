@@ -34,6 +34,11 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text + image + video + audio"
+    source: card
+    at: "README.md; Model Summary"
+    quote: "Modalities: Text, Image, Video, Audio"
 
   params.active:
     value: 42_000_000_000

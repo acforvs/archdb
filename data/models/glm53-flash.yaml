@@ -51,6 +51,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text + image + video"
+    basis: inferred
+    source: hf-transformers
+    at: "modeling_glm5_next.py; Glm5NextVisionModel"
+    quote: "input_modalities = (\"image\", \"video\")"
+    note: "The card calls the model natively multimodal without listing modalities; the transformers class declares image and video inputs alongside text."
 
   params.total:
     value: 320_000_000_000

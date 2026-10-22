@@ -36,6 +36,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text"
+    source: transparency
+    at: "Model card PDF; Modalities"
+    quote: "Both input and output are in Text format"
   params.active:
     value: 37_000_000_000
     source: transparency

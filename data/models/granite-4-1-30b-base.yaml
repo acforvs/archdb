@@ -22,6 +22,11 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text"
+    source: card
+    at: "README.md; opening summary"
+    quote: "designed to support a broad range of text\u2011to\u2011text generation tasks"
 
   params.total:
     value: 28_865_728_512
@@ -169,6 +174,12 @@ facts:
     source: card
     at: "README.md; Infrastructure"
     quote: "We trained the Granite 4.1 Language Models utilizing an NVIDIA GB200 NVL72 cluster hosted in CoreWeave."
+  train.accelerators:
+    value: "GB200"
+    source: card
+    at: "README.md; Infrastructure"
+    quote: "We trained the Granite 4.1 Language Models utilizing an NVIDIA GB200 NVL72 cluster hosted in CoreWeave."
+    note: "The card gives the count only as \"thousands of GPUs\"."
   train.objective:
     value: "FIM with prefix and suffix tokens"
     source: card

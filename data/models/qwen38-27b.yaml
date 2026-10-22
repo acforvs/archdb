@@ -24,6 +24,11 @@ facts:
     quote: "2026-08-14: Qwen3.8-27B is now available on"
     note: "Hugging Face repository created 2026-08-05, before public release."
   meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+  meta.modality:
+    value: "text + image + video"
+    source: card
+    at: "README.md; introduction"
+    quote: "a native vision-language model that understands images and videos"
 
   params.active:
     value: 27_000_000_000

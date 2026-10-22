@@ -26,6 +26,12 @@ facts:
     source: blog
     at: "Gemma 4 launch post header"
     quote: "Gemma 4: Byte for byte, the most capable open models Apr 02, 2026"
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Dense Models table (31B Dense column)"
+    quote: "| **Supported Modalities** | Text, Image, Audio | Text, Image, Audio | Text, Image, Audio | Text, Image |"
+    note: "The card also lists video understanding as processing sequences of frames; audio is limited to E2B, E4B and 12B."
   params.embedding:
     value: 1_410_000_000
     source: report
@@ -177,3 +183,14 @@ facts:
     source: report
     at: "PDF page 2; Table 2"
     quote: "31B v6e 10,240 16 16 40"
+  train.accelerators:
+    value: "10,240 TPU v6e"
+    source: report
+    at: "PDF page 2; Table 2"
+    quote: "31B v6e 10,240 16 16 40"
+  train.parallelism:
+    value: "data16 · seq16 · replica40"
+    source: report
+    at: "PDF page 2; Table 2"
+    quote: "31B v6e 10,240 16 16 40"
+    note: "Table 2 sharding axes (data, sequence, replica) as named by the report, not mapped to TP/CP/DP; §2.7 adds ZeRO-3 optimizer-state sharding."

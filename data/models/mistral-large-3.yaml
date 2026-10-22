@@ -35,6 +35,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Key Features"
+    quote: "Enables the model to analyze images and provide insights based on visual content, in addition to text."
 
   params.active:
     value: 41_000_000_000
@@ -176,6 +181,11 @@ facts:
 
   train.hardware:
     value: "3000 H200 GPUs"
+    source: card
+    at: "README.md; intro"
+    quote: "trained from scratch with 3000 H200s"
+  train.accelerators:
+    value: "3,000 H200"
     source: card
     at: "README.md; intro"
     quote: "trained from scratch with 3000 H200s"

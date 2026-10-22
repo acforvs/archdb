@@ -129,6 +129,7 @@ def count(m: Model) -> dict | None:
     cfg = json.loads(fetch(config).read_text())
     layers = cfg.get("num_hidden_layers") or cfg.get("text_config", {}).get("num_hidden_layers")
     parts = dict.fromkeys(PARTS, 0)
+    per_layer: dict[str, int] = {}
     for f in shards(repo, commit):
         tensors = header(f"https://huggingface.co/{repo}/resolve/{commit}/{f}")
         # FP4 weights packed two per byte carry a microscaling scale: an E8M0 `.scale` (DeepSeek) or
@@ -145,5 +146,11 @@ def count(m: Model) -> dict | None:
             if name == "__metadata__" or SIDE.search(name):
                 continue
             # Multimodal checkpoints prefix the text model (language_model., model.llm., ...).
-            parts[classify(TEXT_PREFIX.sub("", name), layers)] += elements(name, spec, name in mx)
-    return {"repo": repo, "commit": commit, **parts}
+            text = TEXT_PREFIX.sub("", name)
+            part, n = classify(text, layers), elements(name, spec, name in mx)
+            parts[part] += n
+            layer = LAYER.search(text.lower())
+            if layer and part in ("dense", "routed"):
+                block = text[:layer.end(1)]
+                per_layer[block] = per_layer.get(block, 0) + n
+    return {"repo": repo, "commit": commit, **parts, "max_layer": max(per_layer.values(), default=0)}

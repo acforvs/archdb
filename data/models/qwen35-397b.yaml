@@ -25,6 +25,13 @@ facts:
     quote: '2026-02-16T04:00:00+08:00'
     note: "Qwen3.5 blog date (Beijing time)."
   meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+  meta.modality:
+    value: "text + image + video"
+    basis: inferred
+    source: card
+    at: "README.md; Model Overview"
+    quote: "Type: Causal Language Model with Vision Encoder"
+    note: "Card's quickstart gives text, image and video input examples; config defines image and video tokens."
 
   params.active:
     value: 17_000_000_000

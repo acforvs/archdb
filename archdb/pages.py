@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import shutil
 from pathlib import Path
 from urllib.parse import urlencode
@@ -20,7 +21,7 @@ SITE_HEAD = """<script src="/theme.js"></script>
 <link rel="stylesheet" href="/model-pages.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">"""
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif&display=swap" rel="stylesheet">"""
 GITHUB_MARK = """<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="currentColor">
 <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>"""
 
@@ -97,25 +98,20 @@ def metadata(title: str, description: str, path: str, image: str) -> str:
 
 def site_header(data: dict | None = None, *, home: bool = False) -> str:
     tag = "h1" if home else "span"
-    counts = ""
-    if data:
-        facts = sum(len(m["facts"]) for m in data["models"])
-        counts = f'<span><a href="/models/">{len(data["models"])} models</a> · {facts:,} facts</span>'
     compare_current = ' aria-current="page"' if home else ""
     models_current = "" if home else ' aria-current="page"'
     return f'''<header class="masthead">
-<a class="brand" href="/" aria-label="archdb home"><img src="/logo.svg" alt="" width="28" height="28">
+<a class="brand" href="/" aria-label="archdb home"><img src="/logo.svg" alt="" width="30" height="30">
 <div><{tag} class="brand-name">archdb</{tag}>
-<p>Architectures and pretraining recipes of frontier LLMs, with a source for every value.</p></div></a>
-<nav class="meta" aria-label="Data and links">{counts}<span class="downloads">
-<a href="/models.csv" download="archdb-models.csv">models.csv</a>
+<p>LLM architectures and pretraining recipes, with sources.</p></div></a>
+<nav class="meta" aria-label="Site"><a href="/"{compare_current}>Compare models</a>
+<a href="/models/"{models_current}>All models</a><span class="downloads">
+<a href="/models.csv" download="archdb-models.csv" title="One row per model">models.csv</a>
 <a href="/facts.csv" download="archdb-facts.csv" title="One row per value, with source and quote">facts.csv</a>
-<a href="/data.json" download="archdb.json">JSON</a></span>
+<a href="/data.json" download="archdb.json">json</a></span>
 <a class="github-star" href="{REPO}" target="_blank" rel="noreferrer">{GITHUB_MARK} Star on GitHub</a>
 <button class="icon" type="button" data-theme-toggle aria-label="Toggle dark mode">
-<span class="theme-icon" aria-hidden="true"></span></button></nav></header>
-<nav class="site-nav" aria-label="Site"><a href="/"{compare_current}>Compare models</a>
-<a href="/models/"{models_current}>All models</a></nav>'''
+<span class="theme-icon" aria-hidden="true"></span></button></nav></header>'''
 
 
 def site_footer() -> str:
@@ -208,6 +204,25 @@ def list_value(items: list, model: dict, parent: dict) -> str:
     return '<ul class="components">' + "".join(rows) + "</ul>"
 
 
+def model_links(model: dict) -> list[tuple[str, str]]:
+    """Link to the checkpoint, rather than a sibling repository used for shared code."""
+    links = []
+    sources = list(model["sources"].values())
+    repositories = [s for s in sources if s["kind"] == "config" and s["url"].endswith("/config.json")]
+    repositories += [s for s in sources if s["kind"] == "model-card"]
+    for source in repositories:
+        match = re.match(r"https://huggingface\.co/([^/]+/[^/]+)/resolve/", source["url"])
+        if match:
+            links.append(("Hugging Face", "https://huggingface.co/" + match[1]))
+            break
+    for kind, label in (("paper", "Paper"), ("blog", "Blog")):
+        url = next((s["url"] for s in model["sources"].values() if s["kind"] == kind), None)
+        if url:
+            links.append((label, url.replace("/resolve/", "/blob/")))
+            break
+    return links
+
+
 def model_body(model: dict, data: dict) -> str:
     name, mid = escape(model["name"]), escape(model["id"])
     query = urlencode({"model": model["id"], "q": model["id"]})
@@ -215,7 +230,11 @@ def model_body(model: dict, data: dict) -> str:
     body += f'<p class="subtitle">{escape(model["org"])} · {escape(model["kind"])} checkpoint</p>'
     if model.get("note"):
         body += f"<p>{escape(model['note'])}</p>"
-    body += f'<p><a class="button" href="/#{escape(query)}">Open in the comparison table</a></p>'
+    outbound = "".join(
+        f' <a class="button secondary" href="{escape(url)}" target="_blank" rel="noreferrer">{label} ↗</a>'
+        for label, url in model_links(model)
+    )
+    body += f'<p class="actions"><a class="button" href="/#{escape(query)}">Open in the comparison table</a>{outbound}</p>'
     body += '<p class="context-note">KV calculations use one sequence at 131,072 tokens and 16-bit cache elements. '
     body += "They include bounded sliding-window caches. This is retained cache payload, not peak prefill memory. "
     body += "The comparison table also offers sourced mixed-precision layouts, including quantization scales.</p>"
@@ -259,29 +278,31 @@ def model_body(model: dict, data: dict) -> str:
 
 
 def card(path: Path, data: dict, model: dict | None = None) -> None:
-    image = Image.new("RGB", (1200, 630), "#f7f7f5")
+    image = Image.new("RGB", (1200, 630), "#f4f1ea")
     draw = ImageDraw.Draw(image)
 
-    def text(x, y, value, size=28, fill="#16161a"):
+    def text(x, y, value, size=28, fill="#1d1b17"):
         draw.text((x, y), str(value), font=ImageFont.load_default(size=size), fill=fill)
 
-    draw.rounded_rectangle((64, 46, 112, 94), radius=10, fill="#16161a")
-    for y, width, fill in ((58, 28, "#ececf0"), (68, 18, "#5b9ef0"), (78, 28, "#ececf0")):
-        draw.rounded_rectangle((74, y, 74 + width, y + 5), radius=2, fill=fill)
+    draw.rectangle((64, 46, 112, 94), fill="#1d1b17")
+    for i in range(5):
+        x = 73 + i * 7
+        draw.rectangle((x, 56, x + 4, 84), fill="#e0603a" if i == 3 else "#f4f1ea")
+    draw.rectangle((64, 120, 1136, 122), fill="#1d1b17")
     text(130, 52, "archdb", 36)
-    text(64, 560, "archdb.vladsavinov.com", 24, "#55545e")
+    text(64, 560, "archdb.vladsavinov.com", 24, "#4a463d")
     if model is None:
         text(64, 174, "LLM architectures", 65)
         text(64, 258, "and pretraining recipes", 65)
-        text(64, 390, f"{len(data['models'])} models, with sources for the details.", 32, "#55545e")
-        text(64, 442, "Compare models. Download the data.", 30, "#55545e")
+        text(64, 390, f"{len(data['models'])} models, with sources for the details.", 32, "#4a463d")
+        text(64, 442, "Compare models. Download the data.", 30, "#4a463d")
     else:
         title = model["name"]
         size = 58
         while draw.textlength(title, font=ImageFont.load_default(size=size)) > 1070 and size > 26:
             size -= 1
         text(64, 155, title, size)
-        text(64, 235, model["org"], 28, "#55545e")
+        text(64, 235, model["org"], 28, "#4a463d")
         for i, (key, label) in enumerate(
             (
                 ("params.total", "TOTAL PARAMS"),
@@ -294,7 +315,7 @@ def card(path: Path, data: dict, model: dict | None = None) -> None:
             value = model["facts"].get(key, {}).get("value")
             if key == "params.active" and "params.active_prefill" in model["facts"]:
                 label = "ACTIVE (DECODE)"
-            text(x, 340, label, 19, "#55545e")
+            text(x, 340, label, 19, "#4a463d")
             shown = (
                 number(value)
                 if isinstance(value, (int, float))
@@ -308,10 +329,10 @@ def card(path: Path, data: dict, model: dict | None = None) -> None:
         kinds = str(model["facts"].get("attn.kind", {}).get("value", "Architecture and pretraining"))
         if len(kinds) > 94:
             kinds = kinds[:91] + "..."
-        text(64, 480, kinds, 27, "#55545e")
+        text(64, 480, kinds, 27, "#4a463d")
         prefill = model["facts"].get("params.active_prefill", {}).get("value")
         if isinstance(prefill, (int, float)):
-            text(64, 522, number(prefill) + " active parameters during prefill", 22, "#55545e")
+            text(64, 522, number(prefill) + " active parameters during prefill", 22, "#4a463d")
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path, optimize=True)
 

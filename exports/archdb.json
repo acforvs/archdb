@@ -27,18 +27,30 @@
    "label": "License",
    "definition": "License of the released weights as declared by the publisher (model card metadata or license file), e.g. apache-2.0, mit, or the name of a custom license."
   },
+  "meta.modality": {
+   "type": "str",
+   "label": "Input modalities",
+   "aliases": [
+    "multimodal",
+    "vision",
+    "VLM",
+    "omni",
+    "audio"
+   ],
+   "definition": "Input modalities of the released checkpoint as the publisher states them, from: text, image, video, audio, joined with ' + ' in that order (\"text\", \"text + image + video\")."
+  },
   "params.total": {
    "type": "float",
    "required": "always",
    "unit": "params",
-   "label": "Reported total params",
+   "label": "Total params",
    "definition": "Total parameter count as reported by the publisher. See params.note for whether embeddings, MTP heads or vision towers are included."
   },
   "params.active": {
    "type": "float",
    "required": "always",
    "unit": "params",
-   "label": "Reported active params",
+   "label": "Active params",
    "definition": "Parameters used per token in the forward pass, as reported by the publisher."
   },
   "params.active_prefill": {
@@ -93,10 +105,34 @@
    "derived": true,
    "definition": "Parameters in n-gram / Engram / per-layer embedding tables counted from the checkpoint. Like the token embedding, they are lookups and are excluded from params.counted_total and params.counted_active_non_embedding."
   },
+  "params.counted_non_embedding": {
+   "type": "float",
+   "unit": "params",
+   "label": "Non-emb. params (counted)",
+   "aliases": [
+    "non-embedding",
+    "checkpoint"
+   ],
+   "derived": true,
+   "definition": "Language backbone weights excluding input embeddings, output head, lookup/Engram tables, MTP modules and vision/audio towers. Equals params.counted_total minus params.counted_embedding. Same validation as params.counted_total."
+  },
+  "params.counted_max_layer": {
+   "type": "float",
+   "unit": "params",
+   "label": "Largest layer (counted)",
+   "aliases": [
+    "per-layer",
+    "all-gather",
+    "FSDP",
+    "checkpoint"
+   ],
+   "derived": true,
+   "definition": "Largest group of language-backbone weights sharing a full layers.<index> tensor path, including every routed expert. Excludes lookup/Engram tables, embeddings, output head, MTP and other modalities. Hybrid checkpoints may store mixers and FFNs as separate layers. All-gather volume also depends on wrapping, sharding and dtype."
+  },
   "params.counted_active_non_embedding": {
    "type": "float",
    "unit": "params",
-   "label": "Counted active params (non-embedding)",
+   "label": "Active non-emb. (counted)",
    "aliases": [
     "non-embedding",
     "Kaplan N",
@@ -876,6 +912,34 @@
    "label": "Hardware",
    "definition": "Accelerators used for pretraining, count and duration where stated."
   },
+  "train.accelerators": {
+   "type": "str",
+   "label": "Accelerators",
+   "aliases": [
+    "GPUs",
+    "TPUs",
+    "hardware",
+    "cluster"
+   ],
+   "definition": "Accelerator count and type for the main pretraining run, as the count with thousands separators and the chip's short name (\"2,048 H800\", \"2,048 GH200\"). A stated range or bound stays as stated (\"2,048–4,096 GH200\")."
+  },
+  "train.parallelism": {
+   "type": "str",
+   "label": "Parallelism",
+   "aliases": [
+    "TP",
+    "PP",
+    "EP",
+    "DP",
+    "CP",
+    "FSDP",
+    "ZeRO",
+    "pipeline",
+    "tensor parallel",
+    "expert parallel"
+   ],
+   "definition": "Parallelism layout of the main pretraining run as stated, as degree-annotated terms in the order TP, PP, VPP, EP, CP, DP (\"PP16 · EP64 · ZeRO-1 DP\"); a term without a stated degree has none (\"FSDP\")."
+  },
   "train.compute": {
    "type": "str",
    "label": "Compute",
@@ -1252,6 +1316,12 @@
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
     },
+    "meta.modality": {
+     "value": "text + image + audio",
+     "source": "report",
+     "at": "p.6 §1",
+     "quote": "The models accept image and audio inputs in addition to text"
+    },
     "params.total": {
      "value": 70000000000,
      "source": "card",
@@ -1548,6 +1618,20 @@
      "quote": "running, for the 70B model, at scales from 2048 to 4096 GPUs over several months.",
      "note": "Apertus 1.5 node count from its Table G.1 and §6.1 (four GH200 per node)."
     },
+    "train.accelerators": {
+     "value": "2,048–4,096 GH200",
+     "source": "report_v1",
+     "at": "p.43 §6.1.2",
+     "quote": "running, for the 70B model, at scales from 2048 to 4096 GPUs over several months.",
+     "note": "Apertus 1.0 run; chip from the same report §6.1 (Alps GH200); Apertus 1.5 continued pretraining used 512 nodes (2,048 GPUs)."
+    },
+    "train.parallelism": {
+     "value": "TP4 · PP8 · VPP2",
+     "source": "report",
+     "at": "p.107 Table G.1",
+     "quote": "TP4, PP8, VPP2",
+     "note": "Apertus 1.5 continued pretraining; §3.2 states it reuses the Apertus 1.0 tensor and pipeline parallelism."
+    },
     "train.compute": {
      "value": "6.74e24 FLOPs and ~6M GPU-hours for the 15T Apertus 1.0 run; ~1.50M GPU-hours (logged segments) for Apertus 1.5 stages 1–3",
      "source": "report_v1",
@@ -1655,6 +1739,10 @@
     "params.counted_embedding": {
      "value": 3258974208,
      "formula": "input embedding + output head, swiss-ai/Apertus-v1.5-70B-base@0f3fbdd safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 68452380992,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, swiss-ai/Apertus-v1.5-70B-base@0f3fbdd safetensors headers; reproduces stated total (backbone) and active (with output head)"
     },
     "params.counted_active_non_embedding": {
      "value": 68452380992.0,
@@ -1774,6 +1862,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "report",
+     "at": "p.23 §7; Scope of Modalities",
+     "quote": "A.X K2 is currently text-only."
     },
     "params.active": {
      "value": 33000000000,
@@ -2069,6 +2163,19 @@
      "quote": "Pre-training was conducted on 512 NVIDIA B200 GPUs (64 nodes of 8 GPUs) over approximately 70 days.",
      "note": "PP 8 with virtual-pipeline degree 2, EP 8, no tensor parallelism; CP 2 for the 32K stage and 8 for 128K."
     },
+    "train.accelerators": {
+     "value": "512 B200",
+     "source": "report",
+     "at": "p.9 §3.7",
+     "quote": "Pre-training was conducted on 512 NVIDIA B200 GPUs (64 nodes of 8 GPUs) over approximately 70 days."
+    },
+    "train.parallelism": {
+     "value": "PP8 · VPP2 · EP8 · DP (distributed optimizer)",
+     "source": "report",
+     "at": "p.9 §3.7",
+     "quote": "We used pipeline parallelism (PP) of 8 with an interleaved virtual-pipeline degree of 2, and expert parallelism (EP) of 8, with the remaining ranks assigned to data parallelism; tensor parallelism was not used.",
+     "note": "No TP; CP 2 for the 32K stage and 8 for the 128K stage."
+    },
     "train.lr_min": {
      "value": 2.2e-05,
      "source": "report",
@@ -2191,6 +2298,10 @@
     "params.counted_embedding": {
      "value": 2348810240,
      "formula": "input embedding + output head, skt/A.X-K2@2287ca4 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 689341420800,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, skt/A.X-K2@2287ca4 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
     },
     "params.counted_active_non_embedding": {
      "value": 34023363840.0,
@@ -2315,6 +2426,12 @@
      "at": "Beam is now available (post header)",
      "quote": "Beam is now available October 16, 2026",
      "note": "Post: 'Today, we have released Beam’s model weights on Hugging Face'; the Oct 5 announcement preceded the weights."
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README.md; opening description",
+     "quote": "Beam takes text as input and generates text as output."
     },
     "params.total": {
      "value": 501300000000,
@@ -2595,6 +2712,12 @@
      "at": "Pretraining a Foundation for Reasoning; Frontier-grade pretraining infrastructure",
      "quote": "Beam was pretrained end-to-end in under four weeks on a cluster of 6,144 NVIDIA GB300 NVL72 GPUs."
     },
+    "train.accelerators": {
+     "value": "6,144 GB300",
+     "source": "announcement",
+     "at": "Pretraining a Foundation for Reasoning; Frontier-grade pretraining infrastructure",
+     "quote": "Beam was pretrained end-to-end in under four weeks on a cluster of 6,144 NVIDIA GB300 NVL72 GPUs."
+    },
     "train.data": {
      "value": "web, code, PDF-derived STEM and licensed data; code and technical content repeated multiple times",
      "source": "announcement",
@@ -2647,6 +2770,14 @@
     "params.counted_embedding": {
      "value": 1555824640,
      "formula": "input embedding + output head, reflection/Beam-1.0-501B-A23B@78f8f65 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 499711787712,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, reflection/Beam-1.0-501B-A23B@78f8f65 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 10172518960,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, reflection/Beam-1.0-501B-A23B@78f8f65 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 21875704512.0,
@@ -2790,6 +2921,12 @@
      "at": "post header",
      "quote": "May 20, 2026 4 minute read Introducing Command A+",
      "note": "Post: 'Today, we’re releasing Command A+ open-source.'"
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "card",
+     "at": "README.md; Model Details",
+     "quote": "**Input**: Text and images."
     },
     "params.active": {
      "value": 25000000000,
@@ -3049,6 +3186,14 @@
      "value": 1073741824,
      "formula": "input embedding + output head, CohereLabs/command-a-plus-05-2026-bf16@5fb6fde safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 217181196288,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, CohereLabs/command-a-plus-05-2026-bf16@5fb6fde safetensors headers; reproduces stated total (backbone) and active (with embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 6786912256,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, CohereLabs/command-a-plus-05-2026-bf16@5fb6fde safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 23907667968.0,
      "formula": "non-expert weights + routed experts × 8/128, excluding embedding and output head, CohereLabs/command-a-plus-05-2026-bf16@5fb6fde safetensors headers; reproduces stated total (backbone) and active (with embedding)"
@@ -3187,6 +3332,14 @@
      "at": "LICENSE-MODEL, title",
      "quote": "DEEPSEEK LICENSE AGREEMENT",
      "note": "Model weights; code is MIT (README.md §7)."
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "announcement",
+     "at": "DeepSeek API Docs news, Introducing DeepSeek-V3",
+     "quote": "Look forward to multimodal support and other cutting-edge features in the DeepSeek ecosystem.",
+     "note": "Multimodal support is announced as future work and the config (DeepseekV3ForCausalLM) has no vision tower."
     },
     "params.active": {
      "value": 37000000000,
@@ -3539,6 +3692,18 @@
      "quote": "3.7 days on our cluster with 2048 H800 GPUs",
      "note": "Pretraining took less than two months (same paragraph)."
     },
+    "train.accelerators": {
+     "value": "2,048 H800",
+     "source": "report",
+     "at": "p.11 §3.1",
+     "quote": "DeepSeek-V3 is trained on a cluster equipped with 2048 NVIDIA H800 GPUs."
+    },
+    "train.parallelism": {
+     "value": "PP16 · EP64 · ZeRO-1 DP",
+     "source": "report",
+     "at": "p.11 §3.2",
+     "quote": "DeepSeek-V3 applies 16-way Pipeline Parallelism (PP) (Qi et al., 2023a), 64-way Expert Parallelism (EP) (Lepikhin et al., 2021) spanning 8 nodes, and ZeRO-1 Data Parallelism (DP)"
+    },
     "train.init": {
      "value": "random init, std 0.006 for all learnable parameters",
      "source": "report",
@@ -3658,6 +3823,14 @@
     "params.counted_embedding": {
      "value": 1853358080,
      "formula": "input embedding + output head, deepseek-ai/DeepSeek-V3-Base@afb92e1 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 669173061120,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, deepseek-ai/DeepSeek-V3-Base@afb92e1 safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 11507286272,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, deepseek-ai/DeepSeek-V3-Base@afb92e1 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 35698939392.0,
@@ -3797,6 +3970,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "transparency",
+     "at": "Model card PDF; Modalities",
+     "quote": "Both input and output are in Text format"
     },
     "params.active": {
      "value": 37000000000,
@@ -4174,6 +4353,14 @@
      "value": 1853358080,
      "formula": "input embedding + output head, deepseek-ai/DeepSeek-V3.2@a7e62ac safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 670024585984,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, deepseek-ai/DeepSeek-V3.2@a7e62ac safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 11521245696,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, deepseek-ai/DeepSeek-V3.2@a7e62ac safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 36550464256.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, deepseek-ai/DeepSeek-V3.2@a7e62ac safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
@@ -4334,6 +4521,14 @@
      "source": "license",
      "at": "LICENSE (repository has no model card)",
      "quote": "MIT License"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "report",
+     "at": "p.45 §6 Conclusion, Limitations, and Future Directions",
+     "quote": "We are also working on incorporating multimodal capabilities to our models.",
+     "note": "The report names multimodality as future work and the config (DeepseekV4ForCausalLM) has no vision tower; vision came later as the separate V4-Flash-Vision-Exp."
     },
     "params.active": {
      "value": 13000000000,
@@ -4930,6 +5125,14 @@
      "value": 529530880,
      "formula": "input embedding + output head, deepseek-ai/DeepSeek-V4-Flash-Base@8855555 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 283805036372,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, deepseek-ai/DeepSeek-V4-Flash-Base@8855555 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 6596334320,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, deepseek-ai/DeepSeek-V4-Flash-Base@8855555 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 13272428372.0,
      "formula": "non-expert weights + routed experts × 6/256, excluding embedding and output head, deepseek-ai/DeepSeek-V4-Flash-Base@8855555 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
@@ -5124,6 +5327,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "report",
+     "at": "p.45 §6 Conclusion, Limitations, and Future Directions",
+     "quote": "We are also working on incorporating multimodal capabilities to our models.",
+     "note": "The report names multimodality as future work and the config (DeepseekV4ForCausalLM) has no vision tower; vision came later as the separate V4-Flash-Vision-Exp."
     },
     "params.active": {
      "value": 49000000000,
@@ -5697,6 +5908,14 @@
      "value": 926679040,
      "formula": "input embedding + output head, deepseek-ai/DeepSeek-V4-Pro@b5968e9 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 1572072849396,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, deepseek-ai/DeepSeek-V4-Pro@b5968e9 safetensors headers; reproduces stated total (MTP) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 25769422128,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, deepseek-ai/DeepSeek-V4-Pro@b5968e9 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 48854728692.0,
      "formula": "non-expert weights + routed experts × 6/384, excluding embedding and output head, deepseek-ai/DeepSeek-V4-Pro@b5968e9 safetensors headers; reproduces stated total (MTP) and active (non-embedding)"
@@ -5879,6 +6098,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "card",
+     "at": "README.md; Introduction",
+     "quote": "The model natively processes images and text, and generates text autoregressively."
     },
     "params.active_prefill": {
      "value": 8000000000,
@@ -6440,6 +6665,14 @@
      "value": 661913600,
      "formula": "input embedding + output head, deepseek-ai/DeepSeek-V4.1-Flash@314113f safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 550977687424,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, deepseek-ai/DeepSeek-V4.1-Flash@314113f safetensors headers; reproduces stated total (other modalities) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 13765227760,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, deepseek-ai/DeepSeek-V4.1-Flash@314113f safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 15889354624.0,
      "formula": "non-expert weights + routed experts × 6/384, excluding embedding and output head, deepseek-ai/DeepSeek-V4.1-Flash@314113f safetensors headers; reproduces stated total (other modalities) and active (non-embedding)"
@@ -6639,6 +6872,13 @@
      "source": "blog",
      "at": "Gemma 4 launch post header",
      "quote": "Gemma 4: Byte for byte, the most capable open models Apr 02, 2026"
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "card",
+     "at": "README.md; Mixture-of-Experts (MoE) Model table",
+     "quote": "| **Expert Count** | 8 active / 128 total and 1 shared | | **Supported Modalities** | Text, Image |",
+     "note": "The card also lists video understanding as processing sequences of frames; audio is limited to E2B, E4B and 12B."
     },
     "params.active": {
      "value": 3800000000,
@@ -6922,6 +7162,19 @@
      "at": "PDF page 2; Table 2",
      "quote": "26B-A4B* v6e 6,144 16 16 24"
     },
+    "train.accelerators": {
+     "value": "6,144 TPU v6e",
+     "source": "report",
+     "at": "PDF page 2; Table 2",
+     "quote": "26B-A4B* v6e 6,144 16 16 24"
+    },
+    "train.parallelism": {
+     "value": "data16 · seq16 · replica24",
+     "source": "report",
+     "at": "PDF page 2; Table 2",
+     "quote": "26B-A4B* v6e 6,144 16 16 24",
+     "note": "Table 2 sharding axes (data, sequence, replica) as named by the report, not mapped to TP/CP/DP; §2.7 adds ZeRO-3 optimizer-state sharding."
+    },
     "eval.aa_index": {
      "value": 17,
      "source": "aa",
@@ -6955,6 +7208,14 @@
     "params.counted_embedding": {
      "value": 738197504,
      "formula": "input embedding + output head, google/gemma-4-26B-A4B@24548b6 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 24494855966,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, google/gemma-4-26B-A4B@24548b6 safetensors headers; reproduces stated total (backbone) and active (with embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 828510465,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, google/gemma-4-26B-A4B@24548b6 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 3084244766.0,
@@ -7089,6 +7350,13 @@
      "source": "blog",
      "at": "Gemma 4 launch post header",
      "quote": "Gemma 4: Byte for byte, the most capable open models Apr 02, 2026"
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "card",
+     "at": "README.md; Dense Models table (31B Dense column)",
+     "quote": "| **Supported Modalities** | Text, Image, Audio | Text, Image, Audio | Text, Image, Audio | Text, Image |",
+     "note": "The card also lists video understanding as processing sequences of frames; audio is limited to E2B, E4B and 12B."
     },
     "params.embedding": {
      "value": 1410000000,
@@ -7330,6 +7598,19 @@
      "at": "PDF page 2; Table 2",
      "quote": "31B v6e 10,240 16 16 40"
     },
+    "train.accelerators": {
+     "value": "10,240 TPU v6e",
+     "source": "report",
+     "at": "PDF page 2; Table 2",
+     "quote": "31B v6e 10,240 16 16 40"
+    },
+    "train.parallelism": {
+     "value": "data16 · seq16 · replica40",
+     "source": "report",
+     "at": "PDF page 2; Table 2",
+     "quote": "31B v6e 10,240 16 16 40",
+     "note": "Table 2 sharding axes (data, sequence, replica) as named by the report, not mapped to TP/CP/DP; §2.7 adds ZeRO-3 optimizer-state sharding."
+    },
     "eval.aa_index": {
      "value": 15,
      "source": "aa",
@@ -7362,6 +7643,14 @@
     "params.counted_embedding": {
      "value": 1409286144,
      "formula": "input embedding + output head, google/gemma-4-31B@5bbc2fb safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 29288059196,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, google/gemma-4-31B@5bbc2fb safetensors headers; reproduces stated total (backbone) and active (with embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 534009857,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, google/gemma-4-31B@5bbc2fb safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 29288059196.0,
@@ -7493,6 +7782,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "basis": "inferred",
+     "source": "hf-transformers",
+     "at": "modeling_glm5_next.py; Glm5NextVisionModel",
+     "quote": "input_modalities = (\"image\", \"video\")",
+     "note": "The card calls the model natively multimodal without listing modalities; the transformers class declares image and video inputs alongside text."
     },
     "params.total": {
      "value": 320000000000,
@@ -7860,6 +8157,14 @@
      "value": 1268776960,
      "formula": "input embedding + output head, zai-org/GLM-5.3-Flash@46a050b safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 312058034736,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, zai-org/GLM-5.3-Flash@46a050b safetensors headers; reproduces stated total (MTP) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 7412630032,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, zai-org/GLM-5.3-Flash@46a050b safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 16107944496.0,
      "formula": "non-expert weights + routed experts × 8/288, excluding embedding and output head, zai-org/GLM-5.3-Flash@46a050b safetensors headers; reproduces stated total (MTP) and active (with embedding and output head)"
@@ -7996,6 +8301,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: glm-5.3"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; YAML front matter",
+     "quote": "pipeline_tag: text-generation",
+     "note": "The card states no modality in words; the config (GlmMoeDsaForCausalLM) has no vision tower."
     },
     "params.total": {
      "value": 744000000000,
@@ -8324,6 +8637,14 @@
      "value": 1903165440,
      "formula": "input embedding + output head, zai-org/GLM-5.3@ba32f8c safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 741473854464,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, zai-org/GLM-5.3@ba32f8c safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 9877404672,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, zai-org/GLM-5.3@ba32f8c safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 39347364864.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, zai-org/GLM-5.3@ba32f8c safetensors headers; reproduces stated total (backbone) and active (with output head)"
@@ -8440,6 +8761,12 @@
      "source": "hf_card",
      "at": "README.md YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "§1 Introduction",
+     "quote": "these text-only models are compatible with our Responses API"
     },
     "params.active": {
      "value": 5130000000,
@@ -8707,6 +9034,12 @@
      "at": "PDF p.5 §2.4 Pretraining",
      "quote": "The gpt-oss models trained on NVIDIA H100 GPUs using the PyTorch framework"
     },
+    "train.accelerators": {
+     "value": "H100",
+     "source": "card",
+     "at": "PDF p.5 §2.4 Pretraining",
+     "quote": "The gpt-oss models trained on NVIDIA H100 GPUs using the PyTorch framework"
+    },
     "train.compute": {
      "value": "2.1M H100-hours",
      "source": "card",
@@ -8747,6 +9080,14 @@
     "params.counted_embedding": {
      "value": 1158266880,
      "formula": "input embedding + output head, openai/gpt-oss-120b@b5c939d safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 115670889792,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, openai/gpt-oss-120b@b5c939d safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 3213080192,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, openai/gpt-oss-120b@b5c939d safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 4553716032.0,
@@ -8877,6 +9218,12 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README.md; opening summary",
+     "quote": "designed to support a broad range of text‑to‑text generation tasks"
     },
     "params.total": {
      "value": 28865728512,
@@ -9078,6 +9425,13 @@
      "at": "README.md; Infrastructure",
      "quote": "We trained the Granite 4.1 Language Models utilizing an NVIDIA GB200 NVL72 cluster hosted in CoreWeave."
     },
+    "train.accelerators": {
+     "value": "GB200",
+     "source": "card",
+     "at": "README.md; Infrastructure",
+     "quote": "We trained the Granite 4.1 Language Models utilizing an NVIDIA GB200 NVL72 cluster hosted in CoreWeave.",
+     "note": "The card gives the count only as \"thousands of GPUs\"."
+    },
     "train.objective": {
      "value": "FIM with prefix and suffix tokens",
      "source": "card",
@@ -9168,6 +9522,14 @@
     "params.counted_embedding": {
      "value": 411041792,
      "formula": "input embedding + output head, ibm-granite/granite-4.1-30b-base@9bb22a9 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 28454686720,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, ibm-granite/granite-4.1-30b-base@9bb22a9 safetensors headers; reproduces stated total (backbone) and active (with embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 444604416,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, ibm-granite/granite-4.1-30b-base@9bb22a9 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 28454686720.0,
@@ -9279,6 +9641,14 @@
      "source": "card",
      "at": "README.md; License",
      "quote": "Hy3 preview is released under the Tencent Hy Community License Agreement"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "config",
+     "at": "config.json architectures",
+     "quote": "HYV3ForCausalLM",
+     "note": "The card states no modality; the config class HYV3ForCausalLM has no vision or audio tower."
     },
     "params.active": {
      "value": 21000000000,
@@ -9544,6 +9914,14 @@
      "value": 989855744,
      "formula": "input embedding + output head, tencent/Hy3-preview-Base@54a62bb safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 294043687744,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, tencent/Hy3-preview-Base@54a62bb safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 3719045568,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, tencent/Hy3-preview-Base@54a62bb safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 19685874496.0,
      "formula": "non-expert weights + routed experts × 8/192, excluding embedding and output head, tencent/Hy3-preview-Base@54a62bb safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -9654,6 +10032,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README front matter",
+     "quote": "pipeline_tag: text-generation",
+     "basis": "inferred",
+     "note": "Card tags the checkpoint text-generation; config declares no vision or audio tower (HYV4ForCausalLM)."
     },
     "params.total": {
      "value": 770000000000,
@@ -9961,6 +10347,14 @@
      "value": 1484783616,
      "formula": "input embedding + output head, tencent/Hy4-preview@705d81e safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 768422624868,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, tencent/Hy4-preview@705d81e safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 9978461264,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, tencent/Hy4-preview@705d81e safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 47572762212.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, tencent/Hy4-preview@705d81e safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -10084,6 +10478,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image + audio",
+     "source": "card",
+     "at": "§1 General Information",
+     "quote": "Inkling-Small is a general-purpose multimodal model that accepts text, image and audio inputs and generates text outputs."
     },
     "params.total": {
      "value": 276000000000,
@@ -10353,6 +10753,13 @@
      "at": "Introduction",
      "quote": "trained on NVIDIA GB300 NVL72 systems"
     },
+    "train.accelerators": {
+     "value": "GB300",
+     "source": "announcement",
+     "at": "Introduction",
+     "quote": "trained on NVIDIA GB300 NVL72 systems",
+     "note": "Count not stated."
+    },
     "scaling.parametrization": {
      "value": "μP (final hidden state ÷ 16 width multiplier before the LM head)",
      "source": "configuration_inkling",
@@ -10393,6 +10800,14 @@
     "params.counted_embedding": {
      "value": 1646788608,
      "formula": "input embedding + output head, thinkingmachines/Inkling-Small@8cc5877 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 262008410624,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, thinkingmachines/Inkling-Small@8cc5877 safetensors headers; reproduces stated total (MTP+other modalities) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 6537945600,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, thinkingmachines/Inkling-Small@8cc5877 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 10350170624.0,
@@ -10531,6 +10946,13 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image + audio",
+     "source": "card",
+     "at": "§1 General Information",
+     "quote": "Inkling is a general-purpose multimodal model that accepts text, image and audio inputs and generates text outputs.",
+     "note": "§3 says images and video share the patch encoder, but the card's input modalities list only text, image and audio."
     },
     "params.total": {
      "value": 975000000000,
@@ -10818,6 +11240,13 @@
      "at": "The making of Inkling; Training",
      "quote": "was trained on NVIDIA GB300 NVL72 systems"
     },
+    "train.accelerators": {
+     "value": "GB300",
+     "source": "announcement",
+     "at": "The making of Inkling; Training",
+     "quote": "was trained on NVIDIA GB300 NVL72 systems",
+     "note": "Count not stated."
+    },
     "scaling.parametrization": {
      "value": "μP (final hidden state ÷ 24 width multiplier before the LM head)",
      "source": "configuration_inkling",
@@ -10856,6 +11285,14 @@
     "params.counted_embedding": {
      "value": 2470182912,
      "formula": "input embedding + output head, thinkingmachines/Inkling@828496e safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 944555381248,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, thinkingmachines/Inkling@828496e safetensors headers; reproduces stated total (MTP+other modalities) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 14742553088,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, thinkingmachines/Inkling@828496e safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 38585717248.0,
@@ -11003,6 +11440,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README front matter",
+     "quote": "pipeline_tag: text-generation",
+     "basis": "inferred",
+     "note": "Card tags the checkpoint text-generation; config declares no vision or audio tower (ExaoneMoeForCausalLM)."
     },
     "params.active": {
      "value": 37000000000,
@@ -11405,6 +11850,14 @@
      "value": 1887436800,
      "formula": "input embedding + output head, LGAI-EXAONE/K-EXAONE-2.0-750B-A37B@fec0c8d safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 746941534720,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, LGAI-EXAONE/K-EXAONE-2.0-750B-A37B@fec0c8d safetensors headers; reproduces stated total (MTP) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 9816257024,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, LGAI-EXAONE/K-EXAONE-2.0-750B-A37B@fec0c8d safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 35453358592.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, LGAI-EXAONE/K-EXAONE-2.0-750B-A37B@fec0c8d safetensors headers; reproduces stated total (MTP) and active (with embedding and output head)"
@@ -11568,6 +12021,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README front matter",
+     "quote": "pipeline_tag: text-generation",
+     "basis": "inferred",
+     "note": "Card tags the checkpoint text-generation; config declares no vision or audio tower (K2HorizonForCausalLM)."
     },
     "params.total": {
      "value": 36000000000,
@@ -11937,6 +12398,13 @@
      "quote": "This will prevent attention across document boundaries.",
      "note": "The launch script sets --multi_segments true."
     },
+    "train.parallelism": {
+     "value": "TP2 · FSDP",
+     "source": "xllm_launch",
+     "at": "examples/k2-horizon-mova-36B-a4B.sh; DISTRIBUTED_CFGS",
+     "quote": "--model_parallel_size 2",
+     "note": "xllm/config.py defines model_parallel_size as model/tensor parallel; the script sets --context_parallel_size 1 and --model.ddp_backend fsdp2."
+    },
     "eval.aa_index": {
      "value": 25,
      "source": "aa",
@@ -11955,6 +12423,10 @@
      "formula": "checkpoint count (37.4B backbone) does not reproduce the stated total and active counts"
     },
     "params.counted_embedding": {
+     "value": null,
+     "formula": "checkpoint count (37.4B backbone) does not reproduce the stated total and active counts"
+    },
+    "params.counted_non_embedding": {
      "value": null,
      "formula": "checkpoint count (37.4B backbone) does not reproduce the stated total and active counts"
     },
@@ -12080,6 +12552,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README front matter",
+     "quote": "pipeline_tag: text-generation",
+     "basis": "inferred",
+     "note": "Card tags the checkpoint text-generation; config declares no vision or audio tower (K2HorizonForCausalLM)."
     },
     "params.total": {
      "value": 375000000000,
@@ -12414,6 +12894,14 @@
      "value": 3079667712,
      "formula": "input embedding + output head, IFM/K2-Horizon-375B-A23B@7d22cc0 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 376087491456,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, IFM/K2-Horizon-375B-A23B@7d22cc0 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 6464090304,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, IFM/K2-Horizon-375B-A23B@7d22cc0 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 23589794688.0,
      "formula": "non-expert weights + routed experts × 8/192, excluding embedding and output head, IFM/K2-Horizon-375B-A23B@7d22cc0 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
@@ -12544,6 +13032,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: modified-mit"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "source": "card",
+     "at": "§6 Model Usage; Chat Completion with visual content",
+     "quote": "K2.5 supports Image and Video input."
     },
     "params.active": {
      "value": 32000000000,
@@ -12788,6 +13282,21 @@
      "at": "App. C",
      "quote": "Kimi K2.5 is trained on NVIDIA H800 GPU clusters with 8×400 Gbps RoCE interconnects across nodes."
     },
+    "train.accelerators": {
+     "value": "H800",
+     "source": "report",
+     "at": "App. C",
+     "quote": "Kimi K2.5 is trained on NVIDIA H800 GPU clusters with 8×400 Gbps RoCE interconnects across nodes.",
+     "note": "Count not stated."
+    },
+    "train.parallelism": {
+     "value": "PP16 · VPP · EP16 · ZeRO-1 DP",
+     "source": "report",
+     "at": "p.10 §4.5.1",
+     "quote": "K2.5 seamlessly inherits the parallel strategy of K2",
+     "basis": "inferred",
+     "note": "Degrees are Kimi K2's (K2 report §2.4.2: 16-way PP with virtual stages, 16-way EP, ZeRO-1 DP); the vision encoder is replicated on all GPUs."
+    },
     "train.init": {
      "value": "Language model continued from a near-end Kimi K2 checkpoint; MoonViT-3D from SigLIP-SO-400M",
      "source": "report",
@@ -12864,6 +13373,14 @@
     "params.counted_embedding": {
      "value": 2348810240,
      "formula": "input embedding + output head, moonshotai/Kimi-K2.5@4d01dfe safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 1024059422208,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, moonshotai/Kimi-K2.5@4d01dfe safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 17059365248,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, moonshotai/Kimi-K2.5@4d01dfe safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 30512690688.0,
@@ -13278,6 +13795,20 @@
      "at": "p.7 §2.4.1",
      "quote": "Kimi K2 was trained on a cluster equipped with NVIDIA H800 GPUs."
     },
+    "train.accelerators": {
+     "value": "H800",
+     "source": "report",
+     "at": "p.7 §2.4.1",
+     "quote": "Kimi K2 was trained on a cluster equipped with NVIDIA H800 GPUs.",
+     "note": "Count not stated."
+    },
+    "train.parallelism": {
+     "value": "PP16 · VPP · EP16 · ZeRO-1 DP",
+     "source": "report",
+     "at": "p.8 §2.4.2",
+     "quote": "Pipeline Parallelism (PP) with virtual stages [28, 53, 38, 57, 47, 21], 16-way Expert Parallelism (EP) [39], and ZeRO-1 Data Parallelism [60].",
+     "note": "The PP degree ends the previous line, which Figure 7 separates from the quote: 'a combination of 16-way'; VPP degree not stated."
+    },
     "train.lr_min": {
      "value": 7e-06,
      "source": "report",
@@ -13394,6 +13925,14 @@
     "params.counted_embedding": {
      "value": 2348810240,
      "formula": "input embedding + output head, moonshotai/Kimi-K2-Base@ce72df0 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 1024059425624,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, moonshotai/Kimi-K2-Base@ce72df0 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 17059365304,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, moonshotai/Kimi-K2-Base@ce72df0 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 30512694104.0,
@@ -13525,6 +14064,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: \"kimi-k3\""
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "source": "card",
+     "at": "§1 Model Introduction; Key Features",
+     "quote": "Kimi K3 understands text, images, and video within the same model"
     },
     "params.active": {
      "value": 104200000000,
@@ -13914,6 +14459,13 @@
      "at": "p.11 §3.3",
      "quote": "Weight decay is set to 0.1 throughout."
     },
+    "train.parallelism": {
+     "value": "PP · VPP · EP · CP · ZeRO-1 DP",
+     "source": "report",
+     "at": "p.18 §5.2",
+     "quote": "Kimi K3 pre-training combines Pipeline Parallelism (PP) with virtual stages (VP) [49, 82], Expert Parallelism (EP) [67], ZeRO-1 Data Parallelism [101], Pipeline ZeRO-2 gradient sharding [147], and Context Parallelism (CP, §5.1.2) [51].",
+     "note": "Degrees not stated; gradients are also sharded across DP ranks (Pipeline ZeRO-2)."
+    },
     "scaling.hp_rule": {
      "value": "batch size, LR, TPP and model shape retuned by scaling-law studies; separate search per schedule, cosine chosen over WSD",
      "source": "report",
@@ -13956,6 +14508,14 @@
     "params.counted_embedding": {
      "value": 2348810240,
      "formula": "input embedding + output head, moonshotai/Kimi-K3@f831ab6 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 2777135667968,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, moonshotai/Kimi-K3@f831ab6 safetensors headers; reproduces stated total (other modalities) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 30228720256,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, moonshotai/Kimi-K3@f831ab6 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 103015209728.0,
@@ -14072,6 +14632,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "Model overview",
+     "quote": "Modality: text-to-text (completion)"
     },
     "params.active": {
      "value": 23400000000,
@@ -14336,6 +14902,19 @@
      "at": "p.6 §3.1.1",
      "quote": "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
     },
+    "train.accelerators": {
+     "value": "6,144 H200",
+     "source": "report",
+     "at": "p.6 §3.1.1",
+     "quote": "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
+    },
+    "train.parallelism": {
+     "value": "EP8",
+     "source": "report",
+     "at": "p.7 §3.1.2",
+     "quote": "For MoE layers, we use Expert Parallelism, sharding expert weights across 8 H200 GPUs interconnected via NVLink.",
+     "note": "Titan's mesh is (PP, DDP, FSDP, EGP, ETP) for MoE layers with ETP = 1 for M.1 and XS.2; other degrees not stated."
+    },
     "train.stability": {
      "value": "FP32 LM-head input-gradient all-reduce to fix positive logit drift; no z-loss",
      "source": "report",
@@ -14371,6 +14950,14 @@
     "params.counted_embedding": {
      "value": 822083584,
      "formula": "input embedding + output head, poolside/Laguna-M.1-base@628037a safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 224973641984,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, poolside/Laguna-M.1-base@628037a safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 3343917568,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, poolside/Laguna-M.1-base@628037a safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 22640400944.0,
@@ -14487,6 +15074,12 @@
      "at": "README.md; YAML front matter",
      "quote": "license: openmdw-1.1"
     },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "Model overview",
+     "quote": "Modality: text-to-text"
+    },
     "params.active": {
      "value": 8000000000,
      "source": "blog",
@@ -14566,11 +15159,12 @@
      "at": "/num_key_value_heads"
     },
     "attn.layout": {
-     "value": "3 SWA : 1 global",
-     "source": "card",
-     "at": "README.md; Highlights",
-     "quote": "48 layers in a 1:3 global-to-SWA ratio (12 global attention layers, 36 sliding-window layers, window 512)",
-     "note": "Config /layer_types starts each group of four with the global layer."
+     "value": "1 global : 3 SWA",
+     "source": "config",
+     "at": "config.json; /layer_types",
+     "quote": "\"full_attention\", \"sliding_attention\", \"sliding_attention\", \"sliding_attention\"",
+     "basis": "inferred",
+     "note": "The pinned /layer_types array repeats this four-layer pattern 12 times, beginning with the global layer."
     },
     "attn.local_kv_heads": {
      "value": 8,
@@ -14739,6 +15333,12 @@
      "at": "Introducing Laguna S 2.1; The bets we're making",
      "quote": "Laguna S 2.1 began pre-training on 4,096 NVIDIA H200 GPUs on May 22, 2026, 60 days ago."
     },
+    "train.accelerators": {
+     "value": "4,096 H200",
+     "source": "blog",
+     "at": "Introducing Laguna S 2.1; The bets we're making",
+     "quote": "Laguna S 2.1 began pre-training on 4,096 NVIDIA H200 GPUs on May 22, 2026, 60 days ago."
+    },
     "train.data": {
      "value": "same pretraining data as XS 2.1",
      "source": "blog",
@@ -14778,6 +15378,14 @@
     "params.counted_embedding": {
      "value": 616562688,
      "formula": "input embedding + output head, poolside/Laguna-S-2.1@0f57314 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 116945414912,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, poolside/Laguna-S-2.1@0f57314 safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 2489285120,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, poolside/Laguna-S-2.1@0f57314 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 7832681942.0,
@@ -14909,6 +15517,12 @@
      "at": "README.md; YAML front matter",
      "quote": "license: openmdw-1.1"
     },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "Model overview",
+     "quote": "Modality: text-to-text"
+    },
     "params.active": {
      "value": 3000000000,
      "source": "blog",
@@ -14983,11 +15597,12 @@
      "at": "/num_key_value_heads"
     },
     "attn.layout": {
-     "value": "3 SWA : 1 global",
-     "source": "card",
-     "at": "README.md; Highlights",
-     "quote": "enabling mixed SWA (Sliding Window Attention) and global attention layers in a 3:1 ratio (across 40 total layers)",
-     "note": "Config /layer_types starts each group of four with the global layer."
+     "value": "1 global : 3 SWA",
+     "source": "config",
+     "at": "config.json; /layer_types",
+     "quote": "\"full_attention\", \"sliding_attention\", \"sliding_attention\", \"sliding_attention\"",
+     "basis": "inferred",
+     "note": "The pinned /layer_types array repeats this four-layer pattern 10 times, beginning with the global layer."
     },
     "attn.local_kv_heads": {
      "value": 8,
@@ -15182,6 +15797,14 @@
      "value": 411041792,
      "formula": "input embedding + output head, poolside/Laguna-XS-2.1@c5f3626 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 33031575296,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, poolside/Laguna-XS-2.1@c5f3626 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 846860800,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, poolside/Laguna-XS-2.1@c5f3626 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 2606084408.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, poolside/Laguna-XS-2.1@c5f3626 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -15317,6 +15940,12 @@
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
     },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "Model overview",
+     "quote": "Modality: text-to-text"
+    },
     "params.active": {
      "value": 3000000000,
      "source": "report",
@@ -15410,11 +16039,12 @@
      "at": "/num_key_value_heads"
     },
     "attn.layout": {
-     "value": "3 SWA : 1 global",
-     "source": "report",
-     "at": "p.5 §3.1",
-     "quote": "interleaved Sliding Window Attention (SWA) and Global Attention (GA) [11, 27] with a 3:1 ratio",
-     "note": "Config /layer_types starts each group of four with the global layer."
+     "value": "1 global : 3 SWA",
+     "source": "config",
+     "at": "config.json; /layer_types",
+     "quote": "\"full_attention\", \"sliding_attention\", \"sliding_attention\", \"sliding_attention\"",
+     "basis": "inferred",
+     "note": "The pinned /layer_types array repeats this four-layer pattern 10 times, beginning with the global layer."
     },
     "attn.local_kv_heads": {
      "value": 8,
@@ -15691,6 +16321,19 @@
      "at": "p.6 §3.1.1",
      "quote": "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
     },
+    "train.accelerators": {
+     "value": "2,048 H200",
+     "source": "report",
+     "at": "p.6 §3.1.1",
+     "quote": "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
+    },
+    "train.parallelism": {
+     "value": "EP8",
+     "source": "report",
+     "at": "p.7 §3.1.2",
+     "quote": "For MoE layers, we use Expert Parallelism, sharding expert weights across 8 H200 GPUs interconnected via NVLink.",
+     "note": "Titan's mesh is (PP, DDP, FSDP, EGP, ETP) for MoE layers with ETP = 1 for M.1 and XS.2; other degrees not stated."
+    },
     "train.stability": {
      "value": "FP32 LM-head input-gradient all-reduce; no z-loss; padding tokens skip routing and load balancing",
      "source": "report",
@@ -15739,6 +16382,14 @@
     "params.counted_embedding": {
      "value": 411041792,
      "formula": "input embedding + output head, poolside/Laguna-XS.2@a397bde safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 33031575296,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, poolside/Laguna-XS.2@a397bde safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 846860800,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, poolside/Laguna-XS.2@a397bde safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 2606084408.0,
@@ -15878,6 +16529,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "report",
+     "at": "p.33 §5 Conclusion, Limitations, and Future Directions",
+     "quote": "An equally important transition is from text-only systems to native multimodal agents.",
+     "basis": "inferred",
+     "note": "The report names native multimodality as future work; config declares no vision or audio tower and the card tags the checkpoint text-generation."
     },
     "params.active": {
      "value": 63000000000,
@@ -16308,6 +16967,14 @@
      "value": 2575302656,
      "formula": "input embedding + output head, inclusionAI/Ling-2.6-1T-base@64beeb8 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 1009655857664,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, inclusionAI/Ling-2.6-1T-base@64beeb8 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 13272900096,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, inclusionAI/Ling-2.6-1T-base@64beeb8 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 61004956160.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, inclusionAI/Ling-2.6-1T-base@64beeb8 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -16451,6 +17118,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README front matter",
+     "quote": "pipeline_tag: text-generation",
+     "basis": "inferred",
+     "note": "Card tags the checkpoint text-generation; config declares no vision or audio tower, and the TDS summary ticks only Text as a training-data modality."
     },
     "params.active": {
      "value": 5100000000,
@@ -16842,6 +17517,14 @@
      "value": 804782080,
      "formula": "input embedding + output head, inclusionAI/Ling-3.0-flash-base@0a96b0a safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 123609429472,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, inclusionAI/Ling-3.0-flash-base@0a96b0a safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 3090163360,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, inclusionAI/Ling-3.0-flash-base@0a96b0a safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 4700911072.0,
      "formula": "non-expert weights + routed experts × 8/512, excluding embedding and output head, inclusionAI/Ling-3.0-flash-base@0a96b0a safetensors headers; reproduces stated total (backbone) and active (with output head)"
@@ -16961,6 +17644,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README front matter",
+     "quote": "pipeline_tag: text-generation",
+     "basis": "inferred",
+     "note": "Card tags the checkpoint text-generation; config declares no vision or audio tower, and the TDS summary ticks only Text as a training-data modality."
     },
     "params.active": {
      "value": 25000000000,
@@ -17271,6 +17962,14 @@
      "value": 1287651328,
      "formula": "input embedding + output head, inclusionAI/Ling-3.1-flash@a4ccd6b safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 562658832192,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, inclusionAI/Ling-3.1-flash@a4ccd6b safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 8272593600,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, inclusionAI/Ling-3.1-flash@a4ccd6b safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 23606882112.0,
      "formula": "non-expert weights + routed experts × 8/512, excluding embedding and output head, inclusionAI/Ling-3.1-flash@a4ccd6b safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -17390,6 +18089,14 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md front matter",
+     "quote": "pipeline_tag: text-generation",
+     "note": "No modality statement; the card's pipeline tag is text-generation and config.json (LongcatCausalLM) has no vision or audio config."
     },
     "params.active": {
      "value": 48000000000,
@@ -17598,6 +18305,20 @@
      "quote": "LongCat-2.0 is pre-trained on over 50K AI ASICs",
      "note": "6D parallelism (TP/CP/EP/DP/PP plus EMBP for the N-gram Embeddings), ZeRO-1, selective recomputation and allocator-level OOM-aware offloading; CP scaled past 512 for 1M-length training."
     },
+    "train.accelerators": {
+     "value": ">50,000 AI ASICs",
+     "source": "blog",
+     "at": "blog bundle; Training",
+     "quote": "LongCat-2.0 is pre-trained on over 50K AI ASICs",
+     "note": "Chip not named."
+    },
+    "train.parallelism": {
+     "value": "TP · PP · EP · CP · DP · EMBP",
+     "source": "blog",
+     "at": "blog bundle; Training, Training at Scale",
+     "quote": "Beyond standard TP/CP/EP/DP/PP, we introduce EMBP to parallelize and accelerate N-gram Embeddings.",
+     "note": "No degrees stated; EMBP parallelizes the N-gram Embeddings; the same section states ZeRO-1."
+    },
     "train.optimizer": {
      "value": "Muon",
      "source": "blog",
@@ -17663,6 +18384,10 @@
      "formula": "checkpoint count (1503.6B backbone) does not reproduce the stated total and active counts"
     },
     "params.counted_embedding": {
+     "value": null,
+     "formula": "checkpoint count (1503.6B backbone) does not reproduce the stated total and active counts"
+    },
+    "params.counted_non_embedding": {
      "value": null,
      "formula": "checkpoint count (1503.6B backbone) does not reproduce the stated total and active counts"
     },
@@ -18171,6 +18896,20 @@
      "at": "p.21 §2.6.1",
      "quote": "We use expert parallelism 64 with ZeRO-2 for pre-training and mid-training 1, and we enable ZeRO-3 (FSDP) for mid-training phase 2."
     },
+    "train.accelerators": {
+     "value": "8,192 GB200",
+     "source": "report",
+     "at": "p.21 §2.6.1 Table 6",
+     "quote": "Phase Tokens Context length GB200 GPUs Pre-training 30 T 16,384 8,192",
+     "note": "Pre-training and mid-training 1; mid-training 2 used 4,096."
+    },
+    "train.parallelism": {
+     "value": "EP64 · ZeRO-2 DP",
+     "source": "report",
+     "at": "p.21 §2.6.1",
+     "quote": "We use expert parallelism 64 with ZeRO-2 for pre-training and mid-training 1",
+     "note": "§2.8 states TP degree 1 with EP inside the NVL64 domain and DP across racks; mid-training 2 adds ZeRO-3 (FSDP) and context parallelism."
+    },
     "scaling.ladder": {
      "value": "L12–L78 (365M/3.9B to 35.6B/1015B active/total): L layers, D = L·256/3, query heads L rounded up to a multiple of 16, 8 KV heads, 8/512 experts; architecture ablations at 100–200 TPP",
      "source": "report",
@@ -18332,6 +19071,12 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text + image + video + audio",
+     "source": "card",
+     "at": "README.md; Model Summary",
+     "quote": "Modalities: Text, Image, Video, Audio"
     },
     "params.active": {
      "value": 15000000000,
@@ -18678,6 +19423,14 @@
      "value": 1249902592,
      "formula": "input embedding + output head, XiaomiMiMo/MiMo-V2.6-Flash-RL@dcd3fd8 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 307528878272,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, XiaomiMiMo/MiMo-V2.6-Flash-RL@dcd3fd8 safetensors headers; reproduces stated total (other modalities) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 6537879872,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, XiaomiMiMo/MiMo-V2.6-Flash-RL@dcd3fd8 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 14196033728.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, XiaomiMiMo/MiMo-V2.6-Flash-RL@dcd3fd8 safetensors headers; reproduces stated total (other modalities) and active (with output head)"
@@ -18824,6 +19577,12 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text + image + video + audio",
+     "source": "card",
+     "at": "README.md; Model Summary",
+     "quote": "Modalities: Text, Image, Video, Audio"
     },
     "params.active": {
      "value": 42000000000,
@@ -19176,6 +19935,14 @@
      "value": 1874853888,
      "formula": "input embedding + output head, XiaomiMiMo/MiMo-V2.6-Pro-RL@b61f218 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 1019373272448,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, XiaomiMiMo/MiMo-V2.6-Pro-RL@b61f218 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 14765273600,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, XiaomiMiMo/MiMo-V2.6-Pro-RL@b61f218 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 40020065664.0,
      "formula": "non-expert weights + routed experts × 8/384, excluding embedding and output head, XiaomiMiMo/MiMo-V2.6-Pro-RL@b61f218 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -19321,6 +20088,14 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; intro",
+     "quote": "MiMo-V2-Flash is a Mixture-of-Experts (MoE) language model",
+     "note": "No explicit modality statement; config.json (MiMoV2FlashForCausalLM) has no vision or audio config."
     },
     "params.total": {
      "value": 309000000000,
@@ -19792,6 +20567,14 @@
      "value": 1249902592,
      "formula": "input embedding + output head, XiaomiMiMo/MiMo-V2-Flash-Base@e418701 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 307528878272,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, XiaomiMiMo/MiMo-V2-Flash-Base@e418701 safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 6537879872,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, XiaomiMiMo/MiMo-V2-Flash-Base@e418701 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 14196033728.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, XiaomiMiMo/MiMo-V2-Flash-Base@e418701 safetensors headers; reproduces stated total (backbone) and active (with output head)"
@@ -19938,6 +20721,14 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; MiMo-V2.5-Pro",
+     "quote": "MiMo-V2.5-Pro is an open-source Mixture-of-Experts (MoE) language model",
+     "note": "No explicit modality statement; config.json (MiMoV2ForCausalLM) has no vision or audio config, unlike the omnimodal MiMo-V2.5/V2.6 releases."
     },
     "params.active": {
      "value": 42000000000,
@@ -20250,6 +21041,14 @@
      "value": 1874853888,
      "formula": "input embedding + output head, XiaomiMiMo/MiMo-V2.5-Pro-Base@1e94ccf safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 1019373272448,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, XiaomiMiMo/MiMo-V2.5-Pro-Base@1e94ccf safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 14765273600,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, XiaomiMiMo/MiMo-V2.5-Pro-Base@1e94ccf safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 40020065664.0,
      "formula": "non-expert weights + routed experts × 8/384, excluding embedding and output head, XiaomiMiMo/MiMo-V2.5-Pro-Base@1e94ccf safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -20392,6 +21191,14 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "config",
+     "at": "config.json; architectures",
+     "quote": "\"architectures\": [ \"MiniMaxM1ForCausalLM\" ]",
+     "note": "No modality statement; causal-LM class with no vision or audio config, built on MiniMax-Text-01."
     },
     "params.total": {
      "value": 456000000000,
@@ -20723,6 +21530,13 @@
      "at": "p.14 §3",
      "quote": "the number of H800 GPUs ranges from 1500 to 2500"
     },
+    "train.accelerators": {
+     "value": "1,500–2,500 H800",
+     "source": "text01-report",
+     "at": "p.14 §3",
+     "quote": "the number of H800 GPUs ranges from 1500 to 2500",
+     "note": "MiniMax-Text-01 pretraining cluster (base of M1), size varied over the run."
+    },
     "train.data": {
      "value": "Text-01: academic literature, books, web, code, scored by a 5B-active/60B MoE; high-quality data up to 4 epochs. M1: STEM, code, book and reasoning data raised to 70%, no synthetic data",
      "source": "m1-report",
@@ -20810,6 +21624,14 @@
     "params.counted_embedding": {
      "value": 2458386432,
      "formula": "input embedding + output head, MiniMaxAI/MiniMax-M1-80k@8d1494b safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 453631268864,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, MiniMaxAI/MiniMax-M1-80k@8d1494b safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 5687693312,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, MiniMaxAI/MiniMax-M1-80k@8d1494b safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 45944920064.0,
@@ -20938,6 +21760,14 @@
      "source": "license",
      "at": "LICENSE; title",
      "quote": "NON-COMMERCIAL LICENSE Non-commercial use permitted based on MIT-style terms"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "config",
+     "at": "config.json; architectures",
+     "quote": "\"architectures\": [ \"MiniMaxM2ForCausalLM\" ]",
+     "note": "No modality statement; causal-LM class with no vision or audio config."
     },
     "params.active": {
      "value": 9800000000,
@@ -21252,6 +22082,14 @@
      "value": 1229193216,
      "formula": "input embedding + output head, MiniMaxAI/MiniMax-M2.7@d494266 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 227460571648,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, MiniMaxAI/MiniMax-M2.7@d494266 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 3668718848,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, MiniMaxAI/MiniMax-M2.7@d494266 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 9801359872.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, MiniMaxAI/MiniMax-M2.7@d494266 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
@@ -21375,6 +22213,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: minimax-community"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "source": "card",
+     "at": "README.md; Highlights",
+     "quote": "enabling deeper semantic fusion across text, image, and video"
     },
     "params.active": {
      "value": 23000000000,
@@ -21645,6 +22489,14 @@
      "value": 2458386432,
      "formula": "input embedding + output head, MiniMaxAI/MiniMax-M3@f0e1c1e safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 423904942464,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, MiniMaxAI/MiniMax-M3@f0e1c1e safetensors headers; reproduces stated total (other modalities) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 7416066688,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, MiniMaxAI/MiniMax-M3@f0e1c1e safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 23692843392.0,
      "formula": "non-expert weights + routed experts × 4/128, excluding embedding and output head, MiniMaxAI/MiniMax-M3@f0e1c1e safetensors headers; reproduces stated total (other modalities) and active (non-embedding)"
@@ -21780,6 +22632,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "card",
+     "at": "README.md; Key Features",
+     "quote": "Enables the model to analyze images and provide insights based on visual content, in addition to text."
     },
     "params.active": {
      "value": 41000000000,
@@ -21998,6 +22856,12 @@
      "at": "README.md; intro",
      "quote": "trained from scratch with 3000 H200s"
     },
+    "train.accelerators": {
+     "value": "3,000 H200",
+     "source": "card",
+     "at": "README.md; intro",
+     "quote": "trained from scratch with 3000 H200s"
+    },
     "train.cutoff": {
      "value": "July 2025",
      "source": "data_summary",
@@ -22145,6 +23009,12 @@
      "at": "README.md; License",
      "quote": "This model is licensed under a [Modified MIT License](https://huggingface.co/mistralai/Mistral-Medium-3.5-128B/blob/main/LICENSE).",
      "note": "Card front matter: license: other."
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "card",
+     "at": "README.md; Key Features",
+     "quote": "Multimodal input: Accepts both text and image input, with text output."
     },
     "params.total": {
      "value": 128000000000,
@@ -22315,6 +23185,14 @@
      "value": 3221225472,
      "formula": "input embedding + output head, mistralai/Mistral-Medium-3.5-128B@22b2b86 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 121804763136,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, mistralai/Mistral-Medium-3.5-128B@22b2b86 safetensors headers; reproduces stated total (other modalities) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 1384144896,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, mistralai/Mistral-Medium-3.5-128B@22b2b86 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 121804763136.0,
      "formula": "all weights except embedding and output head, mistralai/Mistral-Medium-3.5-128B@22b2b86 safetensors headers; reproduces stated total (other modalities) and active (with embedding and output head)"
@@ -22422,6 +23300,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "card",
+     "at": "README.md; Key Features",
+     "quote": "Multimodal input: Accepts both text and image input, with text output."
     },
     "params.active": {
      "value": 6500000000,
@@ -22683,6 +23567,14 @@
      "value": 1073741824,
      "formula": "input embedding + output head, mistralai/Mistral-Small-4-119B-2603@a11f36b safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 117899084800,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, mistralai/Mistral-Small-4-119B-2603@a11f36b safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 3274974464,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, mistralai/Mistral-Small-4-119B-2603@a11f36b safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 5558846464.0,
      "formula": "non-expert weights + routed experts × 4/128, excluding embedding and output head, mistralai/Mistral-Small-4-119B-2603@a11f36b safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -22798,6 +23690,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: mit"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md front matter",
+     "quote": "pipeline_tag: text-generation",
+     "note": "No modality statement; text-generation pipeline tag and a causal LM config with no vision or audio config."
     },
     "params.total": {
      "value": 314000000000,
@@ -23248,6 +24148,20 @@
      "at": "p.7 §3.1",
      "quote": "With expert and parameter sharding, optimizer-state CPU offloading, and the memory capacity of B200 GPUs, our 314B-parameter model fits within the available device memory"
     },
+    "train.accelerators": {
+     "value": "B200",
+     "source": "report",
+     "at": "p.7 §3.1",
+     "quote": "With expert and parameter sharding, optimizer-state CPU offloading, and the memory capacity of B200 GPUs",
+     "note": "Count not stated."
+    },
+    "train.parallelism": {
+     "value": "EP8 · HSDP (DP-shard 8 · DP-replicate)",
+     "source": "report",
+     "at": "p.7 §3.1",
+     "quote": "Outside the expert-parallel dimension, we use a sharded data-parallel (DP-shard) degree of 8 and assign the remaining ranks to the replicated data-parallel (DP-replicate) dimension.",
+     "note": "Same paragraph: EP = 8 within one eight-GPU node, FSDP sharding, no pipeline parallelism."
+    },
     "train.stages": {
      "value": [
       {
@@ -23296,6 +24210,14 @@
     "params.counted_embedding": {
      "value": 1803550720,
      "formula": "input embedding + output head, Motif-Technologies/Motif-3-Base@ac7c9a7 safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 312787073154,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Motif-Technologies/Motif-3-Base@ac7c9a7 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 6124514746,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Motif-Technologies/Motif-3-Base@ac7c9a7 safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 11174595810.0,
@@ -23430,6 +24352,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: muse-model-license"
+    },
+    "meta.modality": {
+     "value": "text + image + video + audio",
+     "source": "card",
+     "at": "README.md; model summary table, Modalities",
+     "quote": "Input: Text \\+ Image \\+ Video \\+ Audio / Output: Text"
     },
     "params.total": {
      "value": 816000000000,
@@ -23903,6 +24831,12 @@
      "at": "README.md; YAML front matter",
      "quote": "license_name: openmdw-1.1"
     },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README.md; Input",
+     "quote": "Input Type(s): Text"
+    },
     "params.active": {
      "value": 55000000000,
      "source": "report",
@@ -24236,6 +25170,13 @@
      "quote": "128-way expert parallelism, and 2-way pipeline parallelism to train on GB200 GPUs.",
      "note": "Stated only for the long-context phase."
     },
+    "train.accelerators": {
+     "value": "GB200",
+     "source": "report",
+     "at": "PDF page 9; §2.5",
+     "quote": "128-way expert parallelism, and 2-way pipeline parallelism to train on GB200 GPUs.",
+     "note": "Stated only for the long-context phase; count not stated."
+    },
     "train.lr_min": {
      "value": 2.5e-06,
      "source": "report",
@@ -24354,6 +25295,14 @@
     "params.counted_embedding": {
      "value": 2147483648,
      "formula": "input embedding + output head, nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16@9f5b80e safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 547161509888,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16@9f5b80e safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 10942947840,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16@9f5b80e safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 53911359488.0,
@@ -24494,6 +25443,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: nvidia-nemotron-open-model-license"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README.md; Input",
+     "quote": "Input Type(s): Text"
     },
     "params.active": {
      "value": 12700000000,
@@ -24938,6 +25893,14 @@
      "value": 1073741824,
      "formula": "input embedding + output head, nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16@b4cc202 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 119594966016,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16@b4cc202 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 2873102848,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16@b4cc202 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 11696495616.0,
      "formula": "non-expert weights + routed experts × 22/512, excluding embedding and output head, nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16@b4cc202 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -25076,6 +26039,14 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; Model Description",
+     "quote": "Model type: a Transformer style autoregressive language model.",
+     "note": "Language model with no vision or audio components (Olmo3ForCausalLM)."
     },
     "params.total": {
      "value": 32000000000,
@@ -25395,6 +26366,19 @@
      "quote": "The initial pretraining phase on 5.5T tokens took about 9.5 days on 512 GPUs, followed by an additional 35 days on 1024 GPUs.",
      "note": "Table 34: 8× NVIDIA H100 (80GB HBM3) nodes; durations include crash resumptions."
     },
+    "train.accelerators": {
+     "value": "1,024 H100",
+     "source": "report",
+     "at": "p.7 §2 runtime breakdown",
+     "quote": "The initial pretraining phase on 5.5T tokens took about 9.5 days on 512 GPUs, followed by an additional 35 days on 1024 GPUs.",
+     "note": "First ~9.5 days on 512 GPUs; Table 34 (p.85) gives 8× NVIDIA H100 (80GB HBM3) nodes."
+    },
+    "train.parallelism": {
+     "value": "HSDP (DP-shard 64 · DP-rep 16)",
+     "source": "report",
+     "at": "p.85 Table 34; Olmo 3 Base 32B, Pretraining column",
+     "quote": "Olmo 3 Base 32B Pretraining Midtraining Long-context ext DP-rep 16 8 16 DP-shard 64 64 8"
+    },
     "train.averaging": {
      "value": "midtraining: weights of two 100B runs with different data-order seeds averaged; long-context: checkpoints at steps 10,000, 11,000, 11,921 averaged",
      "source": "report",
@@ -25460,6 +26444,14 @@
     "params.counted_embedding": {
      "value": 1026846720,
      "formula": "input embedding + output head, allenai/Olmo-3-1125-32B@c2b61da safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 31206675456,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, allenai/Olmo-3-1125-32B@c2b61da safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 487604224,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, allenai/Olmo-3-1125-32B@c2b61da safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 31206675456.0,
@@ -25602,6 +26594,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; YAML front matter",
+     "quote": "pipeline_tag: text-generation",
+     "note": "Text-generation pipeline tag; Qwen3NextForCausalLM config has no vision components."
     },
     "params.active": {
      "value": 3000000000,
@@ -25924,6 +26924,14 @@
      "value": 622329856,
      "formula": "input embedding + output head, Qwen/Qwen3-Next-80B-A3B-Instruct@9c7f2fb safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 79052061440,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3-Next-80B-A3B-Instruct@9c7f2fb safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 1648531648,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3-Next-80B-A3B-Instruct@9c7f2fb safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 3252599552.0,
      "formula": "non-expert weights + routed experts × 10/512, excluding embedding and output head, Qwen/Qwen3-Next-80B-A3B-Instruct@9c7f2fb safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
@@ -26054,6 +27062,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; Model Overview",
+     "quote": "Type: Causal Language Model with Vision Encoder",
+     "note": "Card's quickstart gives text, image and video input examples; config defines image and video tokens."
     },
     "params.active": {
      "value": 10000000000,
@@ -26357,6 +27373,14 @@
      "value": 1525678080,
      "formula": "input embedding + output head, Qwen/Qwen3.5-122B-A10B@dc4d348 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 120585848832,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3.5-122B-A10B@dc4d348 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 2514674944,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3.5-122B-A10B@dc4d348 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 8245610496.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, Qwen/Qwen3.5-122B-A10B@dc4d348 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -26479,6 +27503,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; Model Overview",
+     "quote": "Type: Causal Language Model with Vision Encoder",
+     "note": "Card's quickstart gives text, image and video input examples; config defines image and video tokens."
     },
     "params.active": {
      "value": 27000000000,
@@ -26739,6 +27771,14 @@
      "value": 2542796800,
      "formula": "input embedding + output head, Qwen/Qwen3.5-27B@fc05dae safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 24353201664,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3.5-27B@fc05dae safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 383273184,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3.5-27B@fc05dae safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 24353201664.0,
      "formula": "all weights except embedding and output head, Qwen/Qwen3.5-27B@fc05dae safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -26853,6 +27893,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; Model Overview",
+     "quote": "Type: Causal Language Model with Vision Encoder",
+     "note": "Card's quickstart gives text, image and video input examples; config defines image and video tokens."
     },
     "params.active": {
      "value": 3000000000,
@@ -27156,6 +28204,14 @@
      "value": 1017118720,
      "formula": "input embedding + output head, Qwen/Qwen3.5-35B-A3B@59d61f3 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 33643491968,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3.5-35B-A3B@59d61f3 safetensors headers; reproduces stated total (other modalities) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 842700992,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3.5-35B-A3B@59d61f3 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 2437870208.0,
      "formula": "non-expert weights + routed experts × 8/256, excluding embedding and output head, Qwen/Qwen3.5-35B-A3B@59d61f3 safetensors headers; reproduces stated total (other modalities) and active (with output head)"
@@ -27279,6 +28335,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; Model Overview",
+     "quote": "Type: Causal Language Model with Vision Encoder",
+     "note": "Card's quickstart gives text, image and video input examples; config defines image and video tokens."
     },
     "params.active": {
      "value": 17000000000,
@@ -27588,6 +28652,14 @@
      "value": 2034237440,
      "formula": "input embedding + output head, Qwen/Qwen3.5-397B-A17B@8472618 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 394312112896,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3.5-397B-A17B@8472618 safetensors headers; reproduces stated total (other modalities) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 6575157504,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3.5-397B-A17B@8472618 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 15314803456.0,
      "formula": "non-expert weights + routed experts × 10/512, excluding embedding and output head, Qwen/Qwen3.5-397B-A17B@8472618 safetensors headers; reproduces stated total (other modalities) and active (with embedding and output head)"
@@ -27707,6 +28779,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: qwen3.8-max"
+    },
+    "meta.modality": {
+     "value": "text",
+     "source": "card",
+     "at": "README.md; API Usage",
+     "quote": "Qwen3.8-2.4T-A95B is a text-only model that requires thinking mode for all interactions. Multimodal inputs are not supported"
     },
     "params.active": {
      "value": 95000000000,
@@ -27997,6 +29075,14 @@
      "value": 4068474880,
      "formula": "input embedding + output head, Qwen/Qwen3.8-2.4T-A95B@207bd68 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 2415736223104,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3.8-2.4T-A95B@207bd68 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 26262741376,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3.8-2.4T-A95B@207bd68 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 91219391872.0,
      "formula": "non-expert weights + routed experts × 10/512, excluding embedding and output head, Qwen/Qwen3.8-2.4T-A95B@207bd68 safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -28116,6 +29202,12 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "source": "card",
+     "at": "README.md; introduction",
+     "quote": "a native vision-language model that understands images and videos"
     },
     "params.active": {
      "value": 27000000000,
@@ -28363,6 +29455,14 @@
      "value": 2542796800,
      "formula": "input embedding + output head, Qwen/Qwen3.8-27B@1d4bf0f safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 24353201664,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3.8-27B@1d4bf0f safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 383273184,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3.8-27B@1d4bf0f safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 24353201664.0,
      "formula": "all weights except embedding and output head, Qwen/Qwen3.8-27B@1d4bf0f safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
@@ -28482,6 +29582,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: qwen-community-1.0"
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; Model Overview",
+     "quote": "Type: Causal Language Model with Vision Encoder",
+     "note": "Card's quickstart gives text, image and video input examples; config defines image and video tokens."
     },
     "params.active": {
      "value": 6000000000,
@@ -28887,6 +29995,14 @@
      "value": 1271398400,
      "formula": "input embedding + output head, Qwen/Qwen3.8-Flash-Next@de4b8e4 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 124472255363,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, Qwen/Qwen3.8-Flash-Next@de4b8e4 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 2626818787,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, Qwen/Qwen3.8-Flash-Next@de4b8e4 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 6035596163.0,
      "formula": "non-expert weights + routed experts × 10/512, excluding embedding and output head, Qwen/Qwen3.8-Flash-Next@de4b8e4 safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
@@ -29014,6 +30130,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: upstage-solar-license"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "card",
+     "at": "README.md; YAML front matter",
+     "quote": "pipeline_tag: text-generation",
+     "note": "Text-generation pipeline tag; SolarOpen2ForCausalLM config has no vision components."
     },
     "params.total": {
      "value": 250287794944,
@@ -29269,6 +30393,12 @@
      "at": "README.md; Model Overview table",
      "quote": "Training Hardware | NVIDIA B200 GPUs"
     },
+    "train.accelerators": {
+     "value": "B200",
+     "source": "card",
+     "at": "README.md; Model Overview table",
+     "quote": "Training Hardware | NVIDIA B200 GPUs"
+    },
     "train.compute": {
      "value": "2M GPU hours",
      "source": "card",
@@ -29339,6 +30469,14 @@
     "params.counted_embedding": {
      "value": 1610612736,
      "formula": "input embedding + output head, upstage/Solar-Open2-250B@9190fbe safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 248677197568,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, upstage/Solar-Open2-250B@9190fbe safetensors headers; reproduces stated total (backbone) and active (with embedding and output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 5187944960,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, upstage/Solar-Open2-250B@9190fbe safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 13125084928.0,
@@ -29467,6 +30605,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "config",
+     "at": "config.json; /architectures/0",
+     "quote": "Step3p5ForCausalLM",
+     "note": "Causal-LM class with no vision config."
     },
     "params.total": {
      "value": 196000000000,
@@ -29905,6 +31051,18 @@
      "quote": "Step 3.5 Flash is trained on a large-scale cluster with 4,096 NVIDIA H800 GPUs.",
      "note": "PP8 with VPP, EP8, ZeRO-1 DP (§3.2)."
     },
+    "train.accelerators": {
+     "value": "4,096 H800",
+     "source": "report",
+     "at": "p.9 §3.1",
+     "quote": "Step 3.5 Flash is trained on a large-scale cluster with 4,096 NVIDIA H800 GPUs."
+    },
+    "train.parallelism": {
+     "value": "PP8 · VPP · EP8 · ZeRO-1 DP",
+     "source": "report",
+     "at": "p.9 §3.2",
+     "quote": "including 8-way pipeline parallelism (PP) [68] with virtual pipeline stages (VPP), and 8-way expert parallelism (EP) [25], and ZeRO-1 Data Parallelism"
+    },
     "train.stages": {
      "value": [
       {
@@ -29963,6 +31121,14 @@
     "params.counted_embedding": {
      "value": 1055252480,
      "formula": "input embedding + output head, stepfun-ai/Step-3.5-Flash-Base@19623ae safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 195900214336,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, stepfun-ai/Step-3.5-Flash-Base@19623ae safetensors headers; reproduces stated total (backbone) and active (non-embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 4656210464,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, stepfun-ai/Step-3.5-Flash-Base@19623ae safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 10931407936.0,
@@ -30110,6 +31276,12 @@
      "source": "card",
      "at": "README.md; front matter",
      "quote": "license: apache-2.0"
+    },
+    "meta.modality": {
+     "value": "text + image",
+     "source": "blog",
+     "at": "Step3 blog; Pretrain, multimodal pathway",
+     "quote": "our 5B-parameter vision encoder extracts dense image features"
     },
     "params.total": {
      "value": 321000000000,
@@ -30369,6 +31541,14 @@
      "value": 1846691840,
      "formula": "input embedding + output head, stepfun-ai/step3@e2d67fc safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 314837928960,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, stepfun-ai/step3@e2d67fc safetensors headers; reproduces stated total (other modalities) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 5564628992,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, stepfun-ai/step3@e2d67fc safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 37384719360.0,
      "formula": "non-expert weights + routed experts × 3/48, excluding embedding and output head, stepfun-ai/step3@e2d67fc safetensors headers; reproduces stated total (other modalities) and active (with output head)"
@@ -30492,6 +31672,13 @@
      "source": "card",
      "at": "README.md; License",
      "quote": "is licensed under the StepFun Model License 1.0."
+    },
+    "meta.modality": {
+     "value": "text + image + video",
+     "source": "card",
+     "at": "README.md; introduction",
+     "quote": "accepts text, images, and video",
+     "note": "The card's specification table lists Input as \"Text, image\"; the config defines image tokens only."
     },
     "params.active": {
      "value": 27000000000,
@@ -30854,6 +32041,14 @@
      "value": 1583874048,
      "formula": "input embedding + output head, stepfun-ai/Step-5-Preview@364b3b0 safetensors headers"
     },
+    "params.counted_non_embedding": {
+     "value": 597470469568,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, stepfun-ai/Step-5-Preview@364b3b0 safetensors headers; reproduces stated total (backbone) and active (with embedding)"
+    },
+    "params.counted_max_layer": {
+     "value": 6790260256,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, stepfun-ai/Step-5-Preview@364b3b0 safetensors headers"
+    },
     "params.counted_active_non_embedding": {
      "value": 26105601472.0,
      "formula": "non-expert weights + routed experts × 8/352, excluding embedding and output head, stepfun-ai/Step-5-Preview@364b3b0 safetensors headers; reproduces stated total (backbone) and active (with embedding)"
@@ -30992,6 +32187,14 @@
      "source": "card",
      "at": "README.md; YAML front matter",
      "quote": "license_name: openmdw-1.1"
+    },
+    "meta.modality": {
+     "value": "text",
+     "basis": "inferred",
+     "source": "config",
+     "at": "config.json; /architectures/0",
+     "quote": "AfmoeForCausalLM",
+     "note": "Causal-LM class with no vision config."
     },
     "params.total": {
      "value": 398000000000,
@@ -31361,6 +32564,19 @@
      "quote": "The full pretraining run finished in 33 days.",
      "note": "Report §3.3: 2048 B300, FSDP group 128, EP 8, CP 4 for context extension."
     },
+    "train.accelerators": {
+     "value": "2,048 B300",
+     "source": "card",
+     "at": "README.md; Infrastructure",
+     "quote": "Hardware: 2,048 NVIDIA B300 GPUs"
+    },
+    "train.parallelism": {
+     "value": "EP8 · HSDP (FSDP group 128)",
+     "source": "report",
+     "at": "p.11 §3.3 Infrastructure",
+     "quote": "For all models, we set the FSDP group size to 128. For Trinity Large, we set the EP group size to 8.",
+     "note": "Context extension added CP4."
+    },
     "train.stages": {
      "value": [
       {
@@ -31432,6 +32648,14 @@
     "params.counted_embedding": {
      "value": 1229979648,
      "formula": "input embedding + output head, arcee-ai/Trinity-Large-Base@b2a665b safetensors headers"
+    },
+    "params.counted_non_embedding": {
+     "value": 397405306368,
+     "formula": "dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, arcee-ai/Trinity-Large-Base@b2a665b safetensors headers; reproduces stated total (backbone) and active (with output head)"
+    },
+    "params.counted_max_layer": {
+     "value": 7339782656,
+     "formula": "max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, arcee-ai/Trinity-Large-Base@b2a665b safetensors headers"
     },
     "params.counted_active_non_embedding": {
      "value": 12141706752.0,

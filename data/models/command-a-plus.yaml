@@ -52,6 +52,11 @@ facts:
     at: "post header"
     quote: "May 20, 2026 4 minute read Introducing Command A+"
     note: "Post: 'Today, we’re releasing Command A+ open-source.'"
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Model Details"
+    quote: "**Input**: Text and images."
   params.active:
     value: 25_000_000_000
     source: card

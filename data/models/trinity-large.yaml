@@ -28,6 +28,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: openmdw-1.1"
+  meta.modality:
+    value: text
+    basis: inferred
+    source: config
+    at: "config.json; /architectures/0"
+    quote: "AfmoeForCausalLM"
+    note: "Causal-LM class with no vision config."
   params.total:
     value: 398_000_000_000
     source: card
@@ -292,6 +299,17 @@ facts:
     at: "Trinity Large blog; Training at scale"
     quote: "The full pretraining run finished in 33 days."
     note: "Report §3.3: 2048 B300, FSDP group 128, EP 8, CP 4 for context extension."
+  train.accelerators:
+    value: "2,048 B300"
+    source: card
+    at: "README.md; Infrastructure"
+    quote: "Hardware: 2,048 NVIDIA B300 GPUs"
+  train.parallelism:
+    value: "EP8 · HSDP (FSDP group 128)"
+    source: report
+    at: "p.11 §3.3 Infrastructure"
+    quote: "For all models, we set the FSDP group size to 128. For Trinity Large, we set the EP group size to 8."
+    note: "Context extension added CP4."
   train.stages:
     value:
       - name: phase 1

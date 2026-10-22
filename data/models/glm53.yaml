@@ -51,6 +51,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: glm-5.3"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "pipeline_tag: text-generation"
+    note: "The card states no modality in words; the config (GlmMoeDsaForCausalLM) has no vision tower."
 
   params.total:
     value: 744_000_000_000

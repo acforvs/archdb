@@ -26,6 +26,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text"
+    source: card
+    at: "README front matter"
+    quote: "pipeline_tag: text-generation"
+    basis: inferred
+    note: "Card tags the checkpoint text-generation; config declares no vision or audio tower (K2HorizonForCausalLM)."
   params.total:
     value: 36_000_000_000
     source: card
@@ -278,3 +285,9 @@ facts:
     at: "xllm/config.py; TrainerConf.multi_segments"
     quote: "This will prevent attention across document boundaries."
     note: "The launch script sets --multi_segments true."
+  train.parallelism:
+    value: "TP2 · FSDP"
+    source: xllm_launch
+    at: "examples/k2-horizon-mova-36B-a4B.sh; DISTRIBUTED_CFGS"
+    quote: "--model_parallel_size 2"
+    note: "xllm/config.py defines model_parallel_size as model/tensor parallel; the script sets --context_parallel_size 1 and --model.ddp_backend fsdp2."

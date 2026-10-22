@@ -26,6 +26,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: report
+    at: "p.45 §6 Conclusion, Limitations, and Future Directions"
+    quote: "We are also working on incorporating multimodal capabilities to our models."
+    note: "The report names multimodality as future work and the config (DeepseekV4ForCausalLM) has no vision tower; vision came later as the separate V4-Flash-Vision-Exp."
   params.active:
     value: 49_000_000_000
     source: report

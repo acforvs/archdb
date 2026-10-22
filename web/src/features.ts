@@ -116,8 +116,23 @@ export const FEATURES: Record<string, Feature> = {
   weights: { label: "Weights", order: ["open", "closed"], of: (m) => m.weights },
 };
 
+/** One bar per feature for the "all features" breakdown: categories in `yes` count as having it. */
+export const OVERVIEW: { feat: string; label: string; yes: string[] }[] = [
+  { feat: "moe", label: "Mixture of experts", yes: ["MoE"] },
+  { feat: "qknorm", label: "QK norm", yes: ["yes"] },
+  { feat: "swa", label: "Sliding-window attention", yes: ["yes"] },
+  { feat: "mla", label: "MLA", yes: ["yes"] },
+  { feat: "linear", label: "Linear / SSM layers", yes: ["yes"] },
+  { feat: "sparse", label: "Sparse attention", yes: ["yes"] },
+  { feat: "mtp", label: "MTP in pretraining", yes: ["yes"] },
+  { feat: "optimizer", label: "Muon-family optimizer", yes: ["Muon family"] },
+  { feat: "precision", label: "FP8 / FP4 training", yes: ["FP8", "FP4"] },
+  { feat: "tied", label: "Tied embeddings", yes: ["yes"] },
+];
+
 /** How models are grouped into bars. */
 export const GROUPS: Record<string, { label: string; of: (m: Model) => string | null }> = {
+  features: { label: "Feature (all features)", of: () => null },
   country: { label: "Country", of: (m) => m.country },
   year: { label: "Release year", of: (m) => String(value(m, "meta.released") ?? "").slice(0, 4) || null },
   half: {

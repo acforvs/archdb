@@ -27,6 +27,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: \"kimi-k3\""
+  meta.modality:
+    value: "text + image + video"
+    source: card
+    at: "§1 Model Introduction; Key Features"
+    quote: "Kimi K3 understands text, images, and video within the same model"
 
   params.active:
     value: 104_200_000_000
@@ -297,6 +302,12 @@ facts:
     source: report
     at: "p.11 §3.3"
     quote: "Weight decay is set to 0.1 throughout."
+  train.parallelism:
+    value: "PP · VPP · EP · CP · ZeRO-1 DP"
+    source: report
+    at: "p.18 §5.2"
+    quote: "Kimi K3 pre-training combines Pipeline Parallelism (PP) with virtual stages (VP) [49, 82], Expert Parallelism (EP) [67], ZeRO-1 Data Parallelism [101], Pipeline ZeRO-2 gradient sharding [147], and Context Parallelism (CP, §5.1.2) [51]."
+    note: "Degrees not stated; gradients are also sharded across DP ranks (Pipeline ZeRO-2)."
   scaling.hp_rule:
     value: "batch size, LR, TPP and model shape retuned by scaling-law studies; separate search per schedule, cosine chosen over WSD"
     source: report

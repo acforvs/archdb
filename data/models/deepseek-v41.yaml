@@ -33,6 +33,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Introduction"
+    quote: "The model natively processes images and text, and generates text autoregressively."
   params.active_prefill:
     value: 8_000_000_000
     source: report

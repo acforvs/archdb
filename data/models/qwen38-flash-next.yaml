@@ -28,6 +28,13 @@ facts:
     quote: "2026-08-26"
     note: "Same date as the qwen.ai blog API entry; Hugging Face repository created 2026-08-24."
   meta.license: {value: "other (qwen-community-1.0)", source: card, at: "README.md; YAML front matter", quote: "license_name: qwen-community-1.0"}
+  meta.modality:
+    value: "text + image + video"
+    basis: inferred
+    source: card
+    at: "README.md; Model Overview"
+    quote: "Type: Causal Language Model with Vision Encoder"
+    note: "Card's quickstart gives text, image and video input examples; config defines image and video tokens."
 
   params.active:
     value: 6_000_000_000

@@ -27,6 +27,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text + image + audio"
+    source: report
+    at: "p.6 §1"
+    quote: "The models accept image and audio inputs in addition to text"
   params.total:
     value: 70_000_000_000
     source: card
@@ -253,6 +258,18 @@ facts:
     at: "p.43 §6.1.2"
     quote: "running, for the 70B model, at scales from 2048 to 4096 GPUs over several months."
     note: "Apertus 1.5 node count from its Table G.1 and §6.1 (four GH200 per node)."
+  train.accelerators:
+    value: "2,048–4,096 GH200"
+    source: report_v1
+    at: "p.43 §6.1.2"
+    quote: "running, for the 70B model, at scales from 2048 to 4096 GPUs over several months."
+    note: "Apertus 1.0 run; chip from the same report §6.1 (Alps GH200); Apertus 1.5 continued pretraining used 512 nodes (2,048 GPUs)."
+  train.parallelism:
+    value: "TP4 · PP8 · VPP2"
+    source: report
+    at: "p.107 Table G.1"
+    quote: "TP4, PP8, VPP2"
+    note: "Apertus 1.5 continued pretraining; §3.2 states it reuses the Apertus 1.0 tensor and pipeline parallelism."
   train.compute:
     value: "6.74e24 FLOPs and ~6M GPU-hours for the 15T Apertus 1.0 run; ~1.50M GPU-hours (logged segments) for Apertus 1.5 stages 1–3"
     source: report_v1

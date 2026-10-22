@@ -24,6 +24,13 @@ facts:
     at: "tencent.com; article header"
     quote: "Tencent Releases and Open-Sources Tencent Hy4 preview August 28, 2026"
   meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+  meta.modality:
+    value: "text"
+    source: card
+    at: "README front matter"
+    quote: "pipeline_tag: text-generation"
+    basis: inferred
+    note: "Card tags the checkpoint text-generation; config declares no vision or audio tower (HYV4ForCausalLM)."
 
   params.total:
     value: 770_000_000_000

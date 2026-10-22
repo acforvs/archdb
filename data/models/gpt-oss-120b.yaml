@@ -42,6 +42,11 @@ facts:
     source: hf_card
     at: "README.md YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text"
+    source: card
+    at: "§1 Introduction"
+    quote: "these text-only models are compatible with our Responses API"
 
   params.active:
     value: 5_130_000_000
@@ -208,6 +213,11 @@ facts:
     quote: "Our model has a knowledge cutoff of June 2024."
   train.hardware:
     value: "NVIDIA H100"
+    source: card
+    at: "PDF p.5 §2.4 Pretraining"
+    quote: "The gpt-oss models trained on NVIDIA H100 GPUs using the PyTorch framework"
+  train.accelerators:
+    value: "H100"
     source: card
     at: "PDF p.5 §2.4 Pretraining"
     quote: "The gpt-oss models trained on NVIDIA H100 GPUs using the PyTorch framework"

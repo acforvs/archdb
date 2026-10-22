@@ -29,6 +29,14 @@ stored in [`data/param_counts.yaml`](../data/param_counts.yaml). A count is show
 the publisher's stated total and active parameters under some scope (with or without embeddings,
 output head, MTP modules, vision towers and n-gram tables). The non-embedding active count excludes the
 input embedding, the output head and n-gram/per-layer lookup tables.
+`params.counted_non_embedding` gives the total backbone count with those same exclusions.
+`params.counted_max_layer` counts the largest group of weights sharing a full `layers.<index>`
+tensor path, including all routed experts. Hybrid checkpoints can store mixers and FFNs in separate
+layers; the number is not an estimate of all-gather time.
+
+`train.accelerators` and `train.parallelism` keep short hardware and parallelism descriptions apart
+from the longer `train.hardware` notes. When a value applies to a particular training stage, its
+evidence note identifies that stage. `meta.modality` lists the checkpoint's input modalities.
 
 Benchmark scores (`eval.*`) are independent measurements of the released post-trained models, kept in
 [`data/evals.yaml`](../data/evals.yaml) apart from the architecture records.

@@ -29,6 +29,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: upstage-solar-license"
+  meta.modality:
+    value: text
+    basis: inferred
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "pipeline_tag: text-generation"
+    note: "Text-generation pipeline tag; SolarOpen2ForCausalLM config has no vision components."
   params.total:
     value: 250_287_794_944
     source: card
@@ -186,6 +193,11 @@ facts:
     note: "The merged PLM is the post-training starting point and is not released; merge weights are not stated."
   train.hardware:
     value: "NVIDIA B200 GPUs"
+    source: card
+    at: "README.md; Model Overview table"
+    quote: "Training Hardware | NVIDIA B200 GPUs"
+  train.accelerators:
+    value: "B200"
     source: card
     at: "README.md; Model Overview table"
     quote: "Training Hardware | NVIDIA B200 GPUs"

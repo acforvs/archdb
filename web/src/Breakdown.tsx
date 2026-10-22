@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Model } from "./data";
-import { FEATURES, GROUPS } from "./features";
+import { FEATURES, GROUPS, OVERVIEW } from "./features";
 import type { View } from "./App";
 
 const ND = "not disclosed";
@@ -23,8 +23,23 @@ export function Breakdown({ models, view, open }: { models: Model[]; view: View;
   const feature = FEATURES[view.feat] ?? FEATURES.swa;
   const group = GROUPS[view.by] ?? GROUPS.country;
   const [hot, setHot] = useState<{ row: string; seg: Segment; x: number; y: number } | null>(null);
+  useEffect(() => setHot(null), [models, view.by, view.feat, view.disc]);
 
+  const overview = view.by === "features";
   const { rows, cats } = useMemo(() => {
+    if (overview) {
+      const rows: Row[] = OVERVIEW.map(({ feat, label, yes }) => {
+        const of = (m: Model) => {
+          const c = FEATURES[feat].of(m);
+          return c === null ? ND : yes.includes(c) ? "yes" : "no";
+        };
+        const segments = ["yes", "no", ...(view.disc ? [] : [ND])]
+          .map((cat) => ({ cat, models: models.filter((m) => of(m) === cat) }))
+          .filter((s) => s.models.length);
+        return { group: label, segments, n: models.length, disclosed: models.filter((m) => of(m) !== ND).length };
+      }).filter((r) => r.segments.length);
+      return { rows, cats: ["yes", "no"] };
+    }
     const byGroup = new Map<string, Model[]>();
     for (const m of models) {
       const g = group.of(m);
@@ -53,19 +68,21 @@ export function Breakdown({ models, view, open }: { models: Model[]; view: View;
       return { group: g, segments, n: ms.length, disclosed: ms.filter((m) => feature.of(m) !== null).length };
     }).filter((r) => r.segments.length);
     return { rows, cats };
-  }, [models, feature, group, view.by, view.disc]);
+  }, [models, feature, group, view.by, view.disc, overview]);
 
   // Two-way splits read as "has it or not": the accent for the first category, a pale tint for the second.
-  const binary = cats.length <= 2 && cats.every((c) => feature.order.slice(0, 2).includes(c)) && feature.order.length === 2;
+  const order = overview ? ["yes", "no"] : feature.order;
+  const binary = cats.length <= 2 && cats.every((c) => order.slice(0, 2).includes(c)) && order.length === 2;
   const color = (cat: string) =>
-    cat === ND ? undefined : binary && cat === feature.order[1] ? "var(--series-off)" : `var(--series-${(cats.indexOf(cat) % 6) + 1})`;
-  const segClass = (cat: string) => `seg${cat === ND ? " nd" : binary && cat === feature.order[1] ? " off" : ""}`;
+    cat === ND ? undefined : binary && cat === order[1] ? "var(--series-off)" : `var(--series-${(cats.indexOf(cat) % 6) + 1})`;
+  const segClass = (cat: string) => `seg${cat === ND ? " nd" : binary && cat === order[1] ? " off" : ""}`;
   const pct = (k: number, n: number) => `${Math.round((100 * k) / n)}%`;
+  const hotRow = hot && rows.find((r) => r.group === hot.row);
 
   return (
-    <div className="plot-card breakdown">
+    <div className={`plot-card breakdown${overview ? " overview" : ""}`}>
       <div className="legend">
-        <b>{feature.label}</b>
+        <b>{overview ? "Share of models with each feature" : feature.label}</b>
         {[...cats, ...(view.disc ? [] : [ND])].map((c) => (
           <span key={c}>
             <i className={segClass(c)} style={{ background: color(c) }} />
@@ -97,12 +114,12 @@ export function Breakdown({ models, view, open }: { models: Model[]; view: View;
         ))}
         {!rows.length && <p className="empty-state">No models match the filters.</p>}
       </div>
-      {hot && (
+      {hot && hotRow && (
         <div className="preview" style={{ left: Math.min(hot.x + 14, innerWidth - 300), top: hot.y + 16, position: "fixed" }}>
           <div className="preview-head">
             {hot.row} · <b>{hot.seg.cat}</b> · {hot.seg.models.length}
             {hot.seg.cat !== ND &&
-              ` (${pct(hot.seg.models.length, rows.find((r) => r.group === hot.row)!.disclosed)} of disclosed)`}
+              ` (${pct(hot.seg.models.length, hotRow.disclosed)} of disclosed)`}
           </div>
           <div className="preview-src">{hot.seg.models.map((m) => m.name).join(", ")}</div>
         </div>
@@ -110,6 +127,7 @@ export function Breakdown({ models, view, open }: { models: Model[]; view: View;
       <p className="footnote">
         Numbers are model counts; the right column is the row total{view.disc ? " of models that disclose it" : ""}.
         {!view.disc && " Hatched: not disclosed."} Hover a segment for its models.
+        {overview && " Change “by” to split one feature by country, organization or release date."}
         {(view.by === "year" || view.by === "half") &&
           " archdb covers recent strong models, so earlier periods hold fewer of them: compare shares, not counts."}
       </p>

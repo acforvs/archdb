@@ -11,13 +11,14 @@ export const PLOT_PRESETS: Record<string, Partial<View>> = {
   "KV / token / B active vs size": {
     x: "params.total", y: "kv.bytes_per_token_per_active", xlog: true, ylog: true, pareto: "",
   },
-  "Batch vs training tokens": { x: "train.tokens", y: "train.batch_tokens", xlog: true, ylog: true, pareto: "" },
   "Tokens per param vs size": { x: "params.active", y: "scaling.tpp_active", xlog: true, ylog: true, pareto: "" },
   "Aspect ratio vs size": { x: "params.active", y: "shape.aspect", xlog: true, ylog: false, pareto: "" },
+  "Batch vs training tokens": { x: "train.tokens", y: "train.batch_tokens", xlog: true, ylog: true, pareto: "" },
 };
 
 /** Named breakdowns. Those with `f` set that filter; the others keep the reader's filters. */
 export const BREAKDOWN_PRESETS: Record<string, Partial<View>> = {
+  "All features": { by: "features" },
   "SWA by country, 2026": { by: "country", feat: "swa", f: "meta.released>=2026-01" },
   "Model size, 2025 vs 2026": { by: "year", feat: "size", f: "meta.released>=2025-01" },
   "Muon over time": { by: "half", feat: "optimizer" },

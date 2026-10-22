@@ -216,16 +216,16 @@ test("the logo returns a customized workspace to its defaults", async () => {
     assert.equal(await page.getByRole("tab", { name: "Table", exact: true }).getAttribute("aria-selected"), "true");
     assert.equal(await page.getByRole("radio", { name: "Overview", exact: true }).getAttribute("aria-checked"), "true");
     assert.equal(await page.getByPlaceholder("Models: deepseek, qwen3.5").inputValue(), "");
-    assert.equal(await page.getByRole("combobox", { name: "Context length" }).inputValue(), "131072");
-    assert.equal(await page.getByRole("combobox", { name: "KV-cache dtype" }).inputValue(), "bf16");
     assert.equal(await page.locator(".pick:checked").count(), 0);
     const data = await (await page.request.get(`${baseURL}/data.json`)).json();
     assert.equal(await page.locator("table.grid tbody tr").count(), data.models.length);
     const sorting = page.locator('th[aria-sort="descending"]');
-    assert.match(await sorting.innerText(), /Reported total params/);
+    assert.match(await sorting.innerText(), /Total params/);
     await page.getByRole("tab", { name: "Plot", exact: true }).click();
     await page.getByRole("button", { name: "Customize", exact: true }).waitFor();
     assert.equal(await page.getByRole("button", { name: "Hide axes", exact: true }).count(), 0);
+    assert.equal(await page.getByRole("combobox", { name: "Context length" }).inputValue(), "131072");
+    assert.equal(await page.getByRole("combobox", { name: "KV-cache dtype" }).inputValue(), "bf16");
     await home.focus();
     await page.keyboard.press("Enter");
     await page.locator("table.grid tbody tr").first().waitFor();
@@ -305,7 +305,12 @@ test("the header offers GitHub stars and model details have a shareable page", a
     await star.waitFor();
     assert.equal(await star.getAttribute("href"), "https://github.com/acforvs/archdb");
     await page.getByRole("button", { name: "DeepSeek-V3-Base", exact: true }).click();
-    await page.getByRole("link", { name: "Link to this model", exact: true }).click();
+    const panel = page.getByRole("complementary", { name: "DeepSeek-V3-Base sources" });
+    assert.equal(
+      await panel.getByRole("link", { name: "Hugging Face ↗", exact: true }).getAttribute("href"),
+      "https://huggingface.co/deepseek-ai/DeepSeek-V3-Base",
+    );
+    await panel.getByRole("link", { name: "Model page", exact: true }).click();
     assert.equal(new URL(page.url()).pathname, "/models/deepseek-v3/");
     await page.getByRole("link", { name: "Open in the comparison table", exact: true }).click();
     await page.getByRole("complementary", { name: "DeepSeek-V3-Base sources" }).waitFor();
@@ -331,13 +336,13 @@ test("the explorer, directory and model pages share the saved theme", async () =
     assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily), font);
     assert.equal(await page.getByRole("link", { name: "All models", exact: true }).getAttribute("aria-current"), "page");
     assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
-    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(247, 247, 245)");
+    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(244, 241, 234)");
     await page.getByRole("link", { name: "DeepSeek-V3-Base", exact: true }).click();
     await page.waitForURL(new URL("/models/deepseek-v3/", baseURL).href);
     assert.equal(await page.locator(".masthead").innerText(), header);
     assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
     await toggle.click();
-    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(17, 17, 20)");
+    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(23, 22, 17)");
     await page.getByRole("link", { name: "Compare models", exact: true }).click();
     await toggle.waitFor();
     assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
@@ -347,7 +352,7 @@ test("the explorer, directory and model pages share the saved theme", async () =
     await directory.goto(baseURL + "/models/");
     await toggle.click();
     await directory.waitForFunction(() => document.documentElement.dataset.theme === "light");
-    assert.equal(await directory.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(247, 247, 245)");
+    assert.equal(await directory.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(244, 241, 234)");
     await page.reload();
     await toggle.waitFor();
     assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
@@ -359,7 +364,7 @@ test("a reload keeps the shared header and never flashes the static directory", 
   let release, started;
   const gate = new Promise((resolve) => { release = resolve; });
   const requested = new Promise((resolve) => { started = resolve; });
-  await page.route("**/data.json", async (route) => {
+  await page.route("**/data.json?v=*", async (route) => {
     started();
     await gate;
     await route.continue();
@@ -394,7 +399,7 @@ test("theme follows system changes until a preference is chosen, even without st
     await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
     await page.getByRole("button", { name: "Toggle dark mode", exact: true }).click();
     assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
-    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(247, 247, 245)");
+    assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(244, 241, 234)");
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
@@ -476,17 +481,17 @@ test("switching column presets replaces hidden sorts and preserves visible sorts
     await page.locator('th[aria-sort="ascending"]').waitFor();
     assert.match(await page.locator('th[aria-sort="ascending"]').innerText(), /Batch/);
     await page.getByRole("radio", { name: "Overview", exact: true }).click();
-    assert.match(await page.locator('th[aria-sort="descending"]').innerText(), /Reported total params/);
+    assert.match(await page.locator('th[aria-sort="descending"]').innerText(), /Total params/);
     assert.equal(await page.locator(".count-note").innerText().then(t => t.includes("sorted by")), false);
     const current = new URLSearchParams(new URL(page.url()).hash.slice(1));
     assert.equal(current.has("sort"), false);
     assert.equal(current.has("dir"), false);
     for (const key of ["q", "ctx", "sel"]) assert.equal(current.get(key), hash.get(key));
-    const active = page.getByRole("columnheader").filter({ hasText: /^Reported active params/ });
+    const active = page.getByRole("columnheader").filter({ hasText: /^Active params/ });
     await active.click();
     await active.click();
     await page.getByRole("radio", { name: "MoE", exact: true }).click();
-    assert.match(await page.locator('th[aria-sort="ascending"]').innerText(), /Reported active params/);
+    assert.match(await page.locator('th[aria-sort="ascending"]').innerText(), /Active params/);
     assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get("sort"), "params.active");
     await page.getByRole("radio", { name: "Attention & KV", exact: true }).click();
     assert.match(await page.locator('th[aria-sort="ascending"]').innerText(), /Model/);
@@ -544,4 +549,112 @@ test("the batch versus tokens plot has no inferred critical-batch guide", async 
     assert.equal(await page.locator(".plot-card .guide").count(), 0);
     assert.equal((await page.locator(".plot-card").innerText()).includes("0.47"), false);
   });
+});
+
+test("compact model specs open the evidence for the value clicked", async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await page.goto(`${baseURL}/#model=deepseek-v3`);
+    const panel = page.getByRole("complementary", { name: "DeepSeek-V3-Base sources" });
+    await panel.waitFor();
+    const active = panel.getByRole("button", { name: "Show source for Active params", exact: true });
+    await active.click();
+    await page.waitForFunction(() => document.querySelector('.fact.focus')?.dataset.key === 'params.active');
+    assert.match(await panel.locator('.fact.focus').innerText(), /37B/);
+    assert.equal(await panel.locator('.fact.focus blockquote').count(), 1);
+    await panel.evaluate((el) => { el.scrollTop = 0; });
+    await active.click();
+    await page.waitForFunction(() => {
+      const panel = document.querySelector('.panel').getBoundingClientRect();
+      const fact = document.querySelector('.fact.focus').getBoundingClientRect();
+      return fact.top >= panel.top && fact.bottom <= panel.bottom;
+    });
+    await panel.getByRole("button", { name: "Show source for Total params", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.fact.focus')?.dataset.key === 'params.total');
+    assert.deepEqual(errors, []);
+  } finally { await page.close(); }
+});
+
+test("the row and detail links open the exact base checkpoint on Hugging Face", async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  try {
+    await page.goto(`${baseURL}/#q=DeepSeek-V4-Flash-Base`);
+    const row = page.locator('table.grid tbody tr');
+    await row.waitFor();
+    assert.equal(await row.getByRole('link', { name: 'HF ↗', exact: true }).getAttribute('href'),
+      'https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-Base');
+    await row.getByRole('button', { name: 'DeepSeek-V4-Flash-Base', exact: true }).click();
+    const panel = page.getByRole('complementary', { name: 'DeepSeek-V4-Flash-Base sources' });
+    assert.equal(await panel.getByRole('link', { name: 'Hugging Face ↗', exact: true }).getAttribute('href'),
+      'https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-Base');
+  } finally { await page.close(); }
+});
+
+test("wide tables keep their scrollbar visible and support keyboard, wheel and drag", async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  try {
+    await page.goto(baseURL);
+    const region = page.getByRole('region', { name: 'Scrollable model table', exact: true });
+    await region.waitFor();
+    const bounds = await region.boundingBox();
+    assert.ok(bounds.y + bounds.height <= 900, 'the horizontal scrollbar stays inside the viewport');
+    const model = page.locator('.grid tbody .model').first();
+    const pinned = (await model.boundingBox()).x;
+    await region.focus();
+    await page.mouse.move(0, 0);
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(() => document.querySelector('.table-scroll').scrollLeft > 100);
+    assert.equal((await model.boundingBox()).x, pinned, 'model names stay pinned');
+    await region.evaluate((el) => { el.scrollLeft = 0; });
+    await page.locator('.grid thead .sticky').last().hover();
+    await page.mouse.wheel(0, 300);
+    await page.waitForFunction(() => document.querySelector('.table-scroll').scrollLeft > 100);
+    await region.evaluate((el) => { el.scrollLeft = 0; });
+    const cell = page.locator('.grid tbody tr').first().locator('td').first();
+    const target = await cell.boundingBox();
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(target.x + target.width / 2 - 100, target.y + target.height / 2, { steps: 8 });
+    await page.mouse.up();
+    assert.ok(await region.evaluate((el) => el.scrollLeft) > 50);
+    assert.equal(await page.locator('.panel').count(), 0, 'panning must not open a cell');
+    await page.getByRole('button', { name: 'Scroll right', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.table-scroll').scrollLeft > 250);
+  } finally { await page.close(); }
+});
+
+test("the feature overview handles empty filters and stale hover previews", async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  try {
+    await page.goto(`${baseURL}/#tab=breakdown&by=features`);
+    await page.locator('.bar-row').first().waitFor();
+    assert.equal(await page.locator('.bar-row').count(), 10);
+    await page.locator('.bar .seg').first().hover();
+    await page.locator('.preview').waitFor();
+    await page.getByPlaceholder('Models: deepseek, qwen3.5').fill('no-such-model-here');
+    await page.getByText('No models match the filters.', { exact: true }).waitFor();
+    assert.equal(await page.locator('.preview').count(), 0);
+    assert.equal(await page.locator('.bar-row').count(), 0);
+    assert.deepEqual(errors, []);
+  } finally { await page.close(); }
+});
+
+test("selecting models enables the comparison view", async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  try {
+    await page.goto(`${baseURL}/#q=DeepSeek-V3`);
+    await page.locator('.grid tbody tr').first().waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Compare selected', exact: true }).isDisabled(), true);
+    await page.getByRole('checkbox', { name: 'Select the models shown', exact: true }).check();
+    await page.getByRole('button', { name: 'Compare selected (2)', exact: true }).click();
+    await page.locator('.grid.compare').waitFor();
+    assert.equal(await page.locator('.compare .model-col').count(), 2);
+    await page.getByRole('button', { name: '← Back to table', exact: true }).click();
+    await page.locator('.grid:not(.compare)').waitFor();
+    assert.equal(await page.getByRole('checkbox', { name: 'Deselect the models shown', exact: true }).isChecked(), true);
+  } finally { await page.close(); }
 });

@@ -6,7 +6,10 @@ import "./styles.css";
 
 const root = createRoot(document.getElementById("root")!);
 
-fetch("data.json")
+declare const __DATA_VERSION__: string;
+
+// Same URL as the preload in index.html; the version changes whenever the dataset does.
+fetch(`data.json?v=${__DATA_VERSION__}`)
   .then((r) => r.json() as Promise<DB>)
   .then((db) =>
     root.render(
@@ -15,4 +18,4 @@ fetch("data.json")
       </StrictMode>,
     ),
   )
-  .catch(() => root.render(<p className="load-error">Could not load data.json. Run `uv run archdb build` first.</p>));
+  .catch(() => root.render(<p className="load-error">The model data could not be loaded. Please reload the page.</p>));

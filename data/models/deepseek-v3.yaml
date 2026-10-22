@@ -26,6 +26,13 @@ facts:
     at: "LICENSE-MODEL, title"
     quote: "DEEPSEEK LICENSE AGREEMENT"
     note: "Model weights; code is MIT (README.md §7)."
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: announcement
+    at: "DeepSeek API Docs news, Introducing DeepSeek-V3"
+    quote: "Look forward to multimodal support and other cutting-edge features in the DeepSeek ecosystem."
+    note: "Multimodal support is announced as future work and the config (DeepseekV3ForCausalLM) has no vision tower."
   params.active:
     value: 37_000_000_000
     source: report
@@ -262,6 +269,16 @@ facts:
     at: "p.5 §1"
     quote: "3.7 days on our cluster with 2048 H800 GPUs"
     note: "Pretraining took less than two months (same paragraph)."
+  train.accelerators:
+    value: "2,048 H800"
+    source: report
+    at: "p.11 §3.1"
+    quote: "DeepSeek-V3 is trained on a cluster equipped with 2048 NVIDIA H800 GPUs."
+  train.parallelism:
+    value: "PP16 · EP64 · ZeRO-1 DP"
+    source: report
+    at: "p.11 §3.2"
+    quote: "DeepSeek-V3 applies 16-way Pipeline Parallelism (PP) (Qi et al., 2023a), 64-way Expert Parallelism (EP) (Lepikhin et al., 2021) spanning 8 nodes, and ZeRO-1 Data Parallelism (DP)"
   train.init:
     value: "random init, std 0.006 for all learnable parameters"
     source: report

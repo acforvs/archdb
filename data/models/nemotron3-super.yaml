@@ -35,6 +35,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: nvidia-nemotron-open-model-license"
+  meta.modality:
+    value: text
+    source: card
+    at: "README.md; Input"
+    quote: "Input Type(s): Text"
 
   params.active:
     value: 12_700_000_000

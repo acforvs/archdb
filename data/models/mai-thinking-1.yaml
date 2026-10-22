@@ -21,7 +21,6 @@ facts:
     at: "Microsoft Build 2026: Be yourself at work; byline"
     quote: "Jun 2, 2026 | Kyle Daigle"
     note: "Post announces MAI-Thinking-1 in private preview on Foundry."
-
   params.total:
     value: 962_000_000_000
     source: report
@@ -374,6 +373,18 @@ facts:
     source: report
     at: "p.21 §2.6.1"
     quote: "We use expert parallelism 64 with ZeRO-2 for pre-training and mid-training 1, and we enable ZeRO-3 (FSDP) for mid-training phase 2."
+  train.accelerators:
+    value: "8,192 GB200"
+    source: report
+    at: "p.21 §2.6.1 Table 6"
+    quote: "Phase Tokens Context length GB200 GPUs Pre-training 30 T 16,384 8,192"
+    note: "Pre-training and mid-training 1; mid-training 2 used 4,096."
+  train.parallelism:
+    value: "EP64 · ZeRO-2 DP"
+    source: report
+    at: "p.21 §2.6.1"
+    quote: "We use expert parallelism 64 with ZeRO-2 for pre-training and mid-training 1"
+    note: "§2.8 states TP degree 1 with EP inside the NVL64 domain and DP across racks; mid-training 2 adds ZeRO-3 (FSDP) and context parallelism."
   scaling.ladder:
     value: "L12–L78 (365M/3.9B to 35.6B/1015B active/total): L layers, D = L·256/3, query heads L rounded up to a multiple of 16, 8 KV heads, 8/512 experts; architecture ablations at 100–200 TPP"
     source: report

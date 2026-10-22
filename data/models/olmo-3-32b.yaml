@@ -23,6 +23,13 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: text
+    basis: inferred
+    source: card
+    at: "README.md; Model Description"
+    quote: "Model type: a Transformer style autoregressive language model."
+    note: "Language model with no vision or audio components (Olmo3ForCausalLM)."
 
   params.total:
     value: 32_000_000_000
@@ -261,6 +268,17 @@ facts:
     at: "p.7 §2 runtime breakdown; p.85 Table 34"
     quote: "The initial pretraining phase on 5.5T tokens took about 9.5 days on 512 GPUs, followed by an additional 35 days on 1024 GPUs."
     note: "Table 34: 8× NVIDIA H100 (80GB HBM3) nodes; durations include crash resumptions."
+  train.accelerators:
+    value: "1,024 H100"
+    source: report
+    at: "p.7 §2 runtime breakdown"
+    quote: "The initial pretraining phase on 5.5T tokens took about 9.5 days on 512 GPUs, followed by an additional 35 days on 1024 GPUs."
+    note: "First ~9.5 days on 512 GPUs; Table 34 (p.85) gives 8× NVIDIA H100 (80GB HBM3) nodes."
+  train.parallelism:
+    value: "HSDP (DP-shard 64 · DP-rep 16)"
+    source: report
+    at: "p.85 Table 34; Olmo 3 Base 32B, Pretraining column"
+    quote: "Olmo 3 Base 32B Pretraining Midtraining Long-context ext DP-rep 16 8 16 DP-shard 64 64 8"
   train.averaging:
     value: "midtraining: weights of two 100B runs with different data-order seeds averaged; long-context: checkpoints at steps 10,000, 11,000, 11,921 averaged"
     source: report

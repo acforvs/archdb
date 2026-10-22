@@ -29,6 +29,13 @@ facts:
     note: "Date of the first commit with weights; no dated publisher page exists for the base weights, and when the repository became public is not recorded."
 
   meta.license: {value: mit, source: card, at: "README.md; YAML front matter", quote: "license: mit"}
+  meta.modality:
+    value: "text"
+    source: card
+    at: "README front matter"
+    quote: "pipeline_tag: text-generation"
+    basis: inferred
+    note: "Card tags the checkpoint text-generation; config declares no vision or audio tower, and the TDS summary ticks only Text as a training-data modality."
 
   params.active:
     value: 5_100_000_000

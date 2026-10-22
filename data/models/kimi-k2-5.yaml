@@ -27,6 +27,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: modified-mit"
+  meta.modality:
+    value: "text + image + video"
+    source: card
+    at: "§6 Model Usage; Chat Completion with visual content"
+    quote: "K2.5 supports Image and Video input."
 
   params.active:
     value: 32_000_000_000
@@ -167,6 +172,19 @@ facts:
     source: report
     at: "App. C"
     quote: "Kimi K2.5 is trained on NVIDIA H800 GPU clusters with 8×400 Gbps RoCE interconnects across nodes."
+  train.accelerators:
+    value: "H800"
+    source: report
+    at: "App. C"
+    quote: "Kimi K2.5 is trained on NVIDIA H800 GPU clusters with 8×400 Gbps RoCE interconnects across nodes."
+    note: "Count not stated."
+  train.parallelism:
+    value: "PP16 · VPP · EP16 · ZeRO-1 DP"
+    source: report
+    at: "p.10 §4.5.1"
+    quote: "K2.5 seamlessly inherits the parallel strategy of K2"
+    basis: inferred
+    note: "Degrees are Kimi K2's (K2 report §2.4.2: 16-way PP with virtual stages, 16-way EP, ZeRO-1 DP); the vision encoder is replicated on all GPUs."
   train.init:
     value: "Language model continued from a near-end Kimi K2 checkpoint; MoonViT-3D from SigLIP-SO-400M"
     source: report

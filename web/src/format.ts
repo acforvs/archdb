@@ -17,6 +17,7 @@ export function bytes(v: number): string {
 }
 
 export function lr(v: number): string {
+  if (v === 0) return "0";
   const [m, e] = v.toExponential(2).split("e");
   return `${+m}e${+e}`;
 }

@@ -30,6 +30,7 @@ beam-1-0:
   dense: 6461637312
   mtp: 0
   other_modality: 0
+  max_layer: 10172518960
 command-a-plus:
   repo: CohereLabs/command-a-plus-05-2026-bf16
   commit: 5fb6fde5fd12ff89356aae552e11883bc49f069b
@@ -40,6 +41,7 @@ command-a-plus:
   dense: 11022766080
   mtp: 0
   other_modality: 495339760
+  max_layer: 6786912256
 deepseek-v3:
   repo: deepseek-ai/DeepSeek-V3-Base
   commit: afb92e1fa402c2be2a9eb085312bb02e0384d6c7
@@ -50,6 +52,7 @@ deepseek-v3:
   dense: 15264290304
   mtp: 13463426304
   other_modality: 0
+  max_layer: 11507286272
 deepseek-v32:
   repo: deepseek-ai/DeepSeek-V3.2
   commit: a7e62ac04ecb2c0a54d736dc46601c5606cf10a6
@@ -60,6 +63,7 @@ deepseek-v32:
   dense: 16115815168
   mtp: 13477385728
   other_modality: 0
+  max_layer: 11521245696
 deepseek-v4-flash-base:
   repo: deepseek-ai/DeepSeek-V4-Flash-Base
   commit: 8855555deef230a27a21a8d6f294b7b7497759b6
@@ -70,6 +74,7 @@ deepseek-v4-flash-base:
   dense: 6779645780
   mtp: 7669110644
   other_modality: 0
+  max_layer: 6596334320
 deepseek-v4-pro:
   repo: deepseek-ai/DeepSeek-V4-Pro
   commit: b5968e9190ef611bbf34a7229255be88a0e937c1
@@ -80,6 +85,7 @@ deepseek-v4-pro:
   dense: 24676663284
   mtp: 25840145972
   other_modality: 0
+  max_layer: 25769422128
 deepseek-v41:
   repo: deepseek-ai/DeepSeek-V4.1-Flash
   commit: 314113f8a7dadb388215396ba5fbee2c610a04d6
@@ -90,6 +96,7 @@ deepseek-v41:
   dense: 7395889024
   mtp: 14225362512
   other_modality: 411847680
+  max_layer: 13765227760
 gemma-4-26b-a4b:
   repo: google/gemma-4-26B-A4B
   commit: 24548b62aa021d562695c04aaf7758a1ea47990b
@@ -100,6 +107,7 @@ gemma-4-26b-a4b:
   dense: 1656870686
   mtp: 0
   other_modality: 572793264
+  max_layer: 828510465
 gemma-4-31b:
   repo: google/gemma-4-31B
   commit: 5bbc2fb1c1b2c611d06e3d9f23c170ba21659d89
@@ -110,6 +118,7 @@ gemma-4-31b:
   dense: 29288059196
   mtp: 0
   other_modality: 575742384
+  max_layer: 534009857
 glm53:
   repo: zai-org/GLM-5.3
   commit: ba32f8c19c8738e2c57c71798c601d477a7bf844
@@ -120,6 +129,7 @@ glm53:
   dense: 16698123264
   mtp: 9952920576
   other_modality: 0
+  max_layer: 9877404672
 glm53-flash:
   repo: zai-org/GLM-5.3-Flash
   commit: 46a050bec13002ad29ee795c16e61cf4fa3c4a9c
@@ -130,6 +140,7 @@ glm53-flash:
   dense: 7652227632
   mtp: 7432592416
   other_modality: 563627008
+  max_layer: 7412630032
 gpt-oss-120b:
   repo: openai/gpt-oss-120b
   commit: b5c939de8f754692c1647ca79fbf85e8c1e70f8a
@@ -140,6 +151,7 @@ gpt-oss-120b:
   dense: 969291072
   mtp: 0
   other_modality: 0
+  max_layer: 3213080192
 granite-4-1-30b-base:
   repo: ibm-granite/granite-4.1-30b-base
   commit: 9bb22a92d17f4a51788c4750d32764ed068d94f2
@@ -150,6 +162,7 @@ granite-4-1-30b-base:
   dense: 28454686720
   mtp: 0
   other_modality: 0
+  max_layer: 444604416
 hy3-preview-base:
   repo: tencent/Hy3-preview-Base
   commit: 54a62bb00a50195423bffb6b55e91aa28b6a8ce2
@@ -160,6 +173,7 @@ hy3-preview-base:
   dense: 7757273920
   mtp: 3752612288
   other_modality: 0
+  max_layer: 3719045568
 hy4-preview:
   repo: tencent/Hy4-preview
   commit: 705d81ee51566a186d645b74c974d642ef2828fe
@@ -170,6 +184,7 @@ hy4-preview:
   dense: 24319540836
   mtp: 10053583936
   other_modality: 0
+  max_layer: 9978461264
 inkling:
   repo: thinkingmachines/Inkling
   commit: 828496eeae4c243ff1a22f7f28ff83694f2f7bc9
@@ -180,6 +195,7 @@ inkling:
   dense: 16842445312
   mtp: 5260445696
   other_modality: 91613696
+  max_layer: 14742553088
 inkling-small:
   repo: thinkingmachines/Inkling-Small
   commit: 8cc5877b44d343f88b92086aa1fb72897950f06a
@@ -190,6 +206,7 @@ inkling-small:
   dense: 4310372864
   mtp: 2231912448
   other_modality: 69327360
+  max_layer: 6537945600
 k-exaone-2:
   repo: LGAI-EXAONE/K-EXAONE-2.0-750B-A37B
   commit: fec0c8dd25fdd20ffd09869d5af5277966d5523d
@@ -200,6 +217,7 @@ k-exaone-2:
   dense: 12502127104
   mtp: 528513280
   other_modality: 0
+  max_layer: 9816257024
 k2-horizon:
   repo: IFM/K2-Horizon-375B-A23B
   commit: 7d22cc0ac26a91003d19482efa71070244239b11
@@ -210,6 +228,7 @@ k2-horizon:
   dense: 8263807872
   mtp: 0
   other_modality: 0
+  max_layer: 6464090304
 k2-horizon-mova:
   repo: IFM/K2-Horizon-MoVA-36B-A4B
   commit: 35c37ffac1422cdc9efffa6f9da1136951e9cda0
@@ -220,6 +239,7 @@ k2-horizon-mova:
   dense: 9619517140
   mtp: 0
   other_modality: 0
+  max_layer: 797998244
 kimi-k2:
   repo: moonshotai/Kimi-K2-Base
   commit: ce72df012259dcc55d945e890f815fe7ef69159c
@@ -230,6 +250,7 @@ kimi-k2:
   dense: 9373401944
   mtp: 0
   other_modality: 0
+  max_layer: 17059365304
 kimi-k2-5:
   repo: moonshotai/Kimi-K2.5
   commit: 4d01dfe0332d63057c186e0b262165819efb6611
@@ -240,6 +261,7 @@ kimi-k2-5:
   dense: 9373398528
   mtp: 0
   other_modality: 471143920
+  max_layer: 17059365248
 kimi-k3:
   repo: moonshotai/Kimi-K3
   commit: f831ab66814297da540d832a5235f8e904f29d06
@@ -250,6 +272,7 @@ kimi-k3:
   dense: 54394837760
   mtp: 0
   other_modality: 447358976
+  max_layer: 30228720256
 laguna-m-1-base:
   repo: poolside/Laguna-M.1-base
   commit: 628037ad548abdf6445ed00d1a691ac36c9dad2f
@@ -260,6 +283,7 @@ laguna-m-1-base:
   dense: 9151518208
   mtp: 0
   other_modality: 0
+  max_layer: 3343917568
 laguna-s-2-1:
   repo: poolside/Laguna-S-2.1
   commit: 0f573140834b11cfac0c2af97a101a7a69a13e22
@@ -270,6 +294,7 @@ laguna-s-2-1:
   dense: 3397204992
   mtp: 0
   other_modality: 0
+  max_layer: 2489285120
 laguna-xs-2:
   repo: poolside/Laguna-XS.2
   commit: a397bde04501591d0ac3d74a5d9d0a4ec298ffb8
@@ -280,6 +305,7 @@ laguna-xs-2:
   dense: 1624616960
   mtp: 0
   other_modality: 0
+  max_layer: 846860800
 laguna-xs-2-1:
   repo: poolside/Laguna-XS-2.1
   commit: c5f36269bbdbd3f27fddc9a9f9dbae0cf2cf57db
@@ -290,6 +316,7 @@ laguna-xs-2-1:
   dense: 1624616960
   mtp: 0
   other_modality: 0
+  max_layer: 846860800
 ling-2-6-1t:
   repo: inclusionAI/Ling-2.6-1T-base
   commit: 64beeb8a048920769d206e52ae303a81779296ec
@@ -300,6 +327,7 @@ ling-2-6-1t:
   dense: 30403314176
   mtp: 13183265024
   other_modality: 0
+  max_layer: 13272900096
 ling-3-0-flash:
   repo: inclusionAI/Ling-3.0-flash-base
   commit: 0a96b0a3c68f93e5565d6f2d56c98557bded74fb
@@ -310,6 +338,7 @@ ling-3-0-flash:
   dense: 2813474272
   mtp: 3072194048
   other_modality: 0
+  max_layer: 3090163360
 ling31-flash:
   repo: inclusionAI/Ling-3.1-flash
   commit: a4ccd6b45c002ddb236f9cb77d52cc427482bf19
@@ -320,6 +349,7 @@ ling31-flash:
   dense: 15050501952
   mtp: 8174197248
   other_modality: 0
+  max_layer: 8272593600
 longcat-2:
   repo: meituan-longcat/LongCat-2.0
   commit: 834bf5ffe3047aa9f6cc7a64a9bc068b146b8274
@@ -330,6 +360,7 @@ longcat-2:
   dense: 32007657472
   mtp: 136943683712
   other_modality: 0
+  max_layer: 39497012224
 mimo-v2-6-flash:
   repo: XiaomiMiMo/MiMo-V2.6-Flash-RL
   commit: dcd3fd83fb181622fbc606fbb1709901982a62c2
@@ -340,6 +371,7 @@ mimo-v2-6-flash:
   dense: 4733683904
   mtp: 987820224
   other_modality: 989721600
+  max_layer: 6537879872
 mimo-v2-6-pro:
   repo: XiaomiMiMo/MiMo-V2.6-Pro-RL
   commit: b61f21852680ee02a29e946e18cf8697f4844061
@@ -350,6 +382,7 @@ mimo-v2-6-pro:
   dense: 19182763392
   mtp: 1934715264
   other_modality: 1033761792
+  max_layer: 14765273600
 mimo-v2-flash-base:
   repo: XiaomiMiMo/MiMo-V2-Flash-Base
   commit: e4187012dd10281638071e417a56164dd7805fbd
@@ -360,6 +393,7 @@ mimo-v2-flash-base:
   dense: 4733683904
   mtp: 987820224
   other_modality: 0
+  max_layer: 6537879872
 mimo25-pro-base:
   repo: XiaomiMiMo/MiMo-V2.5-Pro-Base
   commit: 1e94ccfda10a2e4dc62877139cd8b7d7b523a4be
@@ -370,6 +404,7 @@ mimo25-pro-base:
   dense: 19182763392
   mtp: 1934715264
   other_modality: 0
+  max_layer: 14765273600
 minimax-m1:
   repo: MiniMaxAI/MiniMax-M1-80k
   commit: 8d1494b1a260e22040d5b9b2eb332eb44500b34d
@@ -380,6 +415,7 @@ minimax-m1:
   dense: 18765830144
   mtp: 0
   other_modality: 0
+  max_layer: 5687693312
 minimax-m2-7:
   repo: MiniMaxAI/MiniMax-M2.7
   commit: d494266a4affc0d2995ba1fa35c8481cbd84294b
@@ -390,6 +426,7 @@ minimax-m2-7:
   dense: 2780094976
   mtp: 0
   other_modality: 0
+  max_layer: 3668718848
 minimax-m3:
   repo: MiniMaxAI/MiniMax-M3
   commit: f0e1c1e04d40177e4673a22097036854f536e9c0
@@ -400,6 +437,7 @@ minimax-m3:
   dense: 10782775680
   mtp: 0
   other_modality: 676811264
+  max_layer: 7416066688
 mistral-medium-3-5:
   repo: mistralai/Mistral-Medium-3.5-128B
   commit: 22b2b868a15677cfa6061277ed2f653d1349a9ab
@@ -410,6 +448,7 @@ mistral-medium-3-5:
   dense: 121804763136
   mtp: 0
   other_modality: 2678221568
+  max_layer: 1384144896
 mistral-small-4:
   repo: mistralai/Mistral-Small-4-119B-2603
   commit: a11f36bebf709121056b1dbcc943d1c6afbe494d
@@ -420,6 +459,7 @@ mistral-small-4:
   dense: 1934967808
   mtp: 0
   other_modality: 428472320
+  max_layer: 3274974464
 motif-3:
   repo: Motif-Technologies/Motif-3-Base
   commit: ac7c9a74d113691e789b3df34d4ef685eeaef9a1
@@ -430,6 +470,7 @@ motif-3:
   dense: 4757309058
   mtp: 251151876
   other_modality: 0
+  max_layer: 6124514746
 nemotron-3-ultra:
   repo: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16
   commit: 9f5b80e4845884eb8da03353b0b176503631e034
@@ -440,6 +481,7 @@ nemotron-3-ultra:
   dense: 31765434368
   mtp: 11215610368
   other_modality: 0
+  max_layer: 10942947840
 nemotron3-super:
   repo: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16
   commit: b4cc202094ea3644bc4461c9fe58ec8b6a3695eb
@@ -450,6 +492,7 @@ nemotron3-super:
   dense: 6852074496
   mtp: 2942325248
   other_modality: 0
+  max_layer: 2873102848
 olmo-3-32b:
   repo: allenai/Olmo-3-1125-32B
   commit: c2b61dae89a1ad10e4ad5653d0e46b590902607b
@@ -460,6 +503,7 @@ olmo-3-32b:
   dense: 31206675456
   mtp: 0
   other_modality: 0
+  max_layer: 487604224
 qwen3-next:
   repo: Qwen/Qwen3-Next-80B-A3B-Instruct
   commit: 9c7f2fbe84465e40164a94cc16cd30b6999b0cc7
@@ -470,6 +514,7 @@ qwen3-next:
   dense: 1742650112
   mtp: 1650471424
   other_modality: 0
+  max_layer: 1648531648
 qwen35-122b:
   repo: Qwen/Qwen3.5-122B-A10B
   commit: dc4d348443bc740c68e2d77492492c11606384d5
@@ -480,6 +525,7 @@ qwen35-122b:
   dense: 4621731840
   mtp: 2523679232
   other_modality: 451290864
+  max_layer: 2514674944
 qwen35-27b:
   repo: Qwen/Qwen3.5-27B
   commit: fc05daec18b0a78c049392ed2e771dde82bdf654
@@ -490,6 +536,7 @@ qwen35-27b:
   dense: 24353201664
   mtp: 424699392
   other_modality: 460730096
+  max_layer: 383273184
 qwen35-35b:
   repo: Qwen/Qwen3.5-35B-A3B
   commit: 59d61f3ce65a6d9863b86d2e96597125219dc754
@@ -500,6 +547,7 @@ qwen35-35b:
   dense: 1431237248
   mtp: 844640768
   other_modality: 446571248
+  max_layer: 842700992
 qwen35-397b:
   repo: Qwen/Qwen3.5-397B-A17B
   commit: 8472618112abcbd45acbcdc58436aff4233c23f7
@@ -510,6 +558,7 @@ qwen35-397b:
   dense: 7765056256
   mtp: 6595568128
   other_modality: 456010480
+  max_layer: 6575157504
 qwen38-24t:
   repo: Qwen/Qwen3.8-2.4T-A95B
   commit: 207bd685a7e3696cfaff12ded7c6a7ea0f88c996
@@ -520,6 +569,7 @@ qwen38-24t:
   dense: 44914275712
   mtp: 26378027520
   other_modality: 0
+  max_layer: 26262741376
 qwen38-27b:
   repo: Qwen/Qwen3.8-27B
   commit: 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
@@ -530,6 +580,7 @@ qwen38-27b:
   dense: 24353201664
   mtp: 424699392
   other_modality: 460730096
+  max_layer: 383273184
 qwen38-flash-next:
   repo: Qwen/Qwen3.8-Flash-Next
   commit: de4b8e4d43b917e7706784d8bb445c9af86a3540
@@ -540,6 +591,7 @@ qwen38-flash-next:
   dense: 3676300163
   mtp: 2607150848
   other_modality: 448931056
+  max_layer: 2626818787
 solar-open-2:
   repo: upstage/Solar-Open2-250B
   commit: 9190fbe63a2ad8e17fc766ccceb36de7c66f004b
@@ -550,6 +602,7 @@ solar-open-2:
   dense: 7085287168
   mtp: 0
   other_modality: 0
+  max_layer: 5187944960
 step-3:
   repo: stepfun-ai/step3
   commit: e2d67fc936dc60f8f606f2429728f1dea503e10d
@@ -560,6 +613,7 @@ step-3:
   dense: 18887838720
   mtp: 0
   other_modality: 4285292032
+  max_layer: 5564628992
 step-3-5-flash:
   repo: stepfun-ai/Step-3.5-Flash-Base
   commit: 19623ae192b589db21eb7793e75a5d3ea3ef0dae
@@ -570,6 +624,7 @@ step-3-5-flash:
   dense: 5646584896
   mtp: 809390336
   other_modality: 0
+  max_layer: 4656210464
 step-5-preview:
   repo: stepfun-ai/Step-5-Preview
   commit: 364b3b03fed2477aa0953fe855a2c4c8c48ee3cc
@@ -580,6 +635,7 @@ step-5-preview:
   dense: 12818046400
   mtp: 4477527552
   other_modality: 3911697920
+  max_layer: 6790260256
 trinity-large:
   repo: arcee-ai/Trinity-Large-Base
   commit: b2a665b40e5d67b05fb164205cf63155f7958e2a
@@ -590,3 +646,4 @@ trinity-large:
   dense: 6026411520
   mtp: 0
   other_modality: 0
+  max_layer: 7339782656

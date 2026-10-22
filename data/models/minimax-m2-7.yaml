@@ -40,6 +40,13 @@ facts:
     source: license
     at: "LICENSE; title"
     quote: "NON-COMMERCIAL LICENSE Non-commercial use permitted based on MIT-style terms"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: config
+    at: "config.json; architectures"
+    quote: '"architectures": [ "MiniMaxM2ForCausalLM" ]'
+    note: "No modality statement; causal-LM class with no vision or audio config."
 
   params.active:
     value: 9_800_000_000

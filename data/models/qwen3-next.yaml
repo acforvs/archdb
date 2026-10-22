@@ -24,6 +24,13 @@ facts:
     at: "QwenLM GitHub README; News"
     quote: "2025-09-11: We release Qwen3-Next-80B-A3B"
   meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: apache-2.0"}
+  meta.modality:
+    value: text
+    basis: inferred
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "pipeline_tag: text-generation"
+    note: "Text-generation pipeline tag; Qwen3NextForCausalLM config has no vision components."
 
   params.active:
     value: 3_000_000_000

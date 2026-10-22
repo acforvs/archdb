@@ -25,6 +25,13 @@ facts:
     source: card
     at: "README.md; License"
     quote: "Hy3 preview is released under the Tencent Hy Community License Agreement"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: config
+    at: "config.json architectures"
+    quote: "HYV3ForCausalLM"
+    note: "The card states no modality; the config class HYV3ForCausalLM has no vision or audio tower."
 
   params.active:
     value: 21_000_000_000

@@ -35,6 +35,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text"
+    source: report
+    at: "p.23 §7; Scope of Modalities"
+    quote: "A.X K2 is currently text-only."
   params.active:
     value: 33_000_000_000
     source: report
@@ -224,6 +229,17 @@ facts:
     at: "p.9 §3.7"
     quote: "Pre-training was conducted on 512 NVIDIA B200 GPUs (64 nodes of 8 GPUs) over approximately 70 days."
     note: "PP 8 with virtual-pipeline degree 2, EP 8, no tensor parallelism; CP 2 for the 32K stage and 8 for 128K."
+  train.accelerators:
+    value: "512 B200"
+    source: report
+    at: "p.9 §3.7"
+    quote: "Pre-training was conducted on 512 NVIDIA B200 GPUs (64 nodes of 8 GPUs) over approximately 70 days."
+  train.parallelism:
+    value: "PP8 · VPP2 · EP8 · DP (distributed optimizer)"
+    source: report
+    at: "p.9 §3.7"
+    quote: "We used pipeline parallelism (PP) of 8 with an interleaved virtual-pipeline degree of 2, and expert parallelism (EP) of 8, with the remaining ranks assigned to data parallelism; tensor parallelism was not used."
+    note: "No TP; CP 2 for the 32K stage and 8 for the 128K stage."
   train.lr_min:
     value: 2.2e-5
     source: report

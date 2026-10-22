@@ -33,6 +33,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: openmdw-1.1"
+  meta.modality:
+    value: "text"
+    source: card
+    at: "README.md; Input"
+    quote: "Input Type(s): Text"
 
   params.active:
     value: 55_000_000_000
@@ -254,6 +259,12 @@ facts:
     at: "PDF page 9; §2.5"
     quote: "128-way expert parallelism, and 2-way pipeline parallelism to train on GB200 GPUs."
     note: "Stated only for the long-context phase."
+  train.accelerators:
+    value: "GB200"
+    source: report
+    at: "PDF page 9; §2.5"
+    quote: "128-way expert parallelism, and 2-way pipeline parallelism to train on GB200 GPUs."
+    note: "Stated only for the long-context phase; count not stated."
   train.lr_min:
     value: 2.5e-6
     source: report

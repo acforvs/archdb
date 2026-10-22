@@ -1,5 +1,7 @@
 import { cell, type DB, type Model } from "./data";
 import { format } from "./format";
+import { LayerStrip, layerStack } from "./LayerStack";
+import { ScrollArea } from "./ScrollArea";
 import type { View } from "./App";
 
 export const COMPARE_MAX = 8;
@@ -11,15 +13,15 @@ export function Compare({ db, models, cols, view, set }: {
   if (models.length > COMPARE_MAX)
     return (
       <div className="table-card empty-state">
-        Side-by-side shows up to {COMPARE_MAX} models; {models.length} match now. Tick models in the table, or narrow
-        the list with the model search (comma-separated, e.g. “beam, inkling”) or filters.
+        Compare shows up to {COMPARE_MAX} models; {models.length} match now. Tick the models to compare in the table, or
+        narrow the list with the model search (comma-separated, e.g. “beam, inkling”) or filters.
       </div>
     );
   const rows = cols.filter((k) => view.all || models.some((m) => cell(m, k, view)?.value != null));
   let prev = "";
   return (
     <div className="table-card">
-      <div className="table-scroll">
+      <ScrollArea>
         <table className="grid compare">
           <thead>
             <tr>
@@ -41,7 +43,9 @@ export function Compare({ db, models, cols, view, set }: {
               return [
                 header && (
                   <tr key={`g-${g}`} className="group-sep">
-                    <th className="sticky" colSpan={models.length + 1}>{db.groups[g]}</th>
+                    {/* The label sits in the pinned column; a cell spanning the row could not stay pinned. */}
+                    <th className="sticky">{db.groups[g]}</th>
+                    <td colSpan={models.length} />
                   </tr>
                 ),
                 <tr key={k} className={differ ? "" : "same"}>
@@ -50,13 +54,20 @@ export function Compare({ db, models, cols, view, set }: {
                     const v = values[i];
                     const empty = v === null || v === undefined;
                     const nd = cell(m, k, view)?.kind === "undisclosed";
+                    const stack = k === "attn.layout" ? layerStack(m) : null;
                     return (
                       <td
                         key={m.id}
                         className={nd ? "undisclosed" : empty ? "empty" : "value wrap"}
                         onClick={() => !empty && set({ model: m.id, focus: k })}
                       >
-                        {nd ? "n/d" : format(k, db.fields[k], v, true)}
+                        {nd ? "n/d" : stack ? (
+                          <>
+                            <LayerStrip stack={stack} />
+                            {!stack.ordered && <span className="strip-status">counts only</span>}
+                            <span className="strip-text">{format(k, db.fields[k], v, true)}</span>
+                          </>
+                        ) : format(k, db.fields[k], v, true)}
                       </td>
                     );
                   })}
@@ -65,7 +76,7 @@ export function Compare({ db, models, cols, view, set }: {
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
       <p className="footnote">Rows where all models agree are dimmed. Click a value for its source.</p>
     </div>
   );

@@ -30,6 +30,13 @@ facts:
     source: card
     at: "README.md; front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: card
+    at: "README.md; MiMo-V2.5-Pro"
+    quote: "MiMo-V2.5-Pro is an open-source Mixture-of-Experts (MoE) language model"
+    note: "No explicit modality statement; config.json (MiMoV2ForCausalLM) has no vision or audio config, unlike the omnimodal MiMo-V2.5/V2.6 releases."
 
   params.active:
     value: 42_000_000_000

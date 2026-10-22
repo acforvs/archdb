@@ -1,5 +1,5 @@
-import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
-import { KV_STORAGE_LABELS, PRESETS, numericFields, type DB } from "./data";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { KV_STORAGE_LABELS, PRESETS, PRESET_ALIASES, PRESET_NOTES, numericFields, type DB } from "./data";
 import { context as fmtContext } from "./format";
 import { Table, visibleColumns } from "./Table";
 import { Plot, PARETO } from "./Plot";
@@ -19,6 +19,7 @@ const CONTEXTS = [8192, 32768, 131072, 262144, 1048576];
 
 function readHash(db: DB): View {
   const view = parseView(location.hash.slice(1));
+  view.preset = PRESET_ALIASES[view.preset] ?? view.preset;
   if (!Number.isSafeInteger(view.ctx) || view.ctx <= 0) view.ctx = DEFAULTS.ctx;
   if (!Object.hasOwn(KV_STORAGE_LABELS, view.kvdt)) view.kvdt = DEFAULTS.kvdt;
   const known = (key: string) => Object.hasOwn(db.fields, key);
@@ -43,9 +44,15 @@ function writeHash(view: View) {
 export function App({ db }: { db: DB }) {
   const [view, setView] = useState<View>(() => readHash(db));
   const set = (patch: Partial<View>) => setView((v) => ({ ...v, ...patch }));
+  // Remember sorting for each column set.
+  const sorts = useRef<Record<string, Pick<View, "sort" | "dir">>>({});
   const changeColumns = (preset: string) => {
+    sorts.current[view.preset] = { sort: view.sort, dir: view.dir };
     const columns = visibleColumns(db, { ...view, preset });
-    if (view.sort === "name" || columns.includes(view.sort)) {
+    const kept = sorts.current[preset];
+    if (kept && (kept.sort === "name" || columns.includes(kept.sort))) {
+      set({ preset, ...kept });
+    } else if (view.sort === "name" || columns.includes(view.sort)) {
       set({ preset });
     } else {
       const sort = columns.includes(DEFAULTS.sort) ? DEFAULTS.sort : "name";
@@ -58,7 +65,6 @@ export function App({ db }: { db: DB }) {
     return () => removeEventListener("hashchange", update);
   }, [db]);
   useEffect(() => writeHash(view), [view]);
-
   const numeric = useMemo(() => numericFields(db), [db]);
   const model = db.models.find((m) => m.id === view.model);
   const scoped = useMemo(() => scopeModels(db, view), [db, view]);
@@ -77,9 +83,12 @@ export function App({ db }: { db: DB }) {
     <>
       <div className="controls">
       <div className="toolbar">
-        <div className="segmented" role="tablist">
+        <div className="tabs" role="tablist">
           {(["table", "plot", "breakdown"] as const).map((t) => (
-            <button key={t} role="tab" aria-selected={view.tab === t} onClick={() => set({ tab: t })}>
+            <button key={t} role="tab" aria-selected={view.tab === t} onClick={() => set(
+              // An untouched breakdown opens on the all-features overview.
+              t === "breakdown" && view.by === DEFAULTS.by && view.feat === DEFAULTS.feat ? { tab: t, by: "features" } : { tab: t },
+            )}>
               {{ table: "Table", plot: "Plot", breakdown: "Breakdown" }[t]}
             </button>
           ))}
@@ -88,7 +97,7 @@ export function App({ db }: { db: DB }) {
         {view.tab === "table" ? (
           <div className="chips" role="radiogroup" aria-label="Column set">
             {[...Object.keys(PRESETS), "All fields"].map((p) => (
-              <button key={p} role="radio" aria-checked={view.preset === p} onClick={() => changeColumns(p)}>
+              <button key={p} role="radio" aria-checked={view.preset === p} title={PRESET_NOTES[p]} onClick={() => changeColumns(p)}>
                 {p}
               </button>
             ))}
@@ -125,12 +134,12 @@ export function App({ db }: { db: DB }) {
       {view.tab === "breakdown" && showAxes && (
         <div className="toolbar sub">
           <div className="axes">
-            <label className="axis-picker">
+            {view.by !== "features" && <label className="axis-picker">
               <span className="axis-name">split</span>
               <select value={view.feat} onChange={(e) => set({ feat: e.target.value })}>
                 {Object.entries(FEATURES).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
               </select>
-            </label>
+            </label>}
             <label className="axis-picker">
               <span className="axis-name">by</span>
               <select value={view.by} onChange={(e) => set({ by: e.target.value })}>
@@ -170,35 +179,38 @@ export function App({ db }: { db: DB }) {
             Disclosed only
           </label>
         )}
-        {view.tab === "table" && (
-          <>
-            <label className="toggle" title="Fields as rows, models as columns (up to 8 models)">
-              <input type="checkbox" checked={view.side} onChange={(e) => set({ side: e.target.checked })} />
-              Side by side
-            </label>
-          </>
-        )}
+        {view.tab === "table" && (view.side ? (
+          <button className="chip-btn" onClick={() => set({ side: false })}>← Back to table</button>
+        ) : (
+          <button
+            className="chip-btn"
+            disabled={selected.length < 2}
+            title={selected.length < 2 ? "Tick two or more models in the table to compare them" : "Fields as rows, selected models as columns"}
+            onClick={() => set({ side: true })}
+          >
+            Compare selected{selected.length ? ` (${selected.length})` : ""}
+          </button>
+        ))}
         {kvShown && (
-          <span className="context" title="Uniform precision counts payload only. Sourced storage uses each component's documented format, scales and padding.">
+          <span className="context">
             KV cache
-            <select value={view.kvdt} onChange={(e) => set({ kvdt: e.target.value })} aria-label="KV-cache dtype">
+            <select value={view.kvdt} onChange={(e) => set({ kvdt: e.target.value })} aria-label="KV-cache dtype"
+              title="Uniform precision counts payload only. Sourced storage uses each component's documented format, scales and padding.">
               {Object.entries(KV_STORAGE_LABELS).map(([d, label]) => <option key={d} value={d}>{label}</option>)}
             </select>
             at
             <select value={view.ctx} onChange={(e) => set({ ctx: Number(e.target.value) })} aria-label="Context length">
               {CONTEXTS.map((c) => <option key={c} value={c}>{fmtContext(c)}</option>)}
             </select>
+            <span className="kv-note">
+              {view.kvdt === "sourced"
+                ? `With scales and padding; complete for ${scoped.filter((m) => m.kv?.sourced).length} of ${scoped.length} models.`
+                : "Payload only."}
+              {" "}Per-token values include bounded SWA caches; global KV excludes them.
+            </span>
           </span>
         )}
       </div>
-      {kvShown && (
-        <p className="kv-note">
-          {view.kvdt === "sourced"
-            ? `Sourced formats include quantization scales and documented padding. Complete recipes: ${scoped.filter((m) => m.kv?.sourced).length} of ${scoped.length} models.`
-            : "Uniform precision counts payload only; quantization overhead is excluded."}
-          {" "}KV bytes / token includes bounded SWA caches at this context; global KV excludes them.
-        </p>
-      )}
       </div>
 
       <main>

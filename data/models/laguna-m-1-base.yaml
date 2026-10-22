@@ -25,6 +25,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: "text"
+    source: card
+    at: "Model overview"
+    quote: "Modality: text-to-text (completion)"
 
   params.active:
     value: 23_400_000_000
@@ -201,6 +206,17 @@ facts:
     source: report
     at: "p.6 §3.1.1"
     quote: "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
+  train.accelerators:
+    value: "6,144 H200"
+    source: report
+    at: "p.6 §3.1.1"
+    quote: "LAGUNA M.1 and LAGUNA XS.2 were pre-trained on 6,144 and 2,048 NVIDIA H200 GPUs, respectively."
+  train.parallelism:
+    value: "EP8"
+    source: report
+    at: "p.7 §3.1.2"
+    quote: "For MoE layers, we use Expert Parallelism, sharding expert weights across 8 H200 GPUs interconnected via NVLink."
+    note: "Titan's mesh is (PP, DDP, FSDP, EGP, ETP) for MoE layers with ETP = 1 for M.1 and XS.2; other degrees not stated."
   train.stability:
     value: "FP32 LM-head input-gradient all-reduce to fix positive logit drift; no z-loss"
     source: report

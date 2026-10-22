@@ -28,6 +28,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: mit"
+  meta.modality:
+    value: "text"
+    basis: inferred
+    source: card
+    at: "README.md front matter"
+    quote: "pipeline_tag: text-generation"
+    note: "No modality statement; text-generation pipeline tag and a causal LM config with no vision or audio config."
   params.total:
     value: 314_000_000_000
     source: report
@@ -391,6 +398,18 @@ facts:
     source: report
     at: "p.7 §3.1"
     quote: "With expert and parameter sharding, optimizer-state CPU offloading, and the memory capacity of B200 GPUs, our 314B-parameter model fits within the available device memory"
+  train.accelerators:
+    value: "B200"
+    source: report
+    at: "p.7 §3.1"
+    quote: "With expert and parameter sharding, optimizer-state CPU offloading, and the memory capacity of B200 GPUs"
+    note: "Count not stated."
+  train.parallelism:
+    value: "EP8 · HSDP (DP-shard 8 · DP-replicate)"
+    source: report
+    at: "p.7 §3.1"
+    quote: "Outside the expert-parallel dimension, we use a sharded data-parallel (DP-shard) degree of 8 and assign the remaining ranks to the replicated data-parallel (DP-replicate) dimension."
+    note: "Same paragraph: EP = 8 within one eight-GPU node, FSDP sharding, no pipeline parallelism."
   train.stages:
     value:
       - name: main

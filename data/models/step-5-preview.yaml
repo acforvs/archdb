@@ -51,6 +51,12 @@ facts:
     source: card
     at: "README.md; License"
     quote: "is licensed under the StepFun Model License 1.0."
+  meta.modality:
+    value: "text + image + video"
+    source: card
+    at: "README.md; introduction"
+    quote: "accepts text, images, and video"
+    note: "The card's specification table lists Input as \"Text, image\"; the config defines image tokens only."
 
   params.active:
     value: 27_000_000_000

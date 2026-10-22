@@ -22,6 +22,11 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license_name: muse-model-license"
+  meta.modality:
+    value: "text + image + video + audio"
+    source: card
+    at: "README.md; model summary table, Modalities"
+    quote: 'Input: Text \+ Image \+ Video \+ Audio / Output: Text'
   params.total:
     value: 816_000_000_000
     source: card

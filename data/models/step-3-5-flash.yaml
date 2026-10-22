@@ -34,6 +34,13 @@ facts:
     source: card
     at: "README.md; YAML front matter"
     quote: "license: apache-2.0"
+  meta.modality:
+    value: text
+    basis: inferred
+    source: config
+    at: "config.json; /architectures/0"
+    quote: "Step3p5ForCausalLM"
+    note: "Causal-LM class with no vision config."
 
   params.total:
     value: 196_000_000_000
@@ -377,6 +384,16 @@ facts:
     at: "p.9 §3.1"
     quote: "Step 3.5 Flash is trained on a large-scale cluster with 4,096 NVIDIA H800 GPUs."
     note: "PP8 with VPP, EP8, ZeRO-1 DP (§3.2)."
+  train.accelerators:
+    value: "4,096 H800"
+    source: report
+    at: "p.9 §3.1"
+    quote: "Step 3.5 Flash is trained on a large-scale cluster with 4,096 NVIDIA H800 GPUs."
+  train.parallelism:
+    value: "PP8 · VPP · EP8 · ZeRO-1 DP"
+    source: report
+    at: "p.9 §3.2"
+    quote: "including 8-way pipeline parallelism (PP) [68] with virtual pipeline stages (VPP), and 8-way expert parallelism (EP) [25], and ZeRO-1 Data Parallelism"
   train.stages:
     value:
       - name: pre-training stage 1

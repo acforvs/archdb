@@ -1,6 +1,9 @@
+import json
+
 import pytest
 
 from archdb.checkpoint import SIDE, TEXT_PREFIX, classify, elements
+from archdb.data import Model
 from archdb.derive import counted
 
 
@@ -62,8 +65,43 @@ def test_counted_active_uses_top_k_share_and_scope_check():
     d = counted(facts(moe__experts=96, moe__top_k=8, params__total=100e9, params__active=12e9), COUNTS)
     assert d["params.counted_active_non_embedding"]["value"] == 2e9 + 96e9 * 8 / 96
     assert d["params.counted_total"]["value"] == 100e9
+    assert d["params.counted_non_embedding"]["value"] == 98e9
+    assert "params.counted_max_layer" not in d
+
+
+def test_counted_max_layer_when_counted():
+    counts = {**COUNTS, "max_layer": 2.5e9}
+    d = counted(facts(moe__experts=96, moe__top_k=8, params__total=100e9, params__active=12e9), counts)
+    assert d["params.counted_max_layer"]["value"] == 2.5e9
 
 
 def test_counted_rejects_counts_that_do_not_reproduce_stated_totals():
     d = counted(facts(moe__experts=96, moe__top_k=8, params__total=150e9, params__active=12e9), COUNTS)
     assert d["params.counted_active_non_embedding"]["value"] is None
+    assert d["params.counted_non_embedding"]["value"] is None
+
+
+def test_max_layer_keeps_encoder_and_decoder_blocks_separate(monkeypatch, tmp_path):
+    from archdb import checkpoint
+
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"num_hidden_layers": 2}))
+    monkeypatch.setattr(checkpoint, "fetch", lambda _: config)
+    monkeypatch.setattr(checkpoint, "shards", lambda *_: ["model.safetensors"])
+    shapes = {
+        "model.encoder.layers.0.attn.weight": [2, 3],
+        "model.decoder.layers.0.attn.weight": [3, 4],
+        "model.decoder.layers.0.engram.weight": [100, 4],
+        "model.decoder.layers.2.mlp.weight": [200, 4],
+    }
+    monkeypatch.setattr(checkpoint, "header", lambda _: {
+        name: {"dtype": "BF16", "shape": shape} for name, shape in shapes.items()
+    })
+    model = Model("test", "test", "test", "base", {
+        "config": {"kind": "config", "url": f"https://huggingface.co/o/m/resolve/{'0' * 40}/config.json"},
+    }, {})
+    result = checkpoint.count(model)
+    assert result["max_layer"] == 12
+    assert result["dense"] == 18
+    assert result["lookup"] == 400
+    assert result["mtp"] == 800

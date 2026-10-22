@@ -8,7 +8,7 @@ from PIL import Image
 
 from archdb.data import load_fields, load_models, load_orgs
 from archdb.export import dataset
-from archdb.pages import ORIGIN, dataset_metadata, model_body, page, write
+from archdb.pages import ORIGIN, dataset_metadata, model_body, model_links, page, write
 
 
 class Document(HTMLParser):
@@ -86,3 +86,12 @@ def test_model_text_and_structured_data_escape_html(built):
     inline = rendered.split('<script type="application/ld+json">')[1].split("</script>")[0]
     assert json.loads(inline) == structured
     assert "<script>" not in inline
+
+
+def test_model_links_prefer_the_checkpoint_config_over_sibling_code(built):
+    data, _, _ = built
+    model = next(m for m in data["models"] if m["id"] == "deepseek-v4-flash-base")
+    links = dict(model_links(model))
+    assert links["Hugging Face"] == "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-Base"
+    model = {**model, "sources": {"implementation": next(iter(model["sources"].values()))}}
+    assert model_links(model) == []

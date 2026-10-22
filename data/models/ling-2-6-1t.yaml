@@ -28,6 +28,13 @@ facts:
     note: "Hugging Face repository creation date; no dated publisher page for the base weights (report: arXiv 13 Jun 2026)."
 
   meta.license: {value: mit, source: card, at: "README.md; YAML front matter", quote: "license: mit"}
+  meta.modality:
+    value: "text"
+    source: report
+    at: "p.33 §5 Conclusion, Limitations, and Future Directions"
+    quote: "An equally important transition is from text-only systems to native multimodal agents."
+    basis: inferred
+    note: "The report names native multimodality as future work; config declares no vision or audio tower and the card tags the checkpoint text-generation."
 
   params.active:
     value: 63_000_000_000

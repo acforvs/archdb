@@ -71,6 +71,20 @@ def counted(facts: dict, counts: dict | None) -> dict[str, dict]:
             "value": c["embedding"] + c["head"],
             "formula": f"input embedding + output head, {source}",
         },
+        "params.counted_non_embedding": {
+            "value": backbone - c["embedding"] - c["head"],
+            "formula": f"dense + routed backbone weights; excludes input embedding, output head, lookup tables, MTP and other modalities, {source}{check}",
+        },
+        **(
+            {
+                "params.counted_max_layer": {
+                    "value": c["max_layer"],
+                    "formula": f"max(sum of dense and routed weights sharing a full layers.<index> tensor path), all experts included, {source}",
+                }
+            }
+            if c.get("max_layer")
+            else {}
+        ),
         "params.counted_active_non_embedding": {
             "value": active_ne,
             "formula": f"non-expert weights + routed experts × {top_k}/{experts}, excluding embedding and output head, {source}{check}"
@@ -90,7 +104,12 @@ def counted(facts: dict, counts: dict | None) -> dict[str, dict]:
     }
 
 
-COUNTED = ("params.counted_total", "params.counted_embedding", "params.counted_active_non_embedding")
+COUNTED = (
+    "params.counted_total",
+    "params.counted_embedding",
+    "params.counted_non_embedding",
+    "params.counted_active_non_embedding",
+)
 
 
 def derive(

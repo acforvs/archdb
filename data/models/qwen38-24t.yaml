@@ -23,6 +23,11 @@ facts:
     quote: "2026-08-12: Qwen3.8-2.4T-A95B is now available on"
     note: "Hugging Face repository created 2026-08-08, before public release."
   meta.license: {value: "other (qwen3.8-max)", source: card, at: "README.md; YAML front matter", quote: "license_name: qwen3.8-max"}
+  meta.modality:
+    value: text
+    source: card
+    at: "README.md; API Usage"
+    quote: "Qwen3.8-2.4T-A95B is a text-only model that requires thinking mode for all interactions. Multimodal inputs are not supported"
 
   params.active:
     value: 95_000_000_000

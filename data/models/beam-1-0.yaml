@@ -38,6 +38,11 @@ facts:
     at: "Beam is now available (post header)"
     quote: "Beam is now available October 16, 2026"
     note: "Post: 'Today, we have released Beam’s model weights on Hugging Face'; the Oct 5 announcement preceded the weights."
+  meta.modality:
+    value: "text"
+    source: card
+    at: "README.md; opening description"
+    quote: "Beam takes text as input and generates text as output."
   params.total:
     value: 501_300_000_000
     source: card
@@ -207,6 +212,11 @@ facts:
     at: "Pretraining a Foundation for Reasoning"
   train.hardware:
     value: "6,144 NVIDIA GB300 (NVL72), under four weeks"
+    source: announcement
+    at: "Pretraining a Foundation for Reasoning; Frontier-grade pretraining infrastructure"
+    quote: "Beam was pretrained end-to-end in under four weeks on a cluster of 6,144 NVIDIA GB300 NVL72 GPUs."
+  train.accelerators:
+    value: "6,144 GB300"
     source: announcement
     at: "Pretraining a Foundation for Reasoning; Frontier-grade pretraining infrastructure"
     quote: "Beam was pretrained end-to-end in under four weeks on a cluster of 6,144 NVIDIA GB300 NVL72 GPUs."
