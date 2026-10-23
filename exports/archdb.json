@@ -835,13 +835,17 @@
   "train.batch": {
    "type": "str",
    "required": "always",
-   "label": "Batch size",
+   "label": "Batch schedule / notes",
+   "aliases": [
+    "batch size",
+    "batch ramp"
+   ],
    "definition": "Global batch size, including any batch-size ramp: sequences × sequence length (token total), or the token total alone when only that is stated."
   },
   "train.batch_tokens": {
    "type": "float",
    "unit": "tokens",
-   "label": "Batch (tokens)",
+   "label": "Batch size (tokens)",
    "aliases": [
     "batch size",
     "global batch"

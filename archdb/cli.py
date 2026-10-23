@@ -1,4 +1,4 @@
-"""archdb command line: validate, check-sources, count-params, build, serve."""
+"""Browse model recipes and maintain the database."""
 
 from __future__ import annotations
 
@@ -6,15 +6,16 @@ import argparse
 import functools
 import http.server
 import json
+import os
 import shutil
 import sys
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
-import yaml
+from . import browse
+from .terminal import clean
 
-from . import export
-from .data import ROOT, Loader, load_fields, load_models, load_orgs, validate
-from .export import dataset
-
+ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
 PUBLIC = ROOT / "web" / "public"
 EXPORTS = ROOT / "exports"
@@ -29,6 +30,10 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def build(check: bool = False) -> None:
+    from . import export
+    from .data import load_fields, load_models, load_orgs, validate
+    from .export import dataset
+
     groups, fields = load_fields()
     models = load_models()
     errors = validate(models, fields)
@@ -56,8 +61,16 @@ def build(check: bool = False) -> None:
 
 
 def main(argv=None) -> None:
-    parser = argparse.ArgumentParser(prog="archdb")
-    sub = parser.add_subparsers(dest="cmd", required=True)
+    parser = argparse.ArgumentParser(
+        prog="archdb", description="Compare LLM architectures and pretraining recipes."
+    )
+    try:
+        package_version = version("archdb")
+    except PackageNotFoundError:
+        package_version = "source checkout"
+    parser.add_argument("--version", action="version", version=f"archdb {package_version}")
+    sub = parser.add_subparsers(dest="cmd")
+    browse.add_commands(sub)
     val = sub.add_parser("validate", help="check records against the field registry")
     val.add_argument("models", nargs="*", help="model ids (default: all)")
     check = sub.add_parser("check-sources", help="fetch cited sources; verify config pointers and quotes")
@@ -71,6 +84,25 @@ def main(argv=None) -> None:
     serve = sub.add_parser("serve", help="serve the built site (npm --prefix web run build) on localhost")
     serve.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
+    if args.cmd is None:
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            parser.print_help()
+            return
+        args = parser.parse_args(["explore"])
+
+    if args.cmd in browse.COMMANDS:
+        try:
+            browse.run(args)
+        except ValueError as exc:
+            parser.error(clean(exc))
+        except KeyboardInterrupt:
+            sys.exit(130)
+        except BrokenPipeError:
+            with open(os.devnull, "w") as sink:
+                os.dup2(sink.fileno(), sys.stdout.fileno())
+        return
+
+    from .data import Loader, load_fields, load_models, load_orgs, validate
 
     if args.cmd == "validate":
         _, fields = load_fields()
@@ -98,6 +130,8 @@ def main(argv=None) -> None:
         )
         sys.exit(1 if failed else 0)
     if args.cmd == "count-params":
+        import yaml
+
         from .checkpoint import PARTS, count
 
         path = ROOT / "data" / "param_counts.yaml"

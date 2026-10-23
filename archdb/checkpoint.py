@@ -151,6 +151,6 @@ def count(m: Model) -> dict | None:
             parts[part] += n
             layer = LAYER.search(text.lower())
             if layer and part in ("dense", "routed"):
-                block = text[:layer.end(1)]
+                block = text[: layer.end(1)]
                 per_layer[block] = per_layer.get(block, 0) + n
     return {"repo": repo, "commit": commit, **parts, "max_layer": max(per_layer.values(), default=0)}

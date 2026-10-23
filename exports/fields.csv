@@ -110,8 +110,8 @@ train.lr_peak,train,Peak LR,float,lr,False,Peak learning rate of the main pretra
 train.lr_min,train,Final LR,float,lr,False,Learning rate at the end of the decay.
 train.schedule,train,LR schedule,str,,False,Learning-rate schedule shape with phase boundaries.
 train.warmup,train,Warmup,str,,False,Warmup length in steps or tokens.
-train.batch,train,Batch size,str,,False,"Global batch size, including any batch-size ramp: sequences × sequence length (token total), or the token total alone when only that is stated."
-train.batch_tokens,train,Batch (tokens),float,tokens,False,"Global batch size in tokens during the main pretraining stage, after any ramp (sequences × sequence length when stated in sequences, marked inferred)."
+train.batch,train,Batch schedule / notes,str,,False,"Global batch size, including any batch-size ramp: sequences × sequence length (token total), or the token total alone when only that is stated."
+train.batch_tokens,train,Batch size (tokens),float,tokens,False,"Global batch size in tokens during the main pretraining stage, after any ramp (sequences × sequence length when stated in sequences, marked inferred)."
 train.weight_decay,train,Weight decay,float,,False,Decoupled weight decay coefficient.
 train.betas,train,Adam betas,str,,False,"(beta1, beta2) of the Adam-family optimizer or its AdamW fallback."
 train.grad_clip,train,Grad clip,float,,False,Global gradient-norm clipping threshold.

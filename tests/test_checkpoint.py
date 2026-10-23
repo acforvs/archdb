@@ -94,12 +94,21 @@ def test_max_layer_keeps_encoder_and_decoder_blocks_separate(monkeypatch, tmp_pa
         "model.decoder.layers.0.engram.weight": [100, 4],
         "model.decoder.layers.2.mlp.weight": [200, 4],
     }
-    monkeypatch.setattr(checkpoint, "header", lambda _: {
-        name: {"dtype": "BF16", "shape": shape} for name, shape in shapes.items()
-    })
-    model = Model("test", "test", "test", "base", {
-        "config": {"kind": "config", "url": f"https://huggingface.co/o/m/resolve/{'0' * 40}/config.json"},
-    }, {})
+    monkeypatch.setattr(
+        checkpoint,
+        "header",
+        lambda _: {name: {"dtype": "BF16", "shape": shape} for name, shape in shapes.items()},
+    )
+    model = Model(
+        "test",
+        "test",
+        "test",
+        "base",
+        {
+            "config": {"kind": "config", "url": f"https://huggingface.co/o/m/resolve/{'0' * 40}/config.json"},
+        },
+        {},
+    )
     result = checkpoint.count(model)
     assert result["max_layer"] == 12
     assert result["dense"] == 18

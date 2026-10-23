@@ -6,6 +6,28 @@ sources.
 
 [Browse archdb](https://archdb.vladsavinov.com)
 
+## Terminal
+
+Install with [uv](https://docs.astral.sh/uv/):
+
+```sh
+uv tool install git+https://github.com/acforvs/archdb
+archdb
+```
+
+Browse models and compare their architecture and training fields. Search fields with `/`, find
+models with `m`, and press `?` for the keys. The explorer works offline on macOS and Linux.
+Update the tool and its bundled data with `uv tool upgrade archdb`.
+
+There are also commands for filtering models and exporting results:
+
+```sh
+archdb models --where 'moe.sparsity >= 32' --sort params.active --desc
+archdb show deepseek-v3 --group moe
+```
+
+See [Terminal usage](docs/cli.md) for filtering, source lookup, KV settings and JSON/CSV output.
+
 ## Use the data
 
 The data is also available without the website:

@@ -23,6 +23,7 @@ data/raw/
 archdb/static/
 build/
 dist/
+archdb-selection.json
 .DS_Store
 .env
 .env.*
