@@ -1,6 +1,6 @@
 [project]
 name = "archdb"
-version = "0.1.0"
+version = "0.1.1"
 description = "Sourced database of LLM architectures and pretraining recipes"
 readme = "README.md"
 license = "MIT"
