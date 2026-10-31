@@ -8,6 +8,16 @@ const model = (id) => db.models.find((m) => m.id === id);
 const code = (id) => layerStack(model(id)).layers.map((k) => ({ global: "G", swa: "S", linear: "L" })[k]).join("");
 const globalPositions = (id) => layerStack(model(id)).layers.flatMap((k, i) => k === "global" ? [i] : []);
 
+test("sparse drawing preserves global cache layers and Mistral's shared KV positions", () => {
+  const s = layerStack(model("mistral-large-4"));
+  assert.deepEqual(s.layers, Array(72).fill("global"));
+  assert.deepEqual(s.kinds, Array(72).fill("sparse"));
+  assert.deepEqual(s.types.flatMap((t, i) => t === "DSA (shared KV)" ? [i] : []),
+    [39, 43, 47, 51, 55, 59, 63, 67, 71]);
+  assert.deepEqual(layerStack(model("minimax-m3-1-flash")).kinds, Array(60).fill("sparse"));
+  assert.deepEqual(layerStack(model("kolibri-1")).kinds, Array(10).fill(["swa", "swa", "swa", "swa", "global"]).flat());
+});
+
 test("each strip matches every count and uses the recorded sequence", () => {
   for (const m of db.models) {
     const s = layerStack(m);

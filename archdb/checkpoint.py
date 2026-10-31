@@ -128,8 +128,10 @@ def count(m: Model) -> dict | None:
     repo, commit = match["repo"], match["commit"]
     cfg = json.loads(fetch(config).read_text())
     layers = cfg.get("num_hidden_layers") or cfg.get("text_config", {}).get("num_hidden_layers")
+    block_configs = cfg.get("llm_config", cfg).get("block_configs")
     parts = dict.fromkeys(PARTS, 0)
     per_layer: dict[str, int] = {}
+    routed_per_layer: dict[int, int] = {}
     for f in shards(repo, commit):
         tensors = header(f"https://huggingface.co/{repo}/resolve/{commit}/{f}")
         # FP4 weights packed two per byte carry a microscaling scale: an E8M0 `.scale` (DeepSeek) or
@@ -150,7 +152,17 @@ def count(m: Model) -> dict | None:
             part, n = classify(text, layers), elements(name, spec, name in mx)
             parts[part] += n
             layer = LAYER.search(text.lower())
+            if layer and part == "routed":
+                index = int(layer.group(1))
+                routed_per_layer[index] = routed_per_layer.get(index, 0) + n
             if layer and part in ("dense", "routed"):
                 block = text[: layer.end(1)]
                 per_layer[block] = per_layer.get(block, 0) + n
+    if block_configs and routed_per_layer:
+        # Pruned MoE checkpoints can have a different expert count and width in each layer.
+        # Weight each layer separately instead of using the maximum expert count in the record.
+        parts["routed_active"] = sum(
+            n * block_configs[i]["num_experts_per_tok"] // block_configs[i]["n_routed_experts"]
+            for i, n in routed_per_layer.items()
+        )
     return {"repo": repo, "commit": commit, **parts, "max_layer": max(per_layer.values(), default=0)}

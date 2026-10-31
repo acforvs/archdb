@@ -2,6 +2,7 @@
 # Labs inside a larger company take the parent's country (Qwen: Alibaba, Google DeepMind: Alphabet).
 
 Ai2: {country: United States, url: "https://web.archive.org/web/20261002212725/https://allenai.org/about", quote: "we are a seattle based non-profit ai research institute"}
+Aleph Alpha: {country: Germany, url: "https://en.wikipedia.org/w/index.php?title=Aleph_Alpha&oldid=1380662222", quote: "is a german artificial intelligence (ai) startup developing large language models"}
 Arcee AI: {country: United States, url: "https://web.archive.org/web/20261010083502/https://www.arcee.ai/", quote: "arcee is an open intelligence lab based in the u.s."}
 Cohere: {country: Canada, url: "https://en.wikipedia.org/w/index.php?title=Cohere&oldid=1375422810", quote: "is headquartered in toronto"}
 DeepSeek: {country: China, url: "https://en.wikipedia.org/w/index.php?title=DeepSeek&oldid=1380939138", quote: "based in hangzhou , zhejiang"}

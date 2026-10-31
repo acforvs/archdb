@@ -342,12 +342,12 @@ def test_batch_size_sort_uses_numeric_records_instead_of_batch_notes(state):
     assert state.model["id"] == "trinity-large"
     known = [query.cell(m, state.sort)["value"] for m in state.models]
     count = sum(value is not None for value in known)
-    assert count == 18
+    assert count == 20
     assert known[:count] == sorted(known[:count], reverse=True)
     assert all(value is None for value in known[count:])
     ui.draw()
     assert "BATCH" in ui.screen.writes
-    assert "18/62 known" in ui.notice
+    assert "20/67 known" in ui.notice
 
 
 def test_enter_on_model_shows_every_field_without_changing_model(state):

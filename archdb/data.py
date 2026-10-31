@@ -47,6 +47,7 @@ LAYER_MIXERS = {
             "MLA",
             "MLA+DSA",
             "DSA",
+            "DSA (shared KV)",
             "QSA",
             "MSA",
             "GDLA",

@@ -173,12 +173,17 @@
 .strip { display: block; overflow: visible; }
 .strip .compressed-variant, .strip-legend .compressed-variant { opacity: 0.5; }
 .strip .l-global, .strip-legend .l-global, .layer-counts .l-global { fill: var(--layer-global); background: var(--layer-global); }
+.strip .l-sparse, .strip-legend .l-sparse, .layer-counts .l-sparse { fill: var(--layer-sparse); background: var(--layer-sparse); }
 .strip .l-swa, .strip-legend .l-swa, .layer-counts .l-swa { fill: var(--layer-swa); background: var(--layer-swa); }
 .strip .l-linear, .strip-legend .l-linear, .layer-counts .l-linear { fill: var(--layer-linear); background: var(--layer-linear); }
+.strip rect.shared-kv { fill-opacity: 0.18; stroke-width: 1; }
+.strip rect.l-sparse.shared-kv { stroke: var(--layer-sparse); }
+.strip rect.l-global.shared-kv { stroke: var(--layer-global); }
+.strip-legend i.shared-kv { background: transparent; box-shadow: inset 0 0 0 1px var(--layer-sparse); }
 .strip-legend { display: inline-flex; flex-wrap: wrap; gap: 0 10px; font-weight: 400; }
 .strip-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .strip-legend i { display: inline-block; width: 4px; height: 7px; vertical-align: baseline; }
-.strip-legend .l-global { height: 12px; }
+.strip-legend .l-global, .strip-legend .l-sparse { height: 12px; }
 .strip-legend { font-size: 11.5px; color: var(--text-2); }
 .strip-legend span { align-items: flex-end; }
 .strip-text { display: block; margin-top: 4px; }

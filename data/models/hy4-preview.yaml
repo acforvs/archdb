@@ -73,6 +73,10 @@ facts:
     quote: '"layer_types": [ "deepseek_sparse_attention", "deepseek_sparse_attention",'
     basis: inferred
     note: "Uniform: /layer_types | count deepseek_sparse_attention = 78 = /num_hidden_layers."
+    sequence: [DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA]
   attn.qk_norm:
     value: false
     source: hf-transformers

@@ -84,10 +84,16 @@ facts:
     note: "SGA = MLA plus the head-specific output gate and the top-k indexer (p.4 §2.2)."
   attn.kv_lora_rank: {value: 512, source: config, at: "/kv_lora_rank"}
   attn.layout:
-    value: "61 MLA"
+    value: "61 SGA (MLA + DSA indexer)"
     source: report
     at: "p.3 §2.1"
     quote: "Of the 61 transformer layers, the first is a dense feed-forward layer and the remaining 60 are MoE layers"
+    note: "Every block has the SGA sublayer: Figure 2, 'The A.X K2 transformer block with the SGA sublayer'; the indexer selects top-k entries and MLA attends over them."
+    sequence: [MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA,
+      MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA,
+      MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA,
+      MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA, MLA+DSA,
+      MLA+DSA]
   attn.position:
     value: "partial RoPE (64-dim decoupled RoPE key shared across heads, 128 NoPE dims per head)"
     source: hf-transformers

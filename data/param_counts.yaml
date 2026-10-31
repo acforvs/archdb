@@ -273,6 +273,17 @@ kimi-k3:
   mtp: 0
   other_modality: 447358976
   max_layer: 30228720256
+kolibri-1:
+  repo: Aleph-Alpha/Kolibri-1-BF16
+  commit: cc6d729e6a024c1e59ad48887fdef95ff37b534d
+  embedding: 327680000
+  head: 327680000
+  lookup: 0
+  routed: 75497472000
+  dense: 1950242560
+  mtp: 0
+  other_modality: 0
+  max_layer: 1548954240
 laguna-m-1-base:
   repo: poolside/Laguna-M.1-base
   commit: 628037ad548abdf6445ed00d1a691ac36c9dad2f
@@ -438,6 +449,28 @@ minimax-m3:
   mtp: 0
   other_modality: 676811264
   max_layer: 7416066688
+minimax-m3-1-flash:
+  repo: MiniMaxAI/MiniMax-M3.1-Flash
+  commit: 2f33a8b9ae49ce7b51c994df97166a7fd059bc2e
+  embedding: 1229193216
+  head: 1229193216
+  lookup: 0
+  routed: 413122166784
+  dense: 10794572928
+  mtp: 0
+  other_modality: 676811264
+  max_layer: 7416066688
+mistral-large-4:
+  repo: mistralai/Mistral-Large-4-1T-A52B
+  commit: f12dabdc0c1e99e7f7924461a6f308859b05af4d
+  embedding: 1258291200
+  head: 1258291200
+  lookup: 0
+  routed: 1029244354560
+  dense: 17660273184
+  mtp: 2099969024
+  other_modality: 1704218624
+  max_layer: 14748818624
 mistral-medium-3-5:
   repo: mistralai/Mistral-Medium-3.5-128B
   commit: 22b2b868a15677cfa6061277ed2f653d1349a9ab
@@ -471,6 +504,29 @@ motif-3:
   mtp: 251151876
   other_modality: 0
   max_layer: 6124514746
+nemotron-3-5-bolt:
+  repo: nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-BF16
+  commit: e09a4cedb1787db1760375ee5539f222cae0c672
+  embedding: 536870912
+  head: 536870912
+  lookup: 0
+  routed: 66144174080
+  dense: 7013553664
+  mtp: 0
+  other_modality: 653611528
+  routed_active: 1693974528
+  max_layer: 2654933488
+nemotron-3-5-super:
+  repo: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-Base-BF16
+  commit: 5d80455a9bf1305b898a1088f8824b02ba451c93
+  embedding: 536870912
+  head: 536870912
+  lookup: 0
+  routed: 112742891520
+  dense: 7040823296
+  mtp: 2942325248
+  other_modality: 653614086
+  max_layer: 2873102848
 nemotron-3-ultra:
   repo: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16
   commit: 9f5b80e4845884eb8da03353b0b176503631e034

@@ -75,6 +75,13 @@ def test_counted_max_layer_when_counted():
     assert d["params.counted_max_layer"]["value"] == 2.5e9
 
 
+def test_counted_active_uses_per_layer_expert_counts_when_available():
+    counts = {**COUNTS, "routed_active": 9e9}
+    d = counted(facts(moe__experts=96, moe__top_k=8, params__total=100e9, params__active=12e9), counts)
+    assert d["params.counted_active_non_embedding"]["value"] == 11e9
+    assert "each layer" in d["params.counted_active_non_embedding"]["formula"]
+
+
 def test_counted_rejects_counts_that_do_not_reproduce_stated_totals():
     d = counted(facts(moe__experts=96, moe__top_k=8, params__total=150e9, params__active=12e9), COUNTS)
     assert d["params.counted_active_non_embedding"]["value"] is None
@@ -114,3 +121,37 @@ def test_max_layer_keeps_encoder_and_decoder_blocks_separate(monkeypatch, tmp_pa
     assert result["dense"] == 18
     assert result["lookup"] == 400
     assert result["mtp"] == 800
+
+
+def test_pruned_experts_are_weighted_by_each_layers_routing(monkeypatch, tmp_path):
+    from archdb import checkpoint
+
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"llm_config": {"block_configs": [
+        {"block_type": "moe", "n_routed_experts": 4, "num_experts_per_tok": 2},
+        {"block_type": "moe", "n_routed_experts": 8, "num_experts_per_tok": 1},
+    ]}}))
+    monkeypatch.setattr(checkpoint, "fetch", lambda _: config)
+    monkeypatch.setattr(checkpoint, "shards", lambda *_: ["a.safetensors", "b.safetensors"])
+    shapes = {
+        "a.safetensors": {
+            "language_model.backbone.layers.0.mixer.experts.up_proj": [4, 2, 3],
+            "language_model.backbone.layers.1.mixer.experts.up_proj": [8, 2, 5],
+            "language_model.backbone.layers.0.mixer.shared_experts.up_proj.weight": [2, 3],
+        },
+        "b.safetensors": {
+            "language_model.backbone.layers.0.mixer.experts.down_proj": [4, 3, 2],
+            "language_model.backbone.layers.1.mixer.experts.down_proj": [8, 5, 2],
+        },
+    }
+    monkeypatch.setattr(checkpoint, "header", lambda url: {
+        name: {"dtype": "BF16", "shape": shape}
+        for name, shape in shapes[url.rsplit("/", 1)[-1]].items()
+    })
+    model = Model("test", "test", "test", "base", {
+        "config": {"kind": "config", "url": f"https://huggingface.co/o/m/resolve/{'0' * 40}/config.json"},
+    }, {})
+    result = checkpoint.count(model)
+    assert result["routed"] == 208
+    assert result["routed_active"] == 2 * (2 * 2 * 3 + 1 * 2 * 5)
+    assert result["dense"] == 6

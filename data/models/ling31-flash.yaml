@@ -1,16 +1,17 @@
 name: Ling-3.1-flash
 org: inclusionAI
 kind: reasoning
-note: "No base checkpoint is public; facts describe the released post-trained checkpoint."
+note: "Facts describe the released post-trained checkpoint. The base checkpoint (Ling-3.1-flash-base, published 2026-10-25) has the same architecture config; its card is the source for the pretraining precision and the WSM merge."
 
 sources:
   card: {url: https://huggingface.co/inclusionAI/Ling-3.1-flash/resolve/a4ccd6b45c002ddb236f9cb77d52cc427482bf19/README.md, kind: model-card}
   config: {url: https://huggingface.co/inclusionAI/Ling-3.1-flash/resolve/a4ccd6b45c002ddb236f9cb77d52cc427482bf19/config.json, kind: config}
   hf-index: {url: https://huggingface.co/inclusionAI/Ling-3.1-flash/resolve/a4ccd6b45c002ddb236f9cb77d52cc427482bf19/model.safetensors.index.json, kind: config}
   modeling_bailing_moe_v3: {url: https://huggingface.co/inclusionAI/Ling-3.1-flash/resolve/a4ccd6b45c002ddb236f9cb77d52cc427482bf19/modeling_bailing_moe_v3.py, kind: code}
+  base-card: {url: https://huggingface.co/inclusionAI/Ling-3.1-flash-base/resolve/c2cad79e46fcb7b46d96f9cf876ce1f2418b6e64/README.md, kind: model-card}
   tds: {url: https://huggingface.co/inclusionAI/AI-Transparency/resolve/b72c608a99347c0f4551161fd4c55ae11823460e/Ling-3.1_TDS-Summary.pdf, kind: paper}
 
-not_disclosed: [params.active_non_embedding, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+not_disclosed: [params.active_non_embedding, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip]
 
 config_unused:
   group_norm_size: not read by modeling_bailing_moe_v3.py
@@ -217,3 +218,13 @@ facts:
     at: "Ling-3.1 TDS summary, §1.3 and §2"
     quote: "More than 10 trillions tokens"
     note: "Overall training-data size after pre-processing, not tokens seen; the summary covers all training, not only pretraining."
+  train.precision:
+    value: FP8
+    source: base-card
+    at: "Ling-3.1-flash-base README.md; Introduction"
+    quote: "The model was trained using FP8."
+  train.schedule:
+    value: "Warmup-Stable and Merge (WSM): checkpoint merging in place of LR decay"
+    source: base-card
+    at: "Ling-3.1-flash-base README.md; Introduction"
+    quote: "This release provides the BF16 base checkpoint produced after Warmup-Stable and Merge (WSM) checkpoint merging."

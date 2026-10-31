@@ -1,18 +1,26 @@
 import type { Model } from "./data";
 
 export type Mixer = "global" | "swa" | "linear";
+/** How a layer is drawn: global layers split into full and sparse token selection. */
+export type Kind = Mixer | "sparse";
 
 export interface Stack {
   layers: Mixer[];
+  /** Drawing kind per layer; differs from layers only for sparse global attention. */
+  kinds: Kind[];
   /** Detailed types in the same order, e.g. CSA + SWA rather than just global attention. */
   types: string[];
   ordered: boolean;
 }
 
-export const MIXER_LABEL: Record<Mixer, string> = { global: "global attention", swa: "sliding window", linear: "linear / SSM" };
+export const MIXER_LABEL: Record<Kind, string> = {
+  global: "full attention", sparse: "sparse attention", swa: "sliding window", linear: "linear / SSM",
+};
+/** Global layers that attend to a selected subset of past tokens; their KV cache still covers the full context. */
+const SPARSE_TYPES = new Set(["DSA", "DSA (shared KV)", "MLA+DSA", "QSA", "MSA", "CSA + SWA", "CSA2 m=2 + SWA", "CSA2 m=1 + SWA"]);
 export const LAYER_MIXERS: Record<string, Mixer> = {
   global: "global", GQA: "global", MHA: "global", MQA: "global", MLA: "global", "MLA+DSA": "global",
-  DSA: "global", QSA: "global", MSA: "global", GDLA: "global",
+  DSA: "global", "DSA (shared KV)": "global", QSA: "global", MSA: "global", GDLA: "global",
   "CSA + SWA": "global", "HCA + SWA": "global", "CSA2 m=2 + SWA": "global", "CSA2 m=1 + SWA": "global",
   SWA: "swa", KDA: "linear", "Gated DeltaNet": "linear", Lightning: "linear", "Mamba-2": "linear",
 };
@@ -37,10 +45,10 @@ export function layerStack(m: Model): Stack | null {
   if (sequence?.length === n && sequence.every((type) => Object.hasOwn(LAYER_MIXERS, type))) {
     const layers = sequence.map((type) => LAYER_MIXERS[type]);
     if ((Object.keys(counts) as Mixer[]).every((k) => layers.filter((x) => x === k).length === counts[k]))
-      return { layers, types: sequence, ordered: true };
+      return { layers, kinds: sequence.map((t, i) => SPARSE_TYPES.has(t) ? "sparse" : layers[i]), types: sequence, ordered: true };
   }
   if (!sequence && counts.swa === 0 && counts.linear === 0)
-    return { layers: Array<Mixer>(n).fill("global"), types: Array<string>(n).fill("global attention"), ordered: true };
+    return { layers: Array<Mixer>(n).fill("global"), kinds: Array<Kind>(n).fill("global"), types: Array<string>(n).fill("global attention"), ordered: true };
   const layers = (["global", "swa", "linear"] as Mixer[]).flatMap((k) => Array<Mixer>(counts[k]).fill(k));
-  return { layers, types: layers.map((k) => MIXER_LABEL[k]), ordered: false };
+  return { layers, kinds: layers, types: layers.map((k) => MIXER_LABEL[k]), ordered: false };
 }

@@ -434,6 +434,18 @@ minimax-m3:
       at: Artificial Analysis model page /models/minimax-m3, Wayback snapshot 2026-10-19
       quote: MiniMax-M3 scores 29 on the Artificial Analysis Intelligence Index
       note: 'Variant: MiniMax-M3. Index v4.3.2.'
+minimax-m3-1-flash:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261025065617/https://artificialanalysis.ai/models/minimax-m3-1-flash
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 43
+      source: aa
+      at: Artificial Analysis model page /models/minimax-m3-1-flash, Wayback snapshot 2026-10-25
+      quote: MiniMax-M3.1-Flash scores 43 on the Artificial Analysis Intelligence Index
+      note: 'Variant: MiniMax-M3.1-Flash. Index v4.3.2.'
 mistral-large-3:
   sources:
     aa:
@@ -494,6 +506,30 @@ muse-spark-open:
       at: Artificial Analysis model page /models/muse-spark-open, Wayback snapshot 2026-10-19
       quote: Muse Spark Open (Xhigh) scores 39 on the Artificial Analysis Intelligence Index
       note: 'Variant: Muse Spark Open (Xhigh). Index v4.3.2.'
+nemotron-3-5-bolt:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261021015413/https://artificialanalysis.ai/models/nemotron-3-5-bolt-74b-a9b
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 21
+      source: aa
+      at: Artificial Analysis model page /models/nemotron-3-5-bolt-74b-a9b, Wayback snapshot 2026-10-21
+      quote: Nemotron 3.5 Bolt 74B-A9B scores 21 on the Artificial Analysis Intelligence Index
+      note: 'Variant: Nemotron 3.5 Bolt 74B-A9B. Index v4.3.2.'
+nemotron-3-5-super:
+  sources:
+    aa:
+      url: https://web.archive.org/web/20261026063454/https://artificialanalysis.ai/models/nemotron-3-5-super-vl
+      kind: leaderboard
+  facts:
+    eval.aa_index:
+      value: 26
+      source: aa
+      at: Artificial Analysis model page /models/nemotron-3-5-super-vl, Wayback snapshot 2026-10-26
+      quote: Nemotron 3.5 Super VL scores 26 on the Artificial Analysis Intelligence Index
+      note: 'Score of NVIDIA-Nemotron-3.5-Super-VL-120B-A12B, post-trained from this base. Variant: Nemotron 3.5 Super VL (reasoning). Index v4.3.2.'
 nemotron-3-ultra:
   sources:
     aa:

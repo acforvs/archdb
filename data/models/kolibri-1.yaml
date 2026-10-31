@@ -1,0 +1,368 @@
+name: Kolibri-1
+org: Aleph Alpha
+kind: reasoning
+note: "No base checkpoint is public; architecture facts describe the released post-trained checkpoint (Aleph-Alpha/Kolibri-1-BF16; Aleph-Alpha/Kolibri-1 is its FP8 quantization with the same config apart from quantization_config). Pretraining facts come from the model card and the technical report."
+
+sources:
+  card: {url: https://huggingface.co/Aleph-Alpha/Kolibri-1-BF16/resolve/cc6d729e6a024c1e59ad48887fdef95ff37b534d/README.md, kind: model-card}
+  config: {url: https://huggingface.co/Aleph-Alpha/Kolibri-1-BF16/resolve/cc6d729e6a024c1e59ad48887fdef95ff37b534d/config.json, kind: config}
+  modeling_kolibri1: {url: https://raw.githubusercontent.com/huggingface/transformers/48e4bcd72362ff4887651112dbfa8227211a393a/src/transformers/models/kolibri1/modeling_kolibri1.py, kind: code}
+  configuration_kolibri1: {url: https://raw.githubusercontent.com/huggingface/transformers/48e4bcd72362ff4887651112dbfa8227211a393a/src/transformers/models/kolibri1/configuration_kolibri1.py, kind: code}
+  report: {url: https://web.archive.org/web/20261008215915id_/https://aleph-alpha.com/downloads/tech-report.pdf, kind: paper}
+  blog: {url: "https://web.archive.org/web/20261010131705/https://aleph-alpha.com/en/blog/kolibri-has-landed-a-sovereign-open-weight-model/", kind: blog}
+
+not_disclosed: []
+
+config_unused:
+  use_sliding_window: "not read by modeling_kolibri1.py or configuration_kolibri1.py; layer_types and sliding_window select the SWA layers"
+  head_dtype: "not read by modeling_kolibri1.py (serving hint for an FP32 LM head)"
+
+facts:
+  meta.released:
+    value: "2026-10-03"
+    source: blog
+    at: "Kolibri Has Landed blog post, byline and first sentence"
+    quote: "On the Day of German Reunification, we are releasing our new model: Kolibri."
+    note: "Post dated 03/10/2026; the card's Model overview gives 'Release Date | 3rd of October 2026'. Both Hugging Face repositories were created on 2026-10-02."
+  meta.license: {value: apache-2.0, source: card, at: "README.md; YAML front matter", quote: "license: \"apache-2.0\""}
+  meta.modality:
+    value: "text"
+    source: card
+    at: "README.md; Intended use"
+    quote: "Kolibri is intended to process text input and output in German and English"
+
+  params.total:
+    value: 78_103_074_560
+    source: card
+    at: "README.md; Model overview table"
+    quote: "| Total parameters | 78B (`78,103,074,560`) |"
+  params.active:
+    value: 3_457_573_120
+    source: card
+    at: "README.md; Model overview table"
+    quote: "| Active parameters / token | 3.46B (`3,457,573,120`) |"
+  params.active_non_embedding:
+    value: 3_129_893_120
+    source: report
+    at: "PDF p.8; Table 2 caption"
+    quote: "Active parameters exclude the embeddings."
+    basis: inferred
+    note: "3,457,573,120 − 128,000 × 2,560 (untied LM head) = 3,129,893,120. The report excludes the embeddings from the active count, but the card's 3,457,573,120 is reproduced only with the 327.68M LM head included: 50 layers × (attention 34.08M + 7 × 3.93M routed/shared experts + 0.98M router) ≈ 3.13B."
+  params.note:
+    value: "Total includes the input embedding, the untied LM head and the per-layer expert-bias buffers (equals BF16 index total_size 156,206,149,120 bytes / 2). Active count excludes the input embedding but includes the LM head. No MTP or vision modules."
+    source: report
+    at: "PDF p.8; Table 2 caption"
+    quote: "Active parameters exclude the embeddings."
+
+  shape.layers: {value: 50, source: config, at: "/num_hidden_layers"}
+  shape.d_model: {value: 2560, source: config, at: "/hidden_size"}
+  shape.vocab: {value: 128_000, source: config, at: "/vocab_size"}
+  shape.tied_embeddings: {value: false, source: config, at: "/tie_word_embeddings"}
+  shape.tokenizer:
+    value: "UniBPE (bottom-up BPE merges chosen by Unigram loss) for 119,744 merges, then 7,900 standard BPE merges, 256 byte-fallback tokens, digits split, 100 reserved/special tokens; trained on a 100 GB slice of the German/English pre-training mix"
+    source: report
+    at: "PDF p.10; §2.1.2 Tokeniser, Training"
+    quote: "The next 120 000 − 256 = 119 744 merges use the UniBPE algorithm, standard BPE performs the next 7900 merges, and we then add 100 reserved and special tokens"
+
+  attn.kind:
+    value: "GQA, SWA"
+    source: report
+    at: "PDF p.8; §2.1 Model Architecture"
+    quote: "every fifth block uses full attention, and the other blocks use SWA"
+  attn.layout:
+    value: "4 SWA : 1 global"
+    source: configuration_kolibri1
+    at: "configuration_kolibri1.py; Kolibri1Config.__post_init__"
+    quote: "\"full_attention\" if (i + 1) % 5 == 0 else \"sliding_attention\" for i in range(self.num_hidden_layers)"
+    basis: inferred
+    note: "Default layer_types; the released config.json /layer_types lists the same pattern: full_attention at layers 4, 9, …, 49 (every fifth block)."
+    sequence: [SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, GQA,
+      SWA, SWA, SWA, SWA, GQA, SWA, SWA, SWA, SWA, GQA]
+  attn.global_layers: {value: 10, source: config, at: "/layer_types | count full_attention"}
+  attn.local_layers: {value: 40, source: config, at: "/layer_types | count sliding_attention"}
+  attn.heads: {value: 48, source: config, at: "/num_attention_heads"}
+  attn.kv_heads: {value: 4, source: config, at: "/num_key_value_heads"}
+  attn.head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.local_heads:
+    value: 48
+    source: config
+    at: "/num_attention_heads"
+    note: "Kolibri1Attention uses the same num_attention_heads, num_key_value_heads and head_dim for both layer types; only the mask and RoPE differ."
+  attn.local_kv_heads: {value: 4, source: config, at: "/num_key_value_heads"}
+  attn.local_head_dim: {value: 128, source: config, at: "/head_dim"}
+  attn.window:
+    value: 513
+    source: config
+    at: "/sliding_window"
+    note: "Hugging Face convention, counting the query token: the card states 'Sliding window | 512 preceding tokens plus the current token', and the report selects w = 512."
+  attn.position:
+    value: "RoPE (SWA), NoPE (global)"
+    source: modeling_kolibri1
+    at: "modeling_kolibri1.py; Kolibri1Attention.forward"
+    quote: "# We use global NoPE for hybrid attention model"
+    note: "RoPE applied only when the layer is sliding; report §2.1: 'The full-attention blocks use no positional encoding.'"
+  attn.local_rope_theta:
+    value: 10_000
+    source: config
+    at: "/rope_theta"
+    note: "Applied only in sliding-window layers; the card states 'RoPE, base 10,000, applied only in sliding-window layers'. Full RoPE over head_dim 128."
+  attn.qk_norm:
+    value: true
+    source: report
+    at: "PDF p.8; §2.1 Model Architecture"
+    quote: "Queries and keys are normalised per head with RMS normalisation"
+    note: "Applied before RoPE (q_norm/k_norm over head_dim in Kolibri1Attention)."
+  attn.bias: {value: false, source: config, at: "/attention_bias"}
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling_kolibri1
+    at: "modeling_kolibri1.py; Kolibri1Experts.forward"
+    quote: "current_hidden_states = self.act_fn(gate) * up"
+    note: "act_fn = ACT2FN[/hidden_act] = silu, for routed and shared experts."
+  ffn.bias:
+    value: false
+    source: modeling_kolibri1
+    at: "modeling_kolibri1.py; Kolibri1MLP.__init__"
+    quote: "self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)"
+
+  moe.experts: {value: 384, source: config, at: "/num_experts"}
+  moe.top_k: {value: 6, source: config, at: "/num_experts_per_tok"}
+  moe.shared:
+    value: 1
+    source: card
+    at: "README.md; Model Architecture table"
+    quote: "| Shared experts per MoE layer | 1 |"
+  moe.expert_dim: {value: 512, source: config, at: "/moe_intermediate_size"}
+  moe.shared_dim: {value: 512, source: config, at: "/shared_expert_intermediate_size"}
+  moe.dense_layers:
+    value: 0
+    source: report
+    at: "PDF p.18; §2.1.5.3 Leading Dense Layers"
+    quote: "Kolibri uses MoE layers in all 50 blocks"
+    note: "Report Appendix B.6: the first two MoE layers make almost no use of their routed experts."
+  moe.router:
+    value: sigmoid
+    source: modeling_kolibri1
+    at: "modeling_kolibri1.py; Kolibri1TopKRouter.forward"
+    quote: "router_scores = router_logits.gather(1, router_indices).sigmoid()"
+    note: "FP32 router logits; top-6 selected on logits plus e_score_correction_bias, which affects selection only."
+  moe.balancing:
+    value: "Exact Quantile Balancing (expert-bias update to the exact global-batch quantile, recentred, no tunable coefficient) + Load-Error Injection into router-score gradients (λ = 1e-5, soft clamp τ = 1); no auxiliary loss"
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "We additionally injected load-error gradients into the router scores with a weight of 1e-5 and a soft-clamp value of 1.0."
+    note: "Card: 'The expert-balancing bias was updated separately using a recentered global-quantile target update.' Report §2.1.5 gives the method (Neitemeier et al. 2026)."
+  moe.norm_topk:
+    value: false
+    source: config
+    at: "/norm_topk_prob"
+    note: "Report §2.1.5: 'The selected scores are not renormalised'."
+
+  mtp.depth:
+    value: 0
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "pretrained the model with a causal next-token-prediction objective"
+    basis: inferred
+    note: "No MTP is described in the card or report, and the safetensors index has no tensors beyond layer 49 (model.layers.0–49, lm_head)."
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_kolibri1
+    at: "modeling_kolibri1.py; Kolibri1DecoderLayer.__init__"
+    quote: "self.input_layernorm = Kolibri1RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.placement:
+    value: sandwich
+    source: report
+    at: "PDF p.7; §2.1 Model Architecture"
+    quote: "Each block uses sandwich normalisation"
+    note: "RMSNorm before and after both attention and MoE sublayers (post_self_attn_layernorm, post_mlp_layernorm in Kolibri1DecoderLayer); post-sublayer norm scales initialised to 1/√50."
+  norm.eps: {value: 1.0e-6, source: config, at: "/rms_norm_eps"}
+
+  ctx.pretrain:
+    value: 16_384
+    source: card
+    at: "README.md; Model Architecture table"
+    quote: "| Pretraining sequence length | 16,384 |"
+  ctx.final:
+    value: 262_144
+    source: card
+    at: "README.md; Intended use"
+    quote: "trained on 262,144 tokens in a final long-context phase, which is its native context length"
+  ctx.max:
+    value: 1_048_576
+    source: card
+    at: "README.md; Model overview table"
+    quote: "| Context length | `1,048,576 tokens`; we recommend ≤262,144 tokens for serving efficiency and complex tasks |"
+    note: "Extrapolation beyond the trained length without position scaling (NoPE global layers); config /max_position_embeddings = 262,144."
+  ctx.extension:
+    value: "16K (pre-training) → 64K (mid-training) → 256K (long-context stage, 201B tokens); no RoPE base change or scaling, since only SWA layers use RoPE; validated to 1M by extrapolation"
+    source: card
+    at: "README.md; Intended use"
+    quote: "Kolibri was pre-trained on sequences of 16,384 tokens, mid-trained on 65,536 and trained on 262,144 tokens in a final long-context phase"
+
+  train.tokens:
+    value: 24_000_000_000_000
+    source: report
+    at: "PDF p.1; Abstract"
+    quote: "We train Kolibri on 24T tokens across pre-training, mid-training, and long-context extension"
+    note: "Card breakdown: 20T pre-training + 3.44T mid-training + 201B long-context (23.64T)."
+  train.optimizer:
+    value: "Muon (Nesterov, momentum 0.95, spectral scaling) for attention and expert weights; AdamW for LM head and router; Adam for token embedding and norm scales"
+    source: report
+    at: "PDF p.19; §2.2 Optimisation"
+    quote: "We optimise attention and expert weights with Muon (Jordan et al. 2024), embedding weights and norm scales with Adam (Kingma and Ba 2015), and LM head and router weights with AdamW"
+  train.lr_peak:
+    value: 1.0e-3
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "Nesterov Muon using a learning rate of 0.001"
+    note: "Muon groups. Report Table 6: AdamW (LM head, router) 2.5e-5, Adam (embedding, norm scales) 2e-3."
+  train.lr_min:
+    value: 1.0e-3
+    source: report
+    at: "PDF p.18; §2.2 Optimisation"
+    quote: "The learning rate warms up linearly over the first 100B tokens and then stays constant through pre-training, mid-training"
+    basis: inferred
+    note: "No decay: the learning rate stays at the peak through mid-training and long-context training ('continues training at the same learning rate', §2.3.3); checkpoint merging replaces the decay."
+  train.schedule:
+    value: "Warmup-Stable-Merge: linear warmup over ~100B tokens (1,325 steps), then constant through pre-training, mid-training and long-context training; no decay, final weights are a checkpoint average"
+    source: report
+    at: "PDF p.18; §2.2 Optimisation"
+    quote: "Kolibri is trained with a Warmup-Stable-Merge (WSM) recipe"
+  train.warmup:
+    value: "1,325 steps (~100B tokens)"
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "We linearly warmed up the learning rate over approximately 100 billion tokens, corresponding to 1,325 optimization steps"
+  train.batch:
+    value: "4,608 × 16,384 (75.5M tokens); mid-training 1,536 × 65,536 (100.7M); long-context 768 × 262,144 (201.3M)"
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "We used a global batch size of 4,608 sequences, corresponding to 75.497 million tokens per step, with two gradient-accumulation steps across 768 GPUs."
+  train.batch_tokens:
+    value: 75_497_472
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "We used a global batch size of 4,608 sequences, corresponding to 75.497 million tokens per step"
+    basis: inferred
+    note: "4,608 sequences × 16,384 tokens."
+  train.weight_decay:
+    value: 0.000244140625
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "We applied independent weight decay of 2⁻¹², approximately 0.0002441, to all decay-eligible parameters."
+    note: "2^-12, independent of the learning rate (weights multiplied by 1 − 2^-12 each step, report Table 6); embedding, norm scales and expert-balancing biases excluded."
+  train.betas:
+    value: "(0.9, 0.95)"
+    source: report
+    at: "PDF p.19; Table 6 caption"
+    quote: "Adam and AdamW use β1 = 0.9, β2 = 0.95"
+    note: "ε = 1e-15. Muon uses Nesterov momentum 0.95."
+  train.grad_clip:
+    value: 1.0
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "with bfloat16 parameters, float32 reductions, and a maximum gradient norm of 1.0"
+  train.precision:
+    value: "BF16 (bfloat16 parameters, FP32 reductions)"
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "with bfloat16 parameters, float32 reductions, and a maximum gradient norm of 1.0"
+  train.init:
+    value: "Truncated normal (±3σ): Q/K/V and expert up/gate std 1/√d_in, router std 1/d_in, token embedding std 1; attention output, expert down and LM head zero; norm scales 1, post-sublayer norm scales 1/√L; expert biases 0"
+    source: report
+    at: "PDF p.21; §2.2.1.2 and Table 6"
+    quote: "The attention output and expert down projections also start at zero, so that every block starts as the identity map"
+  train.objective:
+    value: "next-token prediction only, on packed 16,384-token sequences"
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    quote: "Training examples consisted of 16,384-token sequences, with multiple documents potentially packed into a single sequence."
+  train.data:
+    value: "20T-token German/English corpus (~62.5% English, ~23.9% German, ~13.6% code): curated Common Crawl, ~24% synthetic (rephrases with Gemma-4-26B-A4B and Mistral-NeMo-12B, translations), STEM, instruction and specialised legal/public-sector data; drawn from a 29.3T-token pool"
+    source: card
+    at: "README.md; Model overview table, Training Data"
+    quote: "Trained on 20T tokens of a filtered, bilingual corpus (~62.5% English, ~23.9% German, ~13.6% code)"
+    note: "The report (§2.3.2) gives German as 21.3% of the final pre-training tokens and 4.8T (~24%) synthetic tokens; the card domain table sums German web 23.4% + German instruction 0.5%."
+  train.cutoff:
+    value: "2026-06-18"
+    source: card
+    at: "README.md; Model overview table"
+    quote: "| Knowledge cutoff | EN: June 18, 2026, DE: June 18, 2026"
+    note: "Stated as the knowledge cutoff of the released model, for both languages."
+  train.hardware:
+    value: "768 NVIDIA B200 (96 HGX 8×B200 nodes, InfiniBand); pre-training 21 days (511 h, 392k GPU-hours); mid-training 5 days (90k GPU-hours); long-context 13 h (10k GPU-hours)"
+    source: card
+    at: "README.md; Model overview table, Computing Resources"
+    quote: "Hardware: 768 NVIDIA B200 (96 HGX 8xB200 nodes); Parallelism: EP8 FSDP16 DP6; Time: 21 days (511h, 392k GPUh)"
+  train.accelerators:
+    value: "768 B200"
+    source: report
+    at: "PDF p.18; §2.1.6 Infrastructure"
+    quote: "Pre-training ran on 768 NVIDIA B200 GPUs, across 96 nodes with 8 GPUs per node."
+  train.parallelism:
+    value: "EP8 · FSDP16 · DP6"
+    source: report
+    at: "PDF p.18; §2.1.6 Infrastructure"
+    quote: "Our parallelism setup for pre-training is EP 8, FSDP 16, DP 6."
+    note: "Mid-training and long-context use FSDP128 · DP6. TorchTitan-based stack, DeepEP v2, FlashAttention 4."
+  train.compute:
+    value: "6.4e23 FLOPs; 392k GPU-hours pre-training + 90k mid-training + 10k long-context"
+    source: card
+    at: "README.md; Model overview table, Computing Resources"
+    quote: "FLOPS: **6.4e23**"
+  train.averaging:
+    value: "uniform average of the last 20 long-context checkpoints, 10B tokens apart"
+    source: report
+    at: "PDF p.19; §2.2 Optimisation"
+    quote: "We then determine the base model weights as the average of the last 20 checkpoints of the long-context stage"
+  train.stages:
+    source: card
+    at: "README.md; Training Details, Pre-training"
+    value:
+      - name: pre-training
+        tokens: 20_000_000_000_000
+        seq_len: 16_384
+        lr: 1.0e-3
+        batch_sequences: 4608
+        batch_tokens: 75_497_472
+        steps: 264_750
+        note: "Muon LR after 1,325 warmup steps; batch_tokens is 4,608 × 16,384 (card: 75.497 million)."
+        quote: "The pretraining phase covered 20T tokens over 264,750 optimization steps."
+      - name: mid-training
+        tokens: 3_440_000_000_000
+        seq_len: 65_536
+        lr: 1.0e-3
+        batch_sequences: 1536
+        batch_tokens: 100_663_296
+        steps: 34_200
+        note: "Higher-quality reasoning, math, code and instruction data; resumes the optimizer state with no warmup, same constant LR. batch_tokens is 1,536 × 65,536 (card: 100.663 million)."
+        quote: "Its 3.44 trillion token budget corresponds to 34,200 optimization steps."
+      - name: long-context
+        tokens: 201_000_000_000
+        seq_len: 262_144
+        lr: 1.0e-3
+        batch_sequences: 768
+        batch_tokens: 201_326_592
+        steps: 1000
+        note: "One third OCR'd PDFs plus length-reweighted mid-training data; no warmup, same constant LR; base weights are the average of its last 20 checkpoints. batch_tokens is 768 × 262,144 (card: 201.327 million)."
+        quote: "Its 201-billion-token budget corresponds to 1000 optimization steps, again without additional warmup."
+
+  scaling.parametrization:
+    value: "μP width transfer with spectral Muon (update scaled by √(d_out/d_in)); LM head and router LR ∝ 1/d; LM head zero-initialised"
+    source: report
+    at: "PDF p.20; §2.2.1"
+    quote: "For the width transfer we use Maximal Update Parametrisation (µP)"
+  scaling.hp_rule:
+    value: "Muon LR × batch grid (5e-4 to 8e-3; 4,608 or 6,912 sequences) on a half-width proxy (width 1280) trained 500B tokens, loss extrapolated to 20T with a power law in cumulative LR; picked LR 1e-3, batch 4,608; weight decay by the same extrapolation (2^-12 over 2^-13, 2^-14); fixed LR ratios across parameter groups"
+    source: report
+    at: "PDF p.22; §2.2.1.3 Transfer Across Token Horizon"
+    quote: "The prediction at 20T tokens is visualised in Figure 10b, with an optimal Muon learning rate of 1 × 10−3 and a batch size of 4608 sequences of 16k tokens each."
+  scaling.ladder:
+    value: "MoE proxies M (7.8B total / 0.6B active, 97.6B tokens) and L (30.6B / 2.1B, 327.6B tokens) at 50 layers; 0.65B-active / 11.9B proxy pre-trained 2.79T tokens for mid-training mixes; thousands of 30M dense proxies (3B tokens) for the pre-training mix"
+    source: report
+    at: "PDF p.9; §2.1.1 Ablation Methodology"
+    quote: "The proxy at scale M has 0.6B active out of 7.8B total parameters trained on 97.6B tokens."

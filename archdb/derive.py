@@ -30,7 +30,7 @@ def counted(facts: dict, counts: dict | None) -> dict[str, dict]:
     experts, top_k = number(facts, "moe.experts"), number(facts, "moe.top_k")
     share = top_k / experts if experts and top_k else 1.0
     backbone = c["embedding"] + c["head"] + c["routed"] + c["dense"]
-    active_ne = c["dense"] + c["routed"] * share
+    active_ne = c["dense"] + (c["routed_active"] if "routed_active" in c else c["routed"] * share)
     total, active = number(facts, "params.total"), number(facts, "params.active")
     totals = {
         "+".join(name for name, on in zip(("lookup", "MTP", "other modalities"), combo) if on)
@@ -87,7 +87,9 @@ def counted(facts: dict, counts: dict | None) -> dict[str, dict]:
         ),
         "params.counted_active_non_embedding": {
             "value": active_ne,
-            "formula": f"non-expert weights + routed experts × {top_k}/{experts}, excluding embedding and output head, {source}{check}"
+            "formula": f"non-expert weights + sum of each layer's routed weights × its top_k / experts, excluding embedding and output head, {source}{check}"
+            if "routed_active" in c
+            else f"non-expert weights + routed experts × {top_k}/{experts}, excluding embedding and output head, {source}{check}"
             if experts and top_k
             else f"all weights except embedding and output head, {source}{check}",
         },

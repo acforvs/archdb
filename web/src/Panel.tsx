@@ -20,7 +20,8 @@ const SPECS: { label: string; parts: [string, string][] }[] = [
   { label: "MoE", parts: [["moe.experts", " routed"], ["moe.top_k", " active"], ["moe.shared", " shared"], ["moe.expert_dim", " dim"]] },
   { label: "Dense FFN", parts: [["ffn.dim", ""]] },
   { label: "MTP", parts: [["mtp.depth", " depth"]] },
-  { label: "Vocab · context", parts: [["shape.vocab", " vocab"], ["ctx.final", " context"]] },
+  { label: "Vocab · context", parts: [["shape.vocab", " vocab"], ["ctx.final", " context"], ["ctx.max", " max context"]] },
+  { label: "KV cache", parts: [["kv.growth_per_token", " / token"], ["kv.bytes_at_context", " at context"]] },
   { label: "Training", parts: [["train.tokens", " tokens"], ["train.optimizer", ""], ["train.precision", ""]] },
   { label: "Hardware", parts: [["train.accelerators", ""], ["train.parallelism", ""]] },
 ];
@@ -90,13 +91,14 @@ export function Panel({ db, model, view, onClose }: { db: DB; model: Model; view
   const specs = SPECS.filter(({ label }) => !(label === "Layout" && stack)).map(({ label, parts }) => {
     const shown = parts.flatMap(([k, suffix]) => {
       const v = cell(model, k, view)?.value;
-      if (v === null || v === undefined) return [];
+      if (v === null || v === undefined || (k === "ctx.max" && cell(model, "ctx.final", view)?.value != null)) return [];
       // Recipe strings carry their qualifiers in the evidence below; the summary keeps the leading term.
       const text = k === "mtp.depth" && v === 0 ? "none"
         : SHORT.includes(k) && typeof v === "string" ? v.split(/ \(|;|,/)[0]
         : format(k, db.fields[k], v, true);
       const unit = k === "mtp.depth" && v === 0 ? ""
-        : k === "params.active" && model.facts["params.active_prefill"] ? " active (decode)" : suffix;
+        : k === "params.active" && model.facts["params.active_prefill"] ? " active (decode)"
+        : k === "kv.bytes_at_context" ? ` at ${format("ctx.max", db.fields["ctx.max"], view.ctx)}` : suffix;
       return [{ k, text: text + unit }];
     });
     return { label, shown };

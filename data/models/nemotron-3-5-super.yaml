@@ -1,0 +1,358 @@
+name: NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-Base
+org: NVIDIA
+kind: base
+note: "The language backbone is initialized from Nemotron 3 Super Base (see nemotron3-super) and continued for about 1.2T tokens (distillation from Nemotron 3 Ultra Base, Indic CPT, 1M-context CPT, 256K agentic mid-training, 1M recovery). Recipe facts describe that continuation; hyperparameters the report does not restate for it are listed as not disclosed. The checkpoint also carries a C-RADIO vision encoder and connector; architecture facts describe the language backbone."
+
+sources:
+  card: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-Base-BF16/resolve/5d80455a9bf1305b898a1088f8824b02ba451c93/README.md, kind: model-card}
+  config: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-Base-BF16/resolve/5d80455a9bf1305b898a1088f8824b02ba451c93/config.json, kind: config}
+  index: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-Base-BF16/resolve/5d80455a9bf1305b898a1088f8824b02ba451c93/model.safetensors.index.json, kind: config}
+  modeling_nemotron_h: {url: https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/nemotron_h/modeling_nemotron_h.py, kind: code}
+  report: {url: https://web.archive.org/web/20261029180354id_/https://research.nvidia.com/labs/nemotron/files/NVIDIA-Nemotron-3.5-Super-and-Lightning-Technical-Report.pdf, kind: paper}
+  blog: {url: https://web.archive.org/web/20261026165548/https://blogs.nvidia.com/blog/nemotron-3-5-super-vl/, kind: blog}
+
+not_disclosed: [params.active_non_embedding, train.optimizer, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision, ctx.pretrain]
+
+config_unused:
+  chunk_size: "Mamba-2 SSD scan chunk length, kernel tiling only"
+  expand: "not read by modeling_nemotron_h.py; Mamba inner width is mamba_num_heads × mamba_head_dim"
+  intermediate_size: "dense MLP width; layers_block_type has no dense (mlp) blocks"
+  rescale_prenorm_residual: "initialization flag in _init_weights, not evidence of training init"
+  time_step_floor: "dt bias initialization range in _init_weights"
+  time_step_max: "dt bias initialization range in _init_weights"
+  downsample_ratio: "vision connector pixel-shuffle ratio (NemotronH_Omni_Reasoning_V3VisionProjector)"
+  force_image_size: "image preprocessing size, vision input"
+  image_tag_type: "prompt formatting for image tokens"
+  norm_mean: "image normalization mean, vision preprocessing"
+  norm_std: "image normalization std, vision preprocessing"
+  processor_class: "processor class name, library metadata"
+  ps_version: "pixel-shuffle implementation version in the vision connector"
+  template: "chat/prompt template name, serving"
+  vit_hidden_size: "C-RADIO vision encoder width (1280), vision tower"
+
+facts:
+  meta.released:
+    value: "2026-10-15"
+    source: blog
+    at: "blogs.nvidia.com; post header"
+    quote: "October 15, 2026 by Kari Briski"
+    note: "Card Release Date line: 'Hugging Face - 10/15/2026'. Hugging Face base repository created 2026-10-12; technical report dated 2026-10-27."
+  meta.license:
+    value: "other (openmdw-1.1)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: openmdw-1.1"
+  meta.modality:
+    value: "text + image + video"
+    source: card
+    at: "README.md; Input"
+    quote: "Input Type(s): Text, images, and video"
+    note: "The language backbone was pretrained on text only; the C-RADIO encoder and connector are added afterwards (report p.13 §3.1: 'the base model for Nemotron Super 3.5 is pre-trained on text-only data')."
+
+  params.total:
+    value: 120_000_000_000
+    source: report
+    at: "PDF page 1; Abstract"
+    quote: "Super is a 120B-parameter, 12B-active multimodal model"
+  params.active:
+    value: 12_000_000_000
+    source: report
+    at: "PDF page 1; Abstract"
+    quote: "Super is a 120B-parameter, 12B-active multimodal model"
+  params.note:
+    value: "Rounded publisher figures for the multimodal model; whether the 120B includes the C-RADIO encoder, connector, MTP head and embeddings is not stated (§4.2 lists all three under the 120B model). The checkpoint index totals 248,906,833,944 bytes (about 124.5B parameters at 2 bytes each), including the vision tower, connector (mlp1) and MTP block; the predecessor backbone alone is 120.6B."
+    source: report
+    at: "PDF page 32; §4.2"
+    quote: "The model is a 120B-parameter, 12B-active mixture-of-experts vision-language model comprising a C-RADIO vision encoder, a hybrid Mamba/attention language backbone with 512 routed experts per MoE layer, and a multi-token prediction (MTP) head."
+
+  shape.d_model: {value: 4096, source: config, at: "/llm_config/hidden_size"}
+  shape.layers:
+    value: 48
+    source: config
+    at: "config.json; /llm_config/layers_block_type"
+    quote: '"layers_block_type": [ "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe",
+      "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe",
+      "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba",
+      "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe" ]'
+    basis: inferred
+    note: "One block per token mixer: 40 Mamba-2 + 8 attention (88 entries including 40 moe). 40 Mamba-2 blocks are followed by a MoE FFN; the 8 right before each attention layer have none. Same pattern as Nemotron 3 Super."
+  shape.tied_embeddings: {value: false, source: config, at: "/llm_config/tie_word_embeddings"}
+  shape.vocab: {value: 131_072, source: config, at: "/llm_config/vocab_size"}
+
+  attn.global_layers: {value: 8, source: config, at: "/llm_config/layers_block_type | count attention"}
+  attn.head_dim: {value: 128, source: config, at: "/llm_config/head_dim"}
+  attn.heads: {value: 32, source: config, at: "/llm_config/num_attention_heads"}
+  attn.kind:
+    value: "GQA, Mamba-2"
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Architecture Type: Mamba-2–Transformer hybrid Mixture of Experts (MoE) with Multi-Token Prediction (MTP)"
+    note: "Attention is GQA with 32 query and 2 KV heads (config llm_config num_attention_heads, num_key_value_heads); sliding_window null."
+  attn.kv_heads: {value: 2, source: config, at: "/llm_config/num_key_value_heads"}
+  attn.layout:
+    value: 40 Mamba-2 + 8 GQA
+    source: config
+    at: config.json; /llm_config/layers_block_type
+    quote: '"layers_block_type": [ "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe",
+      "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe",
+      "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba",
+      "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe" ]'
+    basis: inferred
+    note: 'Identical to Nemotron 3 Super. Irregular: Mamba-2 runs before, between and after the 8 attention layers are
+      4, 4, 4, 5, 5, 5, 5, 4, 4. Ordered token mixers; standalone moe blocks are omitted, matching shape.layers.'
+    sequence: [Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2]
+  attn.linear_layers: {value: 40, source: config, at: "/llm_config/layers_block_type | count mamba"}
+  attn.linear_kind:
+    value: "Mamba-2: 128 heads × head dim 64, state 128, 8 groups, conv kernel 4"
+    source: config
+    at: "config.json; llm_config mamba_head_dim, mamba_num_heads"
+    quote: '"mamba_head_dim": 64, "mamba_hidden_act": "silu", "mamba_num_heads": 128'
+    note: "head dim mamba_head_dim 64, state ssm_state_size 128, groups n_groups 8, conv_kernel 4 (use_conv_bias true), mamba_hidden_act silu, mamba_proj_bias false; dt clamped below at time_step_min 0.001 (NemotronHMamba2Mixer time_step_limit)."
+  attn.linear_heads: {value: 128, source: config, at: "/llm_config/mamba_num_heads"}
+  attn.linear_head_dim: {value: 64, source: config, at: "/llm_config/mamba_head_dim"}
+  attn.conv: {value: 4, source: config, at: "/llm_config/conv_kernel"}
+  attn.bias: {value: false, source: config, at: "/llm_config/attention_bias"}
+  attn.position:
+    value: NoPE
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHAttention.forward"
+    quote: "key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)"
+    note: "No rotary embedding is applied to q or k. Config llm_config max_position_embeddings is 262144; NoPE layers do not read it."
+  attn.qk_norm:
+    value: false
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHAttention.forward"
+    quote: "query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2)"
+
+  ffn.activation:
+    value: "ReLU²"
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHExperts.forward"
+    quote: "# Expert computation: down_proj(act_fn(up_proj(x)))"
+    note: "Not gated; act_fn = ACT2FN[mlp_hidden_act] with config mlp_hidden_act relu2, for routed and shared experts."
+  ffn.bias: {value: false, source: config, at: "/llm_config/mlp_bias"}
+
+  moe.balancing:
+    value: "sequence-level load-balancing loss 1e-5 during distillation; expert-selection bias (e_score_correction_bias) in the router"
+    source: report
+    at: "PDF page 5; §2.2"
+    quote: "Additionally, we used a smaller MoE sequence load balancing loss coefficient of 10−5, as compared to 10−4 for Lightning 3.5."
+    note: "The bias tensor (mixer.gate.e_score_correction_bias) is in the checkpoint index; its update rate during the 3.5 stages is not stated. Nemotron 3 Super pretraining used an aux-loss-free bias with update rate 1e-3 plus a 1e-4 loss."
+  moe.expert_dim:
+    value: 2688
+    source: config
+    at: "/llm_config/moe_intermediate_size"
+    note: "Routed experts map the 1024-wide latent to 2688 and back (LatentMoE)."
+  moe.latent_dim:
+    value: 1024
+    source: config
+    at: "/llm_config/moe_latent_size"
+    note: "fc1_latent_proj (4096→1024) and fc2_latent_proj (1024→4096) wrap the routed experts; router and shared expert act on the 4096-wide hidden state (NemotronHMoE.forward)."
+  moe.experts: {value: 512, source: config, at: "/llm_config/n_routed_experts"}
+  moe.router:
+    value: sigmoid
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHTopkRouter.forward"
+    quote: "scores = router_logits.sigmoid()"
+    note: "Expert-selection bias e_score_correction_bias is added for top-k choice only; n_group = topk_group = 1 (no group-limited routing)."
+  moe.dense_layers: {value: 0, source: config, at: "/llm_config/layers_block_type | count mlp"}
+  moe.routed_scale: {value: 5.0, source: config, at: "/llm_config/routed_scaling_factor"}
+  moe.norm_topk: {value: true, source: config, at: "/llm_config/norm_topk_prob"}
+  moe.shared: {value: 1, source: config, at: "/llm_config/n_shared_experts"}
+  moe.shared_dim: {value: 5376, source: config, at: "/llm_config/moe_shared_expert_intermediate_size"}
+  moe.top_k: {value: 22, source: config, at: "/llm_config/num_experts_per_tok"}
+
+  mtp.depth:
+    value: 2
+    source: report
+    at: "PDF page 16; §3.1"
+    quote: "while retaining two shared-weight MTP layers with an auxiliary-loss scaling factor of 0.3."
+    basis: inferred
+    note: "Stated for SFT; the pretraining sections describe one recursively shared head trained at recursive steps k with hidden-state mixing (§2.1) but give no step count for Super. Nemotron 3 Super Base trained 2 shared-weight MTP steps."
+  mtp.modules:
+    value: 1
+    source: report
+    at: "PDF page 4; §2.1"
+    quote: "we initialize the MTP parameters exclusively from the first MTP head and discard the second."
+    note: "Config num_nextn_predict_layers 1; mtp_layers_block_type [attention, moe]."
+  mtp.block:
+    value: "next-token embedding and hidden state each normed (enorm, hnorm), concatenated and projected 2×4096→4096 (eh_proj); then one GQA attention layer and one LatentMoE layer; final norm"
+    source: config
+    at: "config.json; llm_config.mtp_layers_block_type"
+    quote: '"mtp_layers_block_type": [ "attention", "moe" ]'
+    note: "Projection and norms from language_model.mtp.layers.0.{enorm,hnorm,eh_proj} and mtp.layers.1.final_layernorm in model.safetensors.index.json."
+  mtp.ffn:
+    value: "MoE"
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"language_model.mtp.layers.1.mixer.fc1_latent_proj.weight"'
+    note: "LatentMoE block with routed experts, latent projections and router bias, like the backbone MoE layers."
+  mtp.shares_embedding:
+    value: true
+    source: index
+    at: "model.safetensors.index.json; weight_map"
+    quote: '"language_model.lm_head.weight"'
+    basis: inferred
+    note: "The MTP tensors (language_model.mtp.*) contain no embedding or output head; the only ones are language_model.backbone.embeddings and language_model.lm_head."
+  mtp.loss_weight:
+    value: "0.1"
+    source: report
+    at: "PDF page 5; §2.2"
+    quote: "We used an MTP loss scaling factor of 0.1."
+    basis: inferred
+    note: "Stated in the Lightning 3.5 distillation paragraph; Super 3.5 'used the same distillation recipe as Lightning 3.5 Base' with the listed exceptions. The preceding 100B-token MTP warmup trains only the MTP head with the backbone frozen."
+  mtp.released: {value: true, source: index, at: "/weight_map | has language_model.mtp.layers.0.eh_proj"}
+
+  norm.eps: {value: 1.0e-5, source: config, at: "/llm_config/layer_norm_epsilon"}
+  norm.placement:
+    value: pre
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHBlock docstring"
+    quote: "Each block applies pre-normalization followed by the mixer, then adds a residual connection."
+    note: "Config residual_in_fp32 false."
+  norm.type:
+    value: RMSNorm
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHBlock.__init__"
+    quote: "self.norm = NemotronHRMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)"
+
+  ctx.extension:
+    value: "1M-context CPT at constant LR 4.5e-6 for 35B tokens (Nemotron 3 Ultra long-context blend) after Indic CPT; 65.4B-token mid-training at 256K dropped RULER-1M from 79.9 to 33.5, so a 9B-token 1M recovery stage with the same recipe followed (RULER-1M 81.0)"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "So we added a short long-context recovery phase after mid-training, for which we trained 9B tokens with the same recipe and successfully recovered the RULER score to 81.0."
+  ctx.final:
+    value: 1_048_576
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "we performed continued pretraining (CPT) at 1M-token context length to equip the base model with long-context ability."
+  ctx.max:
+    value: 1_048_576
+    source: card
+    at: "README.md; Input"
+    quote: "Maximum context length up to 1M tokens."
+    note: "Config llm_config max_position_embeddings is 262144; NoPE layers do not read it."
+
+  train.init:
+    value: "Backbone from Nemotron 3 Super Base; MTP head from the first of Nemotron 3 Super Base's two MTP heads (pre-long-context checkpoint), second discarded; C-RADIO vision encoder and connector added after text pretraining"
+    source: report
+    at: "PDF pages 4-5; §2.1, §2.2"
+    quote: "We initialized Super 3.5 Base from Super 3 Base (NVIDIA, 2026b) and Lightning 3.5 Base from Nano 3 Base (NVIDIA, 2025c), then distilled each model for 1 trillion tokens."
+  train.objective:
+    value: "Logit distillation from Nemotron 3 Ultra Base: top-128 teacher logits plus a sink token for residual mass, Skew Reverse KL (α = 0.1) combined with cross-entropy (0.9 / 0.1)"
+    source: report
+    at: "PDF page 5; §2.2"
+    quote: "with Ultra 3 Base as the teacher and Skew Reverse KL divergence (Ko et al., 2024) as the distillation loss function with 𝛼 = 0.1."
+    note: "Top-128 logits, sink token and the 0.9/0.1 KL/CE weighting are stated for Lightning 3.5, whose recipe Super 3.5 reuses. Mid-training masks tool responses in agent traces from the loss (§2.5)."
+  train.data:
+    value: "Distillation 1T tokens (recipe of Lightning 3.5, which used Nemotron 3 Ultra phase-2 data); Indic CPT 100B tokens: 10% synthetic (Gemma-4-31B-it translations of Nemotron-CC) + natural Indic text, 90% preceding mixture; long-context CPT on the Nemotron 3 Ultra LC blend; agentic mid-training: issue–PR 41%, repositories 20%, agentic traces 10%, commit diffs 3%, build/CI logs 1%, phase-2 pretraining replay 20%, long-context data 5%"
+    source: report
+    at: "PDF pages 5-6, 9-10; §2.2, §2.3, §2.4, §2.5 Table 4"
+    quote: "Super’s Indic continued-pretraining run has a nominal 100B-token budget, with 10% (10B tokens)"
+  train.cutoff:
+    value: "December 2025"
+    source: card
+    at: "README.md; Training Datasets"
+    quote: "Foundation Data Collection Period: 2013 to December 2025"
+    note: "Card's collection period for the foundation corpus, not phrased as a cutoff."
+  train.hardware:
+    value: "GB300"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "We used 16-way context parallelism, 8-way tensor parallelism, and 64-way expert parallelism to train on GB300 GPUs."
+    note: "Stated only for the long-context phase."
+  train.accelerators:
+    value: "GB300"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "We used 16-way context parallelism, 8-way tensor parallelism, and 64-way expert parallelism to train on GB300 GPUs."
+    note: "Stated only for the long-context phase; count not stated."
+  train.parallelism:
+    value: "TP8 · EP64 · CP16"
+    source: report
+    at: "PDF page 9; §2.4"
+    quote: "We used 16-way context parallelism, 8-way tensor parallelism, and 64-way expert parallelism to train on GB300 GPUs."
+    note: "Stated only for the 1M long-context phase."
+  train.lr_peak:
+    value: 4.5e-5
+    source: report
+    at: "PDF page 5; §2.2"
+    quote: "but with Super 3 Base LRs as the anchor, using 4.5 × 10−6 as the minimum and 4.5 × 10−5 as the maximum."
+    note: "Peak of the 1T-token distillation stage. Nemotron 3 Super Base, from which it starts, was pretrained with peak 4.5e-4."
+  train.lr_min:
+    value: 4.5e-6
+    source: report
+    at: "PDF page 5; §2.2"
+    quote: "but with Super 3 Base LRs as the anchor, using 4.5 × 10−6 as the minimum and 4.5 × 10−5 as the maximum."
+    note: "End of the distillation decay; the long-context CPT also runs at constant 4.5e-6 (§2.4). Mid-training resets to 1e-5."
+  train.schedule:
+    value: "Distillation: linear ramp 4.5e-6 → 4.5e-5 over 200B tokens, linear decay back to 4.5e-6 over the remaining 800B; long-context CPT constant 4.5e-6; mid-training reset, linear warmup to 1e-5 then constant; Indic CPT LR not stated"
+    source: report
+    at: "PDF pages 5, 9-10; §2.2, §2.4, §2.5"
+    quote: "We then decayed the LR linearly back to 10−5 over the remaining 800 billion tokens."
+    basis: inferred
+    note: "Ramp and decay shape are stated for Lightning 3.5 (10^-5 → 10^-4 → 10^-5); Super 3.5 'chose learning rates the same way' with 4.5e-6 / 4.5e-5 anchors."
+  train.warmup:
+    value: "200B tokens"
+    source: report
+    at: "PDF page 5; §2.2"
+    quote: "ramped it up slowly to 10−4, 10% of the Nano 3 Base’s peak LR, over 200 billion tokens."
+    basis: inferred
+    note: "Distillation ramp stated for Lightning 3.5; Super 3.5 chose learning rates the same way. Mid-training warmup length not stated."
+  train.tokens:
+    value: 1_209_400_000_000
+    source: report
+    at: "PDF pages 1-2; §1"
+    quote: "followed by 65.4 billion tokens of agentic"
+    basis: inferred
+    note: "Sum of backbone-training stages in train.stages: 1T distillation + 100B Indic CPT + 35B long-context + 65.4B mid-training + 9B recovery. Excludes the 100B-token MTP warmup (backbone frozen) and the 25T-token Nemotron 3 Super Base pretraining it continues from."
+  train.stages:
+    value:
+      - name: mtp-warmup
+        tokens: 100_000_000_000
+        note: "MTP head only, backbone frozen; hidden-state mixing across recursive steps."
+        quote: "we conduct a dedicated MTP warmup phase for 100 B tokens, freezing the backbone parameters and optimizing only the MTP head."
+      - name: distillation
+        tokens: 1_000_000_000_000
+        lr: 4.5e-5
+        note: "Teacher Nemotron 3 Ultra Base; LR ramps 4.5e-6 → 4.5e-5 over 200B, decays linearly to 4.5e-6; lr is the peak."
+        quote: "then distilled each model for 1 trillion tokens."
+      - name: indic-cpt
+        tokens: 100_000_000_000
+        note: "10% Indic (synthetic + natural), 90% preceding mixture."
+        quote: "Super’s Indic continued-pretraining run has a nominal 100B-token budget"
+      - name: long-context
+        tokens: 35_000_000_000
+        seq_len: 1_048_576
+        lr: 4.5e-6
+        note: "Constant LR; CP16 · TP8 · EP64 on GB300."
+        quote: "The LC-Phase was trained for 21B tokens for Lightning and 35B tokens for Super."
+      - name: mid-training
+        tokens: 65_400_000_000
+        seq_len: 262_144
+        lr: 1.0e-5
+        note: "Agentic software-engineering blend; LR reset, linear warmup to 1e-5, then constant."
+        quote: "We mid-trained the long-context checkpoint for 65.4B tokens at a sequence length of 256K."
+      - name: long-context-recovery
+        tokens: 9_000_000_000
+        seq_len: 1_048_576
+        lr: 4.5e-6
+        note: "Same recipe as the long-context phase; restores RULER-1M from 33.5 to 81.0."
+        quote: "for which we trained 9B tokens with the same recipe"
+    source: report
+    at: "PDF pages 4-10; §2.1-2.5"
+
+  scaling.hp_rule:
+    value: "Distillation LRs anchored to Nemotron 3 Super Base: its final LR (4.5e-6) as minimum and 10% of its peak (4.5e-5) as maximum, to limit early drift from the initialization"
+    source: report
+    at: "PDF page 5; §2.2"
+    quote: "We chose learning rates the same way as Lightning 3.5 Base, but with Super 3 Base LRs as the anchor"

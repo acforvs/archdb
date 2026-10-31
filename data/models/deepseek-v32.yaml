@@ -137,6 +137,10 @@ facts:
     at: "inference/model.py lines 498–545; MLA.__init__"
     quote: "self.indexer = Indexer(args)"
     note: "Every MLA layer builds a lightning indexer; 61 layers per /num_hidden_layers."
+    sequence: [DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA]
   attn.q_lora_rank: {value: 1536, source: config, at: "/q_lora_rank"}
   attn.rope_dim: {value: 64, source: config, at: "/qk_rope_head_dim"}
   attn.rope_theta:

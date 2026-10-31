@@ -1,7 +1,11 @@
-import { MIXER_LABEL, type Mixer, type Stack } from "./layers";
+import { MIXER_LABEL, type Kind, type Mixer, type Stack } from "./layers";
 
 export { layerStack } from "./layers";
-export type { Mixer } from "./layers";
+export type { Kind, Mixer } from "./layers";
+
+/** Paler bars for more compressed caches; hollow bars for layers that read another layer's KV cache. */
+const typeVariant = (type: string) =>
+  type.includes("shared KV") ? " shared-kv" : type.startsWith("HCA") || type.startsWith("CSA2 m=1") ? " compressed-variant" : "";
 
 /** Layer counts and diagram ordering. */
 function describe(s: Stack): string {
@@ -27,9 +31,9 @@ export function LayerStrip({ stack, unit = 4, height = 18, title }: {
       </span>
     );
   }
-  const bars: { x: number; k: Mixer; type: string }[] = [];
+  const bars: { x: number; k: Kind; type: string }[] = [];
   let x = 0;
-  stack.layers.forEach((k, i) => {
+  stack.kinds.forEach((k, i) => {
     bars.push({ x, k, type: stack.types[i] });
     x += unit;
   });
@@ -38,10 +42,10 @@ export function LayerStrip({ stack, unit = 4, height = 18, title }: {
     <svg className="strip" width={x} height={height} viewBox={`0 0 ${x} ${height}`}
       role="img" aria-label={description}>
       <title>{description}</title>
-      {/* Taller bars make global-attention positions visible without relying on color. */}
+      {/* Taller bars mark layers whose KV cache covers the full context (full or sparse), without relying on color. */}
       {bars.map((b, i) => {
-        const variant = b.type.startsWith("HCA") || b.type.startsWith("CSA2 m=1") ? " compressed-variant" : "";
-        const h = b.k === "global" ? height : Math.round(height * 0.55);
+        const variant = typeVariant(b.type);
+        const h = b.k === "global" || b.k === "sparse" ? height : Math.round(height * 0.55);
         return <rect key={i} x={b.x} y={height - h} width={w} height={h} className={`l-${b.k}${variant}`} data-layer-type={b.type}>
           <title>Token mixer {i + 1}: {b.type}</title>
         </rect>;
@@ -55,15 +59,15 @@ export function LayerTypeLegend({ stack }: { stack: Stack }) {
   const types = [...new Set(stack.types)];
   return <span className="strip-legend">{types.map((type) => {
     const i = stack.types.indexOf(type);
-    const variant = type.startsWith("HCA") || type.startsWith("CSA2 m=1") ? " compressed-variant" : "";
-    return <span key={type}><i className={`l-${stack.layers[i]}${variant}`} />{type}</span>;
+    const variant = typeVariant(type);
+    return <span key={type}><i className={`l-${stack.kinds[i]}${variant}`} />{type}</span>;
   })}</span>;
 }
 
-export function StripLegend({ kinds }: { kinds?: Mixer[] }) {
+export function StripLegend({ kinds }: { kinds?: Kind[] }) {
   return (
     <span className="strip-legend">
-      {(kinds ?? (["global", "swa", "linear"] as Mixer[])).map((k) => (
+      {(kinds ?? (["global", "sparse", "swa", "linear"] as Kind[])).map((k) => (
         <span key={k}><i className={`l-${k}`} />{MIXER_LABEL[k]}</span>
       ))}
     </span>

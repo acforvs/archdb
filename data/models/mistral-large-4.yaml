@@ -1,0 +1,359 @@
+name: Mistral-Large-4-1T-A52B
+org: Mistral AI
+kind: reasoning
+note: "No base checkpoint is public; facts describe the released post-trained checkpoint (the 2026-10-29 open-weight release, which followed further RL after the 2026-10-06 API preview). The checkpoint also ships a DSpark speculative-decoding draft head (mtp_dspark.*), which is not an MTP module."
+
+sources:
+  card: {url: https://huggingface.co/mistralai/Mistral-Large-4-1T-A52B/resolve/f12dabdc0c1e99e7f7924461a6f308859b05af4d/README.md, kind: model-card}
+  config: {url: https://huggingface.co/mistralai/Mistral-Large-4-1T-A52B/resolve/f12dabdc0c1e99e7f7924461a6f308859b05af4d/config.json, kind: config}
+  params: {url: https://huggingface.co/mistralai/Mistral-Large-4-1T-A52B/resolve/f12dabdc0c1e99e7f7924461a6f308859b05af4d/params.json, kind: config}
+  index: {url: https://huggingface.co/mistralai/Mistral-Large-4-1T-A52B/resolve/f12dabdc0c1e99e7f7924461a6f308859b05af4d/consolidated.safetensors.index.json, kind: config}
+  tokenizer: {url: https://huggingface.co/mistralai/Mistral-Large-4-1T-A52B/resolve/f12dabdc0c1e99e7f7924461a6f308859b05af4d/tekken.json, kind: code}
+  blog: {url: https://web.archive.org/web/20261030162058/https://mistral.ai/news/mistral-large-4-oss/, kind: blog}
+  docs: {url: https://web.archive.org/web/20261028150002/https://docs.mistral.ai/models/mistral-large-4-0, kind: blog}
+  hf_blog: {url: https://web.archive.org/web/20261030071059/https://huggingface.co/blog/mistral-large4, kind: blog}
+  data_summary: {url: "https://web.archive.org/web/20261007201501id_/https://legal.mistral.ai/documents/Mistral%20Large%204%20-%20Public%20Summary%20of%20Training%20Content.pdf", kind: paper}
+  modeling: {url: https://raw.githubusercontent.com/huggingface/transformers/b5e1cb8b015b6e17162a3efb9fc43dc6bf454612/src/transformers/models/mistral_large4/modeling_mistral_large4.py, kind: code}
+
+# Searched: model card and LICENSE (f12dabd), config.json, params.json, safetensors index, release blog (2026-10-29),
+# preview blog (2026-10-06), Mistral docs model page, HF blog, AI-governance page, Technical Documentation for
+# Downstream Providers and Public Summary of Training Content (both v1, 2026-10-06). The release blog says a
+# technical report is "coming soon"; none is public. Modeling code: transformers PR #50121 (commit b5e1cb8).
+not_disclosed: [moe.balancing, mtp.depth, ctx.pretrain, ctx.final, train.tokens, train.optimizer, train.lr_peak, train.lr_min, train.schedule, train.warmup, train.batch, train.weight_decay, train.betas, train.grad_clip, train.precision]
+
+config_unused:
+  num_key_value_heads: "MLA; equals num_attention_heads, so repeat_kv is the identity"
+  n_kv_heads: "params.json counterpart of num_key_value_heads (MLA, equals n_heads)"
+  n_group: "1: group-limited routing inactive (see moe.groups)"
+  topk_group: "1 of 1 group, no-op"
+  num_expert_groups: "params.json counterpart of n_group (1)"
+  num_expert_groups_per_tok: "params.json counterpart of topk_group (1)"
+  no_rope_layer_interval: "only used to build no_rope_layers when that list is absent; the config lists it explicitly"
+  transformers_weights: "loader metadata (index file name)"
+  match_nope: "not read by convert_mistral_large4_to_hf.py; the HF indexer follows each layer's no_rope_layers flag"
+  fp8_indexer: "inference indexer format; not pretraining precision"
+  fp8_kv_cache: "inference KV-cache format; scale layout not specified"
+  qscheme_act: "release FP8 quantization of the checkpoint, not pretraining precision"
+  qformat_weight: "release FP8 quantization of the checkpoint, not pretraining precision"
+  qdynamic_act: "release FP8 quantization of the checkpoint, not pretraining precision"
+  qscheme_weight: "release FP8 quantization of the checkpoint, not pretraining precision"
+  use_ue8m0_for_qscales: "release FP8 quantization of the checkpoint, not pretraining precision"
+  block_size_out: "release FP8 quantization block size (128)"
+  block_size_in: "release FP8 quantization block size (128)"
+  depth: "params.json /mtp/depth 3 describes the DSpark draft head (3-token draft block), not MTP; how it was trained is not stated"
+  ragged_attention: "DSpark draft head attention setting (params.json /mtp)"
+  target_activation_layers: "DSpark draft head: backbone layers whose activations feed the drafter"
+  norm_strategy: "DSpark draft head setting (eagle)"
+  markov_rank: "DSpark draft head (recurrent Markov head rank)"
+  head_type: "DSpark draft head (rnn)"
+  draft_input: "DSpark draft head setting"
+
+facts:
+  meta.released:
+    value: "2026-10-29"
+    source: blog
+    at: "Mistral Large 4 (Le Chonk) is now open weight; page JSON-LD datePublished"
+    quote: "\"datePublished\":\"2026-10-29T12:00:07.000Z\""
+    note: "Same post: \"Today, we're releasing the weights of this improved Mistral Large 4.\" The 2026-10-06 preview post (API only) said \"Weights drop end of this month\"; the EU technical documentation and AI-governance page date the model's placement on the market October 6, 2026."
+  meta.license:
+    value: "other (Mistral Ecosystem Open-Weight License)"
+    source: card
+    at: "README.md; License"
+    quote: "This model is licensed under the [Mistral Ecosystem Open-Weight License](https://huggingface.co/mistralai/Mistral-Large-4-1T-A52B/blob/main/LICENSE)."
+    note: "Card front matter: license: other. LICENSE calls it a modified MIT license; Model-as-a-Service operators need a separate commercial license."
+  meta.modality:
+    value: "text + image"
+    source: card
+    at: "README.md; Key Features"
+    quote: "Multimodal input: accepts text and image input, with text output."
+
+  params.total:
+    value: 1_050_000_000_000
+    source: docs
+    at: "Mistral Docs; Models, Mistral Large 4"
+    quote: "It features 52B active parameters and 1.05T total parameters, and a 1.6B vision encoder."
+    note: "The card and blogs round to 1 trillion (\"~1T total\")."
+  params.active:
+    value: 52_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "with 49 billion active parameters per token (52 billion including embeddings and output layers)"
+    note: "Repository name A52B; the docs page also gives 52B. The preview post and HF blog quote 49B."
+  params.active_non_embedding:
+    value: 49_000_000_000
+    source: card
+    at: "README.md; intro"
+    quote: "with 49 billion active parameters per token (52 billion including embeddings and output layers)"
+  params.note:
+    value: "Card: 49B active without and 52B with embeddings and output layers. Docs: 1.05T total \"and a 1.6B vision encoder\"; whether the total includes the vision encoder or the DSpark draft head is not stated."
+    source: docs
+    at: "Mistral Docs; Models, Mistral Large 4"
+    quote: "It features 52B active parameters and 1.05T total parameters, and a 1.6B vision encoder."
+
+  shape.d_model:
+    value: 6144
+    source: config
+    at: "/text_config/hidden_size"
+    note: "params.json /dim is also 6144."
+  shape.layers:
+    value: 72
+    source: config
+    at: "/text_config/num_hidden_layers"
+    note: "params.json /n_layers is also 72; the 3 DSpark draft layers (params.json /mtp/n_layers) are separate."
+  shape.tied_embeddings: {value: false, source: config, at: "/text_config/tie_word_embeddings"}
+  shape.vocab:
+    value: 204_800
+    source: config
+    at: "/text_config/vocab_size"
+    note: "params.json /vocab_size is also 204800."
+  shape.tokenizer:
+    value: "Tekken v15 (tekken.json), 204,800 tokens including 1,000 special tokens"
+    source: tokenizer
+    at: "tekken.json; config"
+    quote: "\"num_vocab_tokens\": 204800, \"default_vocab_size\": 204800, \"default_num_special_tokens\": 1000, \"version\": \"v15\""
+
+  attn.kind:
+    value: "MLA, DSA"
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextAttention docstring"
+    quote: "DSA attention from GlmMoeDsa, with no Q-LoRA and KV sharing."
+    note: "HF blog: attention blocks combine Multi-head Latent Attention (MLA) with a DeepSeek Sparse Attention (DSA) indexer."
+  attn.layout:
+    value: "72 DSA; layers 39, 43, …, 71 reuse layer 35's KV cache"
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextAttention docstring"
+    quote: "DSA attention from GlmMoeDsa, with no Q-LoRA and KV sharing."
+    note: "Uniform: /text_config/layer_types | count indexed_attention = 72 = /text_config/num_hidden_layers. Every layer is MLA with DSA top-k selection; 44 layers run their own indexer and 28 reuse the previous indexer layer's top-k (attn.sparse). Every 4th layer is NoPE (attn.position); /text_config/kv_source_layers points layers 39, 43, …, 71 at layer 35, so they own no KV cache (attn.kv_sharing)."
+    sequence: [DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, "DSA (shared KV)", DSA, DSA, DSA, "DSA (shared KV)", DSA, DSA, DSA, "DSA (shared KV)",
+      DSA, DSA, DSA, "DSA (shared KV)", DSA, DSA, DSA, "DSA (shared KV)", DSA, DSA, DSA, "DSA (shared KV)",
+      DSA, DSA, DSA, "DSA (shared KV)", DSA, DSA, DSA, "DSA (shared KV)", DSA, DSA, DSA, "DSA (shared KV)"]
+  attn.global_layers:
+    value: 72
+    source: config
+    at: "/text_config/layer_types | count indexed_attention"
+    note: "Every block is MLA with DSA top-k selection; no sliding window is configured."
+  attn.heads:
+    value: 64
+    source: config
+    at: "/text_config/num_attention_heads"
+    note: "params.json /n_heads is also 64."
+  attn.head_dim:
+    value: 128
+    source: config
+    at: "/text_config/qk_nope_head_dim + /text_config/qk_rope_head_dim"
+    note: "64 nope + 64 rope (= /text_config/qk_head_dim and params.json /head_dim). Config /text_config/head_dim (64) is reset to qk_rope_head_dim in __post_init__ and is not the attention head size. NoPE layers use all 128 dims unrotated."
+  attn.v_head_dim: {value: 128, source: config, at: "/text_config/v_head_dim"}
+  attn.kv_lora_rank: {value: 512, source: config, at: "/text_config/kv_lora_rank"}
+  attn.q_lora_rank:
+    value: 0
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextAttention.__init__"
+    quote: "self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.qk_head_dim, bias=False)"
+    note: "Full-rank query projection; params.json q_lora_rank is null."
+  attn.rope_dim:
+    value: 64
+    source: config
+    at: "/text_config/qk_rope_head_dim"
+    note: "In the 18 NoPE layers the decoupled RoPE key is dropped (qk_rope_head_dim 0) and kv_a_proj outputs only the 512-dim latent."
+  attn.rope_theta:
+    value: 10000
+    source: config
+    at: "/text_config/rope_parameters/rope_theta"
+    note: "Base of the RoPE layers; LeRoPE multiplies each inverse frequency by a learned exp(alpha) (checkpoint tensor lerope.alpha)."
+  attn.position:
+    value: "mixed: partial RoPE (MLA decoupled, interleaved, LeRoPE, 64 of 128 QK dims) in 54 layers, NoPE in 18 (every 4th)"
+    source: hf_blog
+    at: "HF blog; Architecture"
+    quote: "For each decoder block, there's a 3:1 RoPE to NoPE pattern, i.e. 3 decoder layers employ RoPE and every fourth layer uses NoPE."
+    note: "Config /text_config/no_rope_layers is 0 at layers 3, 7, …, 71 (params.json /nope \"rope,rope,rope,nope\"). modeling_mistral_large4.py MistralLarge4TextAttention.forward: \"Apply LeRoPE to the queries and the keys, except if this is a no_rope layer\" (interleaved rotation; params.json /lerope true)."
+  attn.qk_norm:
+    value: false
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextAttention.forward"
+    quote: "q_states = self.q_proj(hidden_states).view(query_shape).transpose(1, 2)"
+    note: "RMSNorm only on the KV latent (kv_a_layernorm); queries and per-head keys are not normalized. The DSA indexer LayerNorms its key."
+  attn.scale:
+    value: "learned per-head query scaling × (s_h·ln(pos+1) + b_h) (SSMax-style), in attention and the DSA indexer"
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextSoftmaxScaling.forward"
+    quote: "log_pos = (position_ids + 1).float().log()"
+    note: "params.json /ssmax_scaling and /dsa/ssmax_scaling are true; checkpoint tensors attention.ssmax_scaling.{s,b} in all 72 layers. Softmax scale stays 1/sqrt(128): /text_config/rope_parameters has no mscale_all_dim."
+  attn.bias:
+    value: false
+    source: config
+    at: "/text_config/attention_bias"
+    note: "Read for kv_a_proj_with_mqa and o_proj; q_proj and kv_b_proj are bias-free."
+  attn.sparse:
+    value: "DSA indexer (32 heads × 128, top-2048); 44 layers run their own indexer, 28 reuse the previous indexer layer's top-k"
+    source: config
+    at: "config.json; text_config.index_topk"
+    quote: "\"index_topk\": 2048,"
+    note: "/text_config/index_n_heads 32, /text_config/index_head_dim 128 (params.json /dsa topk, n_heads, head_dim). /text_config/indexer_types (params.json /dsa/sharing): layers 0–16 \"full\", then alternating pairs of \"shared\" and \"full\" from 17. Indexer queries come from LayerNormed hidden states (no Q-LoRA), use the SSMax-style scaling, and rotate the first 64 dims (params.json /dsa/rope_head_dim) only in RoPE layers; indexer norm_eps 1e-6."
+  attn.indexer_dim:
+    value: 128
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextIndexer.__init__"
+    quote: "self.wk = nn.Linear(self.hidden_size, self.head_dim, bias=False)"
+    note: "One 128-dim key per token (LayerNorm k_norm), cached only on the 44 \"full\" indexer layers; see attn.kv_groups."
+  attn.kv_sharing:
+    value: "9 NoPE layers (39, 43, …, 71) reuse layer 35's latent KV cache and have no kv_a projection; the other 63 layers own caches"
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextAttention.__init__"
+    quote: "self.is_kv_shared_layer = config.kv_source_layers[layer_idx] != layer_idx"
+    note: "From /text_config/kv_source_layers (params.json /kv_sharing/source_layers_str); the safetensors index has wkv_a_with_mqa in 63 layers. HF blog: \"The model also shares KV state across layers.\""
+  attn.kv_groups:
+    value:
+      - name: MLA latent + RoPE key
+        layers: 54
+        elements: 576
+        tokens_per_entry: 1
+        note: "RoPE layers: kv_lora_rank 512 + qk_rope_head_dim 64."
+        quote: "kv_pass, k_rot = torch.split(compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1)"
+      - name: MLA latent (NoPE layers)
+        layers: 9
+        elements: 512
+        tokens_per_entry: 1
+        note: "NoPE cache owners 3, 7, …, 35; layers 39–71 (every 4th) read layer 35's cache."
+        quote: "self.qk_rope_head_dim = config.qk_rope_head_dim if self.use_rope else 0"
+      - name: DSA indexer key
+        layers: 44
+        elements: 128
+        tokens_per_entry: 1
+        note: "Only \"full\" indexer layers own an indexer; 28 \"shared\" layers reuse the previous top-k."
+        quote: "self.indexer = None if self.skip_topk else MistralLarge4TextIndexer(config, layer_idx)"
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextAttention.__init__, MistralLarge4TextAttention.forward"
+
+  ffn.activation:
+    value: SwiGLU
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextMLP.forward"
+    quote: "down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))"
+    note: "Config /text_config/hidden_act is silu; experts use the same gate × up form."
+  ffn.bias:
+    value: false
+    source: index
+    at: "/weight_map | has w1.bias"
+    note: "No FFN bias tensor in the dense, shared-expert or routed-expert weights; MistralLarge4TextMLP builds its projections with bias=False."
+  ffn.dim:
+    value: 24576
+    source: config
+    at: "/text_config/intermediate_size"
+    note: "Used only by the dense layer 0; params.json /hidden_dim is also 24576."
+
+  moe.dense_layers:
+    value: 1
+    source: config
+    at: "/text_config/mlp_layer_types | count dense"
+    note: "Layer 0; matches /text_config/first_k_dense_replace (params.json /moe/first_k_dense_replace 1, route_every_n 1). The code reads /mlp_layer_types."
+  moe.experts:
+    value: 128
+    source: config
+    at: "/text_config/n_routed_experts"
+    note: "params.json /moe/num_experts is also 128."
+  moe.top_k:
+    value: 4
+    source: config
+    at: "/text_config/num_experts_per_tok"
+    note: "params.json /moe/num_experts_per_tok is also 4."
+  moe.shared:
+    value: 1
+    source: config
+    at: "/text_config/n_shared_experts"
+    note: "params.json /moe/num_shared_experts is also 1."
+  moe.expert_dim:
+    value: 6144
+    source: config
+    at: "/text_config/moe_intermediate_size"
+    note: "params.json /moe/expert_hidden_dim is also 6144."
+  moe.shared_dim:
+    value: 6144
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextMoE.__init__"
+    quote: "config=config, intermediate_size=config.moe_intermediate_size * config.n_shared_experts"
+    basis: inferred
+    note: "moe_intermediate_size 6144 × n_shared_experts 1."
+  moe.router:
+    value: softmax
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextTopkRouter.forward"
+    quote: "scores = router_logits.softmax(-1)"
+    note: "Router logits computed in FP32; no score-correction bias tensor in the checkpoint."
+  moe.norm_topk:
+    value: true
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextTopkRouter.forward"
+    quote: "topk_weights /= denominator"
+    note: "Class docstring: norming of topk weights is always on."
+  moe.routed_scale:
+    value: 1.0
+    source: config
+    at: "/text_config/routed_scaling_factor"
+    note: "params.json /moe/routed_scale is also 1.0."
+  moe.groups:
+    value: "none"
+    source: config
+    at: "config.json; text_config.n_group, topk_group"
+    quote: "\"n_group\": 1,"
+    note: "/text_config/n_group = /text_config/topk_group = 1."
+
+  norm.type:
+    value: RMSNorm
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextDecoderLayer.__init__"
+    quote: "self.input_layernorm = MistralLarge4RMSNorm(config.hidden_size, eps=config.rms_norm_eps)"
+  norm.placement:
+    value: pre
+    source: modeling
+    at: "modeling_mistral_large4.py; MistralLarge4TextDecoderLayer.forward"
+    quote: "hidden_states = self.input_layernorm(hidden_states)"
+  norm.eps:
+    value: 1.0e-5
+    source: config
+    at: "/text_config/rms_norm_eps"
+    note: "params.json /norm_eps is also 1e-5."
+  norm.logit_softcap:
+    value: 30.0
+    source: params
+    at: "/softmax_tanh_gating"
+    note: "convert_mistral_large4_to_hf.py maps it to config /text_config/final_logit_softcapping (30.0); MistralLarge4ForConditionalGeneration applies tanh(logits / 30) × 30."
+
+  ctx.max:
+    value: 1_048_576
+    source: card
+    at: "README.md; Key Features"
+    quote: "1M context length, for long-context workloads."
+    note: "Config /text_config/max_position_embeddings (and params.json /max_position_embeddings) is 1048576."
+  ctx.extension:
+    value: "YaRN factor 2048 over original 512, with LeRoPE learned per-frequency multipliers (release config)"
+    source: config
+    at: "config.json; text_config.rope_parameters"
+    quote: "\"factor\": 2048, \"original_max_position_embeddings\": 512,"
+    note: "Training-time context stages are not disclosed; the transformers code comment \"YaRN over a 512-token pretraining window\" is not a Mistral statement. Same dict: rope_type yarn, beta_fast 32, beta_slow 1, attention_factor 1.0 (params.json /yarn: factor, original_max_position_embeddings, beta, alpha; apply_scale false). HF blog: LeRope is \"a YaRN-scaled RoPE with one learned multiplier per frequency\"."
+
+  train.hardware:
+    value: "3,800 NVIDIA Grace Blackwell GPUs in Mistral's own datacenters in Europe"
+    source: card
+    at: "README.md; intro"
+    quote: "trained from scratch on 3,800 NVIDIA Grace Blackwell GPUs in Mistral's own datacenters in Europe."
+  train.accelerators:
+    value: "3,800 Grace Blackwell"
+    source: card
+    at: "README.md; intro"
+    quote: "trained from scratch on 3,800 NVIDIA Grace Blackwell GPUs"
+    note: "The chip variant (GB200 or GB300) is not stated."
+  train.cutoff:
+    value: "September 2026"
+    source: data_summary
+    at: "§1.3 Latest date of data acquisition/collection"
+    quote: "The latest date of data collection was September 2026."
+    note: "§2.3 gives the crawl period as \"Up to July 2026\"."
+  train.data:
+    value: "multilingual text and images: Common Crawl and other public datasets, licensed and third-party datasets, synthetic data, user interaction data from Mistral products (subject to opt-out)"
+    source: data_summary
+    at: "§2.1 Publicly available datasets"
+    quote: "The datasets used to train the model include Common Crawl."
+    note: "§1.3 ticks \"More than 10 trillions tokens\" for text and \"1Million to1 billion images\"; §2.4 covers user data. The preview post says a significant share spans more than 160 languages."

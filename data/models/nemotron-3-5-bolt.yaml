@@ -1,0 +1,312 @@
+name: NVIDIA-Nemotron-3.5-Bolt-74B-A9B-BF16
+org: NVIDIA
+kind: reasoning
+note: "Post-trained vision-language checkpoint (vision-adapter training, SFT, RLHF and agentic RL, SLERP merges); no base checkpoint is public. The language backbone was not pretrained from scratch: it was compressed from Nemotron 3.5 Super VL 120B-A12B with Star Elastic (router-guided architecture search plus knowledge distillation from the frozen parent), which pruned routed experts and MoE intermediate channels per layer and cut top-k from 22 to 9 (report §2). Recipe facts (train.*, ctx.*) describe that 120B-token compression and distillation stage; the parent's foundation pretraining (card: more than 20T tokens) is not restated. Despite the nemotron_h_puzzle config class, the publisher names Star Elastic, not Puzzle, as the method. Because routed-expert count and width vary per MoE layer, moe.experts and moe.expert_dim store the per-layer maxima. This BF16 checkpoint precedes the 2-bit QAD of the 24GB variant."
+
+sources:
+  card: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-BF16/resolve/e09a4cedb1787db1760375ee5539f222cae0c672/README.md, kind: model-card}
+  config: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-BF16/resolve/e09a4cedb1787db1760375ee5539f222cae0c672/config.json, kind: config}
+  modeling_nemotron_h: {url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-BF16/resolve/e09a4cedb1787db1760375ee5539f222cae0c672/modeling_nemotron_h.py, kind: code}
+  report: {url: https://web.archive.org/web/20261016074445id_/https://research.nvidia.com/labs/nemotron/files/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-24GB-Technical-Report.pdf, kind: paper}
+  blog: {url: https://web.archive.org/web/20261029180508/https://research.nvidia.com/labs/nemotron/Nemotron-3.5-Bolt-24GB/, kind: blog}
+
+not_disclosed:
+  - params.active_non_embedding
+  - moe.balancing
+  - train.optimizer
+  - train.lr_peak
+  - train.lr_min
+  - train.schedule
+  - train.warmup
+  - train.weight_decay
+  - train.betas
+  - train.grad_clip
+  - train.precision
+
+config_unused:
+  _megatron_bridge_hf_prefix: "Megatron Bridge checkpoint-conversion metadata"
+  blockwise_members: "bookkeeping in NemotronHPuzzleConfig listing which keys block_configs sets per layer"
+  chunk_size: "Mamba-2 SSD scan chunk length, kernel tiling only"
+  expand: "not read by modeling_nemotron_h.py (the config argument is mamba_expand); Mamba inner width is mamba_num_heads × mamba_head_dim"
+  hidden_act: "not read by modeling_nemotron_h.py; NemotronHMLP uses mlp_hidden_act"
+  intermediate_size: "dense MLP width (the parent's 2688); layers_block_type has no dense (mlp) blocks"
+  num_experts: "not read by modeling_nemotron_h.py; the parent's 512, per-layer n_routed_experts come from block_configs"
+  num_local_experts: "not read by modeling_nemotron_h.py; the parent's 512, per-layer n_routed_experts come from block_configs"
+  norm_eps: "not read by modeling_nemotron_h.py; layer_norm_epsilon is used"
+  rms_norm_eps: "not read by modeling_nemotron_h.py; layer_norm_epsilon is used"
+  rescale_prenorm_residual: "initialization flag in _init_weights, not evidence of training init"
+  time_step_floor: "dt bias initialization range in _init_weights"
+  time_step_max: "dt bias initialization range in _init_weights"
+  time_step_min: "dt bias initialization range in _init_weights; also a dt floor in the torch fallback path only"
+  time_step_limit: "dt clamp of the Mamba kernel path; (0, inf) applies no clamp"
+  downsample_ratio: "vision pixel-shuffle ratio before the projector"
+  force_image_size: "vision preprocessing tile size"
+  norm_mean: "image normalization constants"
+  norm_std: "image normalization constants"
+  processor_class: "processor class name"
+  projector_hidden_size: "hidden width of the vision-to-language MLP projector"
+  ps_version: "pixel-shuffle implementation version for the vision path"
+  template: "chat/conversation template name"
+  vit_hidden_size: "C-RADIO vision encoder width"
+
+facts:
+  meta.released:
+    value: "2026-10-15"
+    source: blog
+    at: "research.nvidia.com Nemotron 3.5 Bolt 24GB page; header"
+    quote: "Published: October 15, 2026"
+    note: "Card Release Date line: Hugging Face 10/15/2026. The Hugging Face repository was created 2026-10-09; the report PDF is dated 15 October 2026."
+  meta.license:
+    value: "other (openmdw-1.1)"
+    source: card
+    at: "README.md; YAML front matter"
+    quote: "license_name: openmdw-1.1"
+  meta.modality:
+    value: "text + image + video"
+    source: card
+    at: "README.md; Input"
+    quote: "Input Type(s): Image, Video, Text"
+
+  params.total:
+    value: 74_000_000_000
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Number of model parameters: 74B Total / 9B Active"
+  params.active:
+    value: 9_000_000_000
+    source: card
+    at: "README.md; Model Architecture"
+    quote: "Number of model parameters: 74B Total / 9B Active"
+  params.note:
+    value: "Rounded publisher figures; scope (embeddings, vision encoder) not stated. No MTP module. The safetensors metadata lists 74.885B parameters including the C-RADIO v4-H vision encoder and projector."
+    source: card
+    at: "README.md; Model Summary"
+    quote: "Total Parameters 74B (9B active)"
+
+  shape.d_model: {value: 4096, source: config, at: "/llm_config/hidden_size"}
+  shape.layers:
+    value: 48
+    source: report
+    at: "PDF page 4; §2.2, Table 1"
+    quote: "40 / 40 / 8"
+    basis: inferred
+    note: "One block per token mixer: 40 Mamba-2 + 8 attention (config /llm_config/layers_block_type, 88 entries). 40 blocks are followed by a MoE FFN; the 8 Mamba-2 layers right before each attention layer have none. Same block order as Nemotron 3 Super."
+  shape.tied_embeddings: {value: false, source: config, at: "/llm_config/tie_word_embeddings"}
+  shape.vocab: {value: 131_072, source: config, at: "/llm_config/vocab_size"}
+
+  attn.kind:
+    value: "GQA, Mamba-2"
+    source: card
+    at: "README.md; Model Summary, Architecture"
+    quote: "Mamba-2–Transformer hybrid LatentMoE with a C-RADIO v4-H vision encoder"
+    note: "Attention is GQA with 32 query and 2 KV heads (config num_attention_heads, num_key_value_heads)."
+  attn.layout:
+    value: 40 Mamba-2 + 8 GQA
+    source: config
+    at: config.json; /llm_config/layers_block_type
+    quote: '"layers_block_type": [ "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe",
+      "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe",
+      "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe",
+      "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba",
+      "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba",
+      "moe", "mamba", "moe", "mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "mamba", "moe", "mamba",
+      "moe", "mamba", "moe" ]'
+    basis: inferred
+    note: 'Irregular: Mamba-2 runs before, between and after the 8 attention layers are 4, 4, 4, 5, 5, 5, 5, 4, 4.
+      The same list is the block_type sequence of /llm_config/block_configs. Standalone moe blocks are omitted, matching
+      shape.layers.'
+    sequence: [Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2,
+      Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2,
+      Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2, Mamba-2, GQA, Mamba-2, Mamba-2, Mamba-2,
+      Mamba-2]
+  attn.global_layers: {value: 8, source: config, at: "/llm_config/layers_block_type | count attention"}
+  attn.linear_layers: {value: 40, source: config, at: "/llm_config/layers_block_type | count mamba"}
+  attn.heads: {value: 32, source: config, at: "/llm_config/num_attention_heads"}
+  attn.kv_heads: {value: 2, source: config, at: "/llm_config/num_key_value_heads"}
+  attn.head_dim: {value: 128, source: config, at: "/llm_config/head_dim"}
+  attn.bias: {value: false, source: config, at: "/llm_config/attention_bias"}
+  attn.position:
+    value: NoPE
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHAttention.forward"
+    quote: "query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)"
+    note: "No rotary embedding is applied to q or k, and the config has no rope_theta. Config max_position_embeddings (262144) is stored but not used for positions."
+  attn.qk_norm:
+    value: false
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHAttention.forward"
+    quote: "query_states = self.q_proj(hidden_states) key_states = self.k_proj(hidden_states) value_states = self.v_proj(hidden_states)"
+    note: "No norm between the projections and attention; config use_qk_norm is false."
+  attn.linear_kind:
+    value: "Mamba-2: 128 heads × head dim 64, state 128, 8 groups, conv kernel 4"
+    source: report
+    at: "PDF page 4; §2.2"
+    quote: "The compressed model retains the parent's Mamba, MoE, and attention layers and all dimensions outside the routed experts"
+    note: "Values from config /llm_config: mamba_num_heads 128, mamba_head_dim 64, ssm_state_size 128, n_groups 8, conv_kernel 4 (use_conv_bias true); mamba_hidden_act silu; no projection bias (use_bias, mamba_proj_bias false)."
+  attn.linear_heads: {value: 128, source: config, at: "/llm_config/mamba_num_heads"}
+  attn.linear_head_dim: {value: 64, source: config, at: "/llm_config/mamba_head_dim"}
+  attn.conv: {value: 4, source: config, at: "/llm_config/conv_kernel"}
+
+  ffn.activation:
+    value: "ReLU²"
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHMLP.forward"
+    quote: "return self.down_proj(self.act_fn(self.up_proj(x)))"
+    note: "Not gated (up → act → down); act_fn = ACT2FN[mlp_hidden_act] with config mlp_hidden_act relu2, for routed and shared experts."
+  ffn.bias: {value: false, source: config, at: "/llm_config/mlp_bias"}
+
+  moe.experts:
+    value: 496
+    source: report
+    at: "PDF page 4; §2.2, Table 1"
+    quote: "∈ {240, 304, 368, 432, 496}"
+    basis: inferred
+    note: "Per-layer maximum; the count varies by MoE layer (config /llm_config/block_configs n_routed_experts): 240 in 12 layers, 304 in 6, 368 in 9, 432 in 10, 496 in 3; 13,824 routed experts in total (mean 345.6). Parent: 512 in every layer."
+  moe.expert_dim:
+    value: 2560
+    source: report
+    at: "PDF page 4; §2.2, Table 1"
+    quote: "∈ {1536, 2048, 2304, 2560}"
+    basis: inferred
+    note: "Per-layer maximum; experts within a layer share one width, which varies by layer (block_configs moe_intermediate_size): 1536 in 1 layer, 2048 in 11, 2304 in 15, 2560 in 13. Experts map the 1024-wide latent to this width and back (LatentMoE). Parent: 2688."
+  moe.top_k:
+    value: 9
+    source: config
+    at: "/llm_config/block_configs/1/num_experts_per_tok"
+    note: "All 40 MoE entries of block_configs set num_experts_per_tok 9; the parent uses 22 (report §2.3)."
+  moe.shared: {value: 1, source: config, at: "/llm_config/n_shared_experts"}
+  moe.shared_dim: {value: 5376, source: config, at: "/llm_config/moe_shared_expert_intermediate_size"}
+  moe.latent_dim:
+    value: 1024
+    source: config
+    at: "/llm_config/moe_latent_size"
+    note: "fc1_latent_proj (4096→1024) and fc2_latent_proj (1024→4096) wrap the routed experts; router and shared expert act on the 4096-wide hidden state (NemotronHMoE.forward)."
+  moe.dense_layers: {value: 0, source: config, at: "/llm_config/layers_block_type | count mlp"}
+  moe.router:
+    value: sigmoid
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHTopkRouter.forward"
+    quote: "scores = router_logits.sigmoid()"
+    note: "Config scoring_func sigmoid. Expert-selection bias e_score_correction_bias is added for top-k choice only; n_group = topk_group = 1 (no group-limited routing)."
+  moe.norm_topk: {value: true, source: config, at: "/llm_config/norm_topk_prob"}
+  moe.routed_scale: {value: 5.0, source: config, at: "/llm_config/routed_scaling_factor"}
+
+  mtp.depth:
+    value: 0
+    source: config
+    at: "/llm_config/num_nextn_predict_layers"
+    basis: inferred
+    note: "No MTP block: mtp_block_configs is empty and model.safetensors.index.json has no mtp.* tensors. The compression stage does not mention MTP. Speculative decoding uses a separately trained LiLiCorr drafter (report §6), which is not an MTP head."
+
+  norm.type:
+    value: RMSNorm
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHBlock.__init__"
+    quote: "self.norm = NemotronHRMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)"
+  norm.placement:
+    value: pre
+    source: modeling_nemotron_h
+    at: "modeling_nemotron_h.py; NemotronHBlock docstring"
+    quote: "Each block applies pre-normalization followed by the mixer, then adds a residual connection."
+  norm.eps: {value: 1.0e-5, source: config, at: "/llm_config/layer_norm_epsilon"}
+
+  ctx.pretrain:
+    value: 8192
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "Architecture search runs at 8K context, with the router converging during the first 8B tokens."
+    note: "Compression and distillation stage; 72B of the 120B tokens run at 8K."
+  ctx.final:
+    value: 131_072
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "A further 48B tokens at 128K brings the total to 120B tokens."
+  ctx.max:
+    value: 262_144
+    source: card
+    at: "README.md; Input"
+    quote: "Maximum context length up to 256K tokens."
+    note: "Config /llm_config/max_position_embeddings is 262144; NoPE layers do not read it."
+  ctx.extension:
+    value: "Distillation recovery continued at 128K for 48B tokens after 72B tokens at 8K; no RoPE to rescale (NoPE)"
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "Following Star Elastic's schedule, we perform most recovery at 8K, where it proceeds faster, before extending to long contexts."
+
+  train.tokens:
+    value: 120_000_000_000
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "A further 48B tokens at 128K brings the total to 120B tokens."
+    note: "Compression (architecture search plus distillation recovery) only. Excludes the parent's foundation pretraining (card: more than 20T tokens) and post-training. The card's Bolt Training section gives a training data size of 80B tokens, which conflicts with the 120B here."
+  train.stages:
+    value:
+      - name: architecture search
+        tokens: 8_000_000_000
+        seq_len: 8192
+        batch_sequences: 2048
+        note: "Router and student trained jointly with KD plus budget loss until the router converges."
+        quote: "Architecture search runs at 8K context, with the router converging during the first 8B tokens."
+      - name: short-context recovery
+        tokens: 64_000_000_000
+        seq_len: 8192
+        batch_sequences: 2048
+        note: "Architecture fixed; KD continues."
+        quote: "We then fix the architecture and continue distillation for another 64B tokens at 8K"
+      - name: long-context recovery
+        tokens: 48_000_000_000
+        seq_len: 131_072
+        batch_sequences: 128
+        quote: "A further 48B tokens at 128K brings the total to 120B tokens."
+    source: report
+    at: "PDF page 6; §2.3"
+  train.batch:
+    value: "2,048 × 8,192 at 8K; 128 × 131,072 at 128K (16.8M tokens in both)"
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "The global batch size was 2,048 sequences at 8K and 128 sequences at 128K, giving approximately 16.8M tokens per batch in both settings."
+  train.batch_tokens:
+    value: 16_777_216
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "The global batch size was 2,048 sequences at 8K and 128 sequences at 128K"
+    basis: inferred
+    note: "2,048 × 8,192 = 128 × 131,072 = 16,777,216; no batch ramp stated."
+  train.init:
+    value: "Nemotron 3.5 Super VL 120B-A12B checkpoint with routed experts sorted by REAP scores and MoE intermediate channels by Star Elastic importance (estimated on 8M tokens), then pruned with Gumbel-softmax-weighted nested prefix masks chosen per layer by a budget-conditioned router"
+    source: report
+    at: "PDF pages 1, 3; §1, §2.1"
+    quote: "We begin from a Nemotron 3.5 Super VL 120B A12B model checkpoint and use Star Elastic"
+    note: "Sorting: 'we sort the routed experts and MoE intermediate channels in each MoE layer in descending order using the scoring mechanisms described in REAP (Lasby et al., 2026) and Star Elastic' (p.3 §2.1); importance calibration on 8M tokens (p.6 §2.3). Hidden size, latent, shared expert, Mamba and attention dimensions are kept (Table 1)."
+  train.objective:
+    value: "Knowledge distillation from the frozen parent (token-level KL on next-token distributions) for the student weights, plus a router budget loss (λ = 1, tolerance 0.05) on the architecture router only"
+    source: report
+    at: "PDF page 3; §2.1"
+    quote: "We use the frozen parent checkpoint as teacher T and minimize the token-level KL divergence between its next-token distribution and the student's."
+    note: "Budget target derived from a <24 GB footprint at batch 1 and 128K context after quantization (§2.3). Architecture router LR 5e-3 (§2.3); the student-weight LR is not stated."
+  train.data:
+    value: "70% Nemotron 3.5 Super VL SFT data, 30% Nemotron Ultra-v3 pretraining data"
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "we use a blend of 70% SFT data used to train the Nemotron 3.5 Super VL parent and 30% Nemotron Ultra-v3 pretraining data."
+    note: "Used for calibration, search and recovery. The compression trains only the text tower (§4.1)."
+  train.cutoff:
+    value: "February 24, 2026"
+    source: card
+    at: "README.md; Training, Testing, and Evaluation Datasets, Bolt Training"
+    quote: "Time period for training data collection: 2013 to February 24, 2026"
+    note: "Bolt training data (compression and post-training). The parent's foundation corpus covers 2013 to December 2025; post-training data cutoff May 2026."
+  train.hardware:
+    value: "32 GB200 nodes (128 GPUs), about 64 hours as 16 consecutive four-hour jobs"
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "Training used 32 GB200 nodes (128 GPUs) for approximately 64 hours, across 16 consecutive four-hour jobs."
+    note: "Compression stage only."
+  train.accelerators:
+    value: "128 GB200"
+    source: report
+    at: "PDF page 6; §2.3"
+    quote: "Training used 32 GB200 nodes (128 GPUs)"
+    note: "Compression stage only."

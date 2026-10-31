@@ -108,6 +108,10 @@ facts:
     at: "modeling_glm_moe_dsa.py; GlmMoeDsaAttention.forward"
     quote: "# DSA: select this layer's top-k tokens, or reuse the previous full layer's on `\"shared\"` layers."
     note: "/indexer_types: 21 \"full\" layers (0, 1, 2, then every 4th from 6) and 57 \"shared\" layers."
+    sequence: [DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA,
+      DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA, DSA]
   attn.position:
     value: "partial RoPE (MLA decoupled, interleaved, 64 of 256 QK dims)"
     source: hf-transformers

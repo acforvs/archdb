@@ -16,7 +16,7 @@
   --warn: #8a5a00;
   --warn-soft: #f6ead0;
   --shadow: 0 1px 0 rgb(29 27 23 / 0.06), 0 10px 28px rgb(29 27 23 / 0.10);
-  --layer-global: #c4401c; --layer-swa: #b8860b; --layer-linear: #1479a0;
+  --layer-global: #c4401c; --layer-sparse: #7a4fa8; --layer-swa: #b8860b; --layer-linear: #1479a0;
   --series-1: #c4401c; --series-2: #1479a0; --series-3: #b8860b; --series-4: #7a4fa8; --series-5: #3f7d3a; --series-6: #c2477f; --series-off: #e8d3c6;
   --nd: #c9c2b2;
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Cambria Math", "STIX Two Math", "Noto Sans Math", sans-serif;
@@ -29,7 +29,7 @@
     --bg: #171611; --surface: #1d1c16; --surface-2: #26241d; --line: #34322a; --line-strong: #4f4b40; --ink-rule: #e9e4d6;
     --text: #ece7d9; --text-2: #c0b9a8; --muted: #959080; --accent: #ec7048; --accent-soft: #33221a; --accent-line: #6e3f2b;
     --warn: #e0a64a; --warn-soft: #2f2615; --shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.4);
-    --layer-global: #e0603a; --layer-swa: #b88a2a; --layer-linear: #3a98bd;
+    --layer-global: #e0603a; --layer-sparse: #9a7bd0; --layer-swa: #b88a2a; --layer-linear: #3a98bd;
     --series-1: #e0603a; --series-2: #3a98bd; --series-3: #b88a2a; --series-4: #9a7bd0; --series-5: #5a9a4e; --series-6: #d0679a; --series-off: #3d2c24;
     --nd: #4f4b40;
   }
@@ -39,7 +39,7 @@
   --bg: #171611; --surface: #1d1c16; --surface-2: #26241d; --line: #34322a; --line-strong: #4f4b40; --ink-rule: #e9e4d6;
   --text: #ece7d9; --text-2: #c0b9a8; --muted: #959080; --accent: #ec7048; --accent-soft: #33221a; --accent-line: #6e3f2b;
   --warn: #e0a64a; --warn-soft: #2f2615; --shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.4);
-  --layer-global: #e0603a; --layer-swa: #b88a2a; --layer-linear: #3a98bd;
+  --layer-global: #e0603a; --layer-sparse: #9a7bd0; --layer-swa: #b88a2a; --layer-linear: #3a98bd;
   --series-1: #e0603a; --series-2: #3a98bd; --series-3: #b88a2a; --series-4: #9a7bd0; --series-5: #5a9a4e; --series-6: #d0679a; --series-off: #3d2c24;
   --nd: #4f4b40;
 }
